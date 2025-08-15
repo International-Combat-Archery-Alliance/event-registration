@@ -1,0 +1,8 @@
+version = 0.1
+
+[default.build.parameters]
+hook_name = "terraform"
+terraform_project_root_path = "./infra"
+
+[default.local_invoke.parameters]
+hook_name = "terraform"

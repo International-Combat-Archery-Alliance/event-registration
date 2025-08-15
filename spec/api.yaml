@@ -1,0 +1,42 @@
+openapi: 3.0.0
+info:
+  title: ICAA Event Registration
+  version: 1.0.0
+  description: An API for managing events and signing up for events.
+servers:
+  - url: https://api.icaa.world/v1
+    description: Production server
+  - url: http://localhost:8080/v1
+    description: Local dev server
+paths:
+  /events:
+    get:
+      summary: Get all events
+      description: Retrieves a list of all events
+      responses:
+        '200':
+          description: A list of events.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+components:
+  schemas:
+    Event:
+      type: object
+      required:
+        - id
+        - name
+        - eventDateTime
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+        eventDateTime:
+          type: string
+          format: date-time
