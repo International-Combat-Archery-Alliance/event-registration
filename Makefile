@@ -10,4 +10,4 @@ build: armSupport
 .PHONY: local
 local: build
 	docker-compose up -d
-	sam local start-api
+	sam local start-api --docker-network icaa-event-registration 

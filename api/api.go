@@ -2,21 +2,25 @@
 package api
 
 import (
-	"context"
-	"time"
+	"log/slog"
 
-	"github.com/google/uuid"
-	openapi_types "github.com/oapi-codegen/runtime/types"
+	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 )
 
+type DB interface {
+	events.EventRepository
+}
+
 type API struct {
+	db     DB
+	logger *slog.Logger
 }
 
 var _ StrictServerInterface = (*API)(nil)
 
-func (a *API) GetEvents(ctx context.Context, request GetEventsRequestObject) (GetEventsResponseObject, error) {
-	var id openapi_types.UUID = uuid.New()
-	return GetEvents200JSONResponse{
-		Event{Id: &id, Name: "fsad", EventDateTime: time.Now()},
-	}, nil
+func NewAPI(db DB, logger *slog.Logger) *API {
+	return &API{
+		db:     db,
+		logger: logger,
+	}
 }

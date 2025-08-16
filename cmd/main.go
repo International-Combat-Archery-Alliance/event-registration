@@ -1,22 +1,41 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
+	"github.com/International-Combat-Archery-Alliance/event-registration/dynamo"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	middleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
 func main() {
-	eventAPI := &api.API{}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	db, err := makeDB(ctx)
+	if err != nil {
+		logger.Error("Error creating db client", "error", err)
+		os.Exit(1)
+	}
+
+	eventAPI := api.NewAPI(db, logger)
 
 	swagger, err := api.GetSwagger()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading swagger spec\n: %s", err)
+		logger.Error("Error loading swagger spec", "error", err)
 		os.Exit(1)
 	}
 
@@ -57,4 +76,51 @@ func getEnvOrDefault(key string, defaultVal string) string {
 	}
 
 	return defaultVal
+}
+
+func makeDB(ctx context.Context) (api.DB, error) {
+	var dynamoClient *dynamodb.Client
+	var err error
+	if isLocal() {
+		dynamoClient, err = createLocalDynamoClient(ctx)
+	} else {
+		dynamoClient, err = createProdDynamoClient(ctx)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dynamo client: %w", err)
+	}
+
+	database := dynamo.NewDB(dynamoClient, os.Getenv("DYNAMO_TABLE_NAME"))
+	return database, nil
+}
+
+func isLocal() bool {
+	return getEnvOrDefault("AWS_SAM_LOCAL", "false") == "true"
+}
+
+func createLocalDynamoClient(ctx context.Context) (*dynamodb.Client, error) {
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion("localhost"),
+		config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
+			Value: aws.Credentials{
+				AccessKeyID: "local", SecretAccessKey: "local", SessionToken: "",
+				Source: "Mock credentials used above for local instance",
+			},
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String("http://dynamodb:8000")
+	}), nil
+}
+
+func createProdDynamoClient(ctx context.Context) (*dynamodb.Client, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return dynamodb.NewFromConfig(cfg), nil
 }

@@ -3,9 +3,18 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   ICAA Event Registration API
 
+Mappings:
+  attributes:
+    dynamo:
+      tableName: event-registration
+
 Globals:
   Function:
     Timeout: 10
+    MemorySize: 128
+    Environment:
+      Variables:
+        DYNAMO_TABLE_NAME: !FindInMap [attributes, dynamo, tableName]
 
 Resources:
   ICAAEventRegistration:
@@ -24,6 +33,6 @@ Resources:
       Dockerfile: Dockerfile
 
 Outputs:
-  GinApi:
+  ICAAEventRegistrationApi:
     Description: "API Gateway endpoint URL"
     Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"

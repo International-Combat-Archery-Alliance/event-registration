@@ -5,10 +5,9 @@ WORKDIR /app
 ADD go.mod go.sum /app/
 RUN go mod download
 
-ADD cmd /app/cmd
-ADD spec /app/spec
-ADD api /app/api
+ADD . /app/
 
+RUN go generate ./...
 RUN go build -o bootstrap cmd/main.go
 
 FROM alpine

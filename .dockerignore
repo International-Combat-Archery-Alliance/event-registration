@@ -1,0 +1,5 @@
+README.md
+template.yml
+Makefile
+docker-compose.yml
+.aws-sam*
