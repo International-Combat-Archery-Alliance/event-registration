@@ -1,10 +1,13 @@
+.PHONY: armSupport
+armSupport:
+	docker run --privileged --rm tonistiigi/binfmt --install all
+
 .PHONY: build
-build:
+build: armSupport
 	go generate ./...
 	sam build
 
 .PHONY: local
 local: build
-	docker run --privileged --rm tonistiigi/binfmt --install all
 	docker-compose up -d
 	sam local start-api
