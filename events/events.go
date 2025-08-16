@@ -9,9 +9,10 @@ import (
 )
 
 type Event struct {
-	ID            uuid.UUID
-	Name          string
-	EventDateTime time.Time
+	ID                    uuid.UUID
+	Name                  string
+	EventDateTime         time.Time
+	RegistrationCloseTime time.Time
 }
 
 type GetEventsResponse struct {

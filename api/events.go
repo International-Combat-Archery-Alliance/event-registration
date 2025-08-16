@@ -11,9 +11,10 @@ import (
 
 func eventToApiEvent(event events.Event) Event {
 	return Event{
-		Id:            &event.ID,
-		Name:          event.Name,
-		EventDateTime: event.EventDateTime,
+		Id:                    &event.ID,
+		Name:                  event.Name,
+		EventDateTime:         event.EventDateTime,
+		RegistrationCloseTime: event.RegistrationCloseTime,
 	}
 }
 
@@ -61,9 +62,10 @@ func (a *API) GetEvents(ctx context.Context, request GetEventsRequestObject) (Ge
 
 func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (PostEventsResponseObject, error) {
 	event := events.Event{
-		ID:            uuid.New(),
-		Name:          request.Body.Name,
-		EventDateTime: request.Body.EventDateTime,
+		ID:                    uuid.New(),
+		Name:                  request.Body.Name,
+		EventDateTime:         request.Body.EventDateTime,
+		RegistrationCloseTime: request.Body.RegistrationCloseTime,
 	}
 
 	err := a.db.CreateEvent(ctx, event)

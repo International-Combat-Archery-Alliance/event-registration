@@ -3,6 +3,15 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   ICAA Event Registration API
 
+Parameters:
+  architecture:
+    Description: Architecure to run on
+    Type: string
+    Default: arm64
+    AllowedValues:
+      - arm64
+      - x86_64
+
 Mappings:
   attributes:
     dynamo:
@@ -22,7 +31,7 @@ Resources:
     Properties:
       PackageType: Image
       Architectures:
-        - arm64
+        - !Ref architecture
       MemorySize: 256
       Events:
         APIEvent:

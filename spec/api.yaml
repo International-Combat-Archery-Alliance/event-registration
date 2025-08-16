@@ -73,10 +73,14 @@ paths:
               required:
                 - name
                 - eventDateTime
+                - registrationCloseTime
               properties:
                 name:
                   type: string
                 eventDateTime:
+                  type: string
+                  format: date-time
+                registrationCloseTime:
                   type: string
                   format: date-time
       responses:
@@ -101,6 +105,7 @@ components:
         - id
         - name
         - eventDateTime
+        - registrationCloseTime
       properties:
         id:
           type: string
@@ -109,6 +114,9 @@ components:
         name:
           type: string
         eventDateTime:
+          type: string
+          format: date-time
+        registrationCloseTime:
           type: string
           format: date-time
     ErrorCode:

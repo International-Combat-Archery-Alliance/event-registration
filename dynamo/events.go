@@ -19,13 +19,14 @@ import (
 var _ events.EventRepository = &DB{}
 
 type eventDynamo struct {
-	PK            string
-	SK            string
-	GSI1PK        string
-	GSI1SK        string
-	ID            uuid.UUID
-	Name          string
-	EventDateTime time.Time
+	PK                    string
+	SK                    string
+	GSI1PK                string
+	GSI1SK                string
+	ID                    uuid.UUID
+	Name                  string
+	EventDateTime         time.Time
+	RegistrationCloseTime time.Time
 }
 
 const (
@@ -34,21 +35,23 @@ const (
 
 func newEventDynamo(event events.Event) eventDynamo {
 	return eventDynamo{
-		PK:            fmt.Sprintf("%s#%s", eventPKPrefix, event.ID),
-		SK:            fmt.Sprintf("%s#%s", eventPKPrefix, event.ID),
-		GSI1PK:        eventPKPrefix,
-		GSI1SK:        fmt.Sprintf("%s#%s#%s", eventPKPrefix, event.EventDateTime, event.ID),
-		ID:            event.ID,
-		Name:          event.Name,
-		EventDateTime: event.EventDateTime,
+		PK:                    fmt.Sprintf("%s#%s", eventPKPrefix, event.ID),
+		SK:                    fmt.Sprintf("%s#%s", eventPKPrefix, event.ID),
+		GSI1PK:                eventPKPrefix,
+		GSI1SK:                fmt.Sprintf("%s#%s#%s", eventPKPrefix, event.EventDateTime, event.ID),
+		ID:                    event.ID,
+		Name:                  event.Name,
+		EventDateTime:         event.EventDateTime,
+		RegistrationCloseTime: event.RegistrationCloseTime,
 	}
 }
 
 func eventFromEventDynamo(event eventDynamo) events.Event {
 	return events.Event{
-		ID:            event.ID,
-		Name:          event.Name,
-		EventDateTime: event.EventDateTime,
+		ID:                    event.ID,
+		Name:                  event.Name,
+		EventDateTime:         event.EventDateTime,
+		RegistrationCloseTime: event.RegistrationCloseTime,
 	}
 }
 
