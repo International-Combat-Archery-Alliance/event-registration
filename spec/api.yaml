@@ -11,6 +11,7 @@ servers:
 paths:
   /events:
     get:
+      operationId: getEvents
       summary: Get all events
       description: Retrieves a list of all events
       responses:
