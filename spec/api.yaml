@@ -190,6 +190,7 @@ components:
         - InternalError
         - LimitOutOfBounds
         - InvalidCursor
+        - NotFound
     Error:
       type: object
       required:

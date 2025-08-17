@@ -131,5 +131,26 @@ func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (
 }
 
 func (a *API) GetEventsId(ctx context.Context, request GetEventsIdRequestObject) (GetEventsIdResponseObject, error) {
-	panic("unimplemented")
+	event, err := a.db.GetEvent(ctx, request.Id)
+	if err != nil {
+		a.logger.Error("Failed to fetch an event", "error", err)
+
+		var eventErr *events.EventError
+		if errors.As(err, &eventErr) {
+			switch eventErr.Reason {
+			case events.REASON_EVENT_DOES_NOT_EXIST:
+				return GetEventsId404JSONResponse{
+					Code:    NotFound,
+					Message: "Event does not exist",
+				}, nil
+			}
+		}
+
+		return GetEventsId500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to get event",
+		}, nil
+	}
+
+	return GetEventsId200JSONResponse(eventToApiEvent(event)), nil
 }

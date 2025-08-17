@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ type mockDB struct {
 	events.EventRepository
 	GetEventsFunc   func(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error)
 	CreateEventFunc func(ctx context.Context, event events.Event) error
+	GetEventFunc    func(ctx context.Context, id uuid.UUID) (events.Event, error)
 }
 
 func (m *mockDB) GetEvents(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error) {
@@ -27,6 +29,10 @@ func (m *mockDB) CreateEvent(ctx context.Context, event events.Event) error {
 	return m.CreateEventFunc(ctx, event)
 }
 
+func (m *mockDB) GetEvent(ctx context.Context, id uuid.UUID) (events.Event, error) {
+	return m.GetEventFunc(ctx, id)
+}
+
 func TestGetEvents(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		id := uuid.New()
@@ -35,7 +41,8 @@ func TestGetEvents(t *testing.T) {
 			{
 				ID:                    id,
 				Name:                  "Test Event",
-				EventDateTime:         now,
+				StartTime:             now,
+				EndTime:               now.Add(time.Hour),
 				RegistrationCloseTime: now,
 			},
 		}
@@ -92,7 +99,8 @@ func TestPostEvents(t *testing.T) {
 		now := time.Now()
 		reqBody := PostEventsJSONRequestBody{
 			Name:                  "Test Event",
-			EventDateTime:         now,
+			StartTime:             now,
+			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
 		}
 		mock := &mockDB{
@@ -113,6 +121,90 @@ func TestPostEvents(t *testing.T) {
 		case PostEvents200JSONResponse:
 			assert.NotNil(t, r.Id)
 			assert.Equal(t, reqBody.Name, r.Name)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+}
+
+func TestGetEventsId(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		id := uuid.New()
+		now := time.Now()
+		expectedEvent := events.Event{
+			ID:                    id,
+			Name:                  "Test Event",
+			StartTime:             now,
+			EndTime:               now.Add(time.Hour),
+			RegistrationCloseTime: now,
+		}
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, eventId uuid.UUID) (events.Event, error) {
+				assert.Equal(t, id, eventId)
+				return expectedEvent, nil
+			},
+		}
+		api := NewAPI(mock, noopLogger)
+
+		req := GetEventsIdRequestObject{
+			Id: id,
+		}
+
+		resp, err := api.GetEventsId(context.Background(), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case GetEventsId200JSONResponse:
+			assert.Equal(t, &expectedEvent.ID, r.Id)
+			assert.Equal(t, expectedEvent.Name, r.Name)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		id := uuid.New()
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, eventId uuid.UUID) (events.Event, error) {
+				return events.Event{}, &events.EventError{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
+			},
+		}
+		api := NewAPI(mock, noopLogger)
+
+		req := GetEventsIdRequestObject{
+			Id: id,
+		}
+
+		resp, err := api.GetEventsId(context.Background(), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case GetEventsId404JSONResponse:
+			assert.Equal(t, NotFound, r.Code)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("internal server error", func(t *testing.T) {
+		id := uuid.New()
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, eventId uuid.UUID) (events.Event, error) {
+				return events.Event{}, errors.New("some error")
+			},
+		}
+		api := NewAPI(mock, noopLogger)
+
+		req := GetEventsIdRequestObject{
+			Id: id,
+		}
+
+		resp, err := api.GetEventsId(context.Background(), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case GetEventsId500JSONResponse:
+			assert.Equal(t, InternalError, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}

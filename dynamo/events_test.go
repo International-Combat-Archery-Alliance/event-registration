@@ -21,9 +21,10 @@ func TestCreateEvent(t *testing.T) {
 	t.Run("successfully create an event", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:            uuid.New(),
-			Name:          "Test Event",
-			EventDateTime: time.Now(),
+			ID:        uuid.New(),
+			Name:      "Test Event",
+			StartTime: time.Now(),
+			EndTime:   time.Now().Add(time.Hour),
 		}
 
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -32,9 +33,10 @@ func TestCreateEvent(t *testing.T) {
 	t.Run("fail to create an event that already exists", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:            uuid.New(),
-			Name:          "Test Event",
-			EventDateTime: time.Now(),
+			ID:        uuid.New(),
+			Name:      "Test Event",
+			StartTime: time.Now(),
+			EndTime:   time.Now().Add(time.Hour),
 		}
 
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -49,9 +51,10 @@ func TestCreateEvent(t *testing.T) {
 	t.Run("successfully create an event and verify data", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:            uuid.New(),
-			Name:          "Test Event",
-			EventDateTime: time.Now().UTC().Truncate(time.Second),
+			ID:        uuid.New(),
+			Name:      "Test Event",
+			StartTime: time.Now().UTC().Truncate(time.Second),
+			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 		}
 
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -75,7 +78,41 @@ func TestCreateEvent(t *testing.T) {
 
 		assert.Equal(t, event.ID, savedEvent.ID)
 		assert.Equal(t, event.Name, savedEvent.Name)
-		assert.WithinDuration(t, event.EventDateTime, savedEvent.EventDateTime, time.Second)
+		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
+		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
+	})
+}
+
+func TestGetEvent(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("successfully get an event", func(t *testing.T) {
+		resetTable(ctx)
+		event := events.Event{
+			ID:        uuid.New(),
+			Name:      "Test Event",
+			StartTime: time.Now().UTC().Truncate(time.Second),
+			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+		}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		actual, err := db.GetEvent(ctx, event.ID)
+		require.NoError(t, err)
+
+		assert.Equal(t, event.ID, actual.ID)
+		assert.Equal(t, event.Name, actual.Name)
+		assert.WithinDuration(t, event.StartTime, actual.StartTime, time.Second)
+		assert.WithinDuration(t, event.EndTime, actual.EndTime, time.Second)
+	})
+
+	t.Run("fail to get an event that does not exist", func(t *testing.T) {
+		resetTable(ctx)
+
+		_, err := db.GetEvent(ctx, uuid.New())
+		require.Error(t, err)
+		var eventError *events.EventError
+		require.ErrorAs(t, err, &eventError)
+		assert.Equal(t, events.REASON_EVENT_DOES_NOT_EXIST, eventError.Reason)
 	})
 }
 
@@ -93,9 +130,10 @@ func TestGetEvents(t *testing.T) {
 	t.Run("successfully get a single event", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:            uuid.New(),
-			Name:          "Test Event",
-			EventDateTime: time.Now(),
+			ID:        uuid.New(),
+			Name:      "Test Event",
+			StartTime: time.Now(),
+			EndTime:   time.Now().Add(time.Hour),
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
@@ -110,9 +148,10 @@ func TestGetEvents(t *testing.T) {
 		resetTable(ctx)
 		for i := range 5 {
 			event := events.Event{
-				ID:            uuid.New(),
-				Name:          fmt.Sprintf("Test Event %d", i),
-				EventDateTime: time.Now().Add(time.Duration(i) * time.Hour),
+				ID:        uuid.New(),
+				Name:      fmt.Sprintf("Test Event %d", i),
+				StartTime: time.Now().Add(time.Duration(i) * time.Hour),
+				EndTime:   time.Now().Add(time.Duration(i+1) * time.Hour),
 			}
 			require.Nil(t, db.CreateEvent(ctx, event))
 		}
@@ -127,9 +166,10 @@ func TestGetEvents(t *testing.T) {
 		resetTable(ctx)
 		for i := range 15 {
 			event := events.Event{
-				ID:            uuid.New(),
-				Name:          fmt.Sprintf("Test Event %d", i),
-				EventDateTime: time.Now().Add(time.Duration(i) * time.Hour),
+				ID:        uuid.New(),
+				Name:      fmt.Sprintf("Test Event %d", i),
+				StartTime: time.Now().Add(time.Duration(i) * time.Hour),
+				EndTime:   time.Now().Add(time.Duration(i+1) * time.Hour),
 			}
 			require.Nil(t, db.CreateEvent(ctx, event))
 		}
@@ -154,9 +194,10 @@ func TestUpdateEvent(t *testing.T) {
 	t.Run("successfully update an event", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:            uuid.New(),
-			Name:          "Test Event",
-			EventDateTime: time.Now(),
+			ID:        uuid.New(),
+			Name:      "Test Event",
+			StartTime: time.Now(),
+			EndTime:   time.Now().Add(time.Hour),
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
@@ -167,9 +208,10 @@ func TestUpdateEvent(t *testing.T) {
 	t.Run("fail to update an event that does not exist", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:            uuid.New(),
-			Name:          "Test Event",
-			EventDateTime: time.Now(),
+			ID:        uuid.New(),
+			Name:      "Test Event",
+			StartTime: time.Now(),
+			EndTime:   time.Now().Add(time.Hour),
 		}
 
 		eventErr := db.UpdateEvent(ctx, event)
@@ -182,14 +224,16 @@ func TestUpdateEvent(t *testing.T) {
 	t.Run("successfully update an event and verify data", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:            uuid.New(),
-			Name:          "Test Event",
-			EventDateTime: time.Now().UTC().Truncate(time.Second),
+			ID:        uuid.New(),
+			Name:      "Test Event",
+			StartTime: time.Now().UTC().Truncate(time.Second),
+			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
 		event.Name = "New name"
-		event.EventDateTime = time.Now().Add(time.Hour).UTC().Truncate(time.Second)
+		event.StartTime = time.Now().Add(time.Hour).UTC().Truncate(time.Second)
+		event.EndTime = time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second)
 		require.NoError(t, db.UpdateEvent(ctx, event))
 
 		dynamoEvent := newEventDynamo(event)
@@ -211,6 +255,7 @@ func TestUpdateEvent(t *testing.T) {
 
 		assert.Equal(t, event.ID, savedEvent.ID)
 		assert.Equal(t, event.Name, savedEvent.Name)
-		assert.WithinDuration(t, event.EventDateTime, savedEvent.EventDateTime, time.Second)
+		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
+		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
 	})
 }
