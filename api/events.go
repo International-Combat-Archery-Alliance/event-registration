@@ -13,8 +13,55 @@ func eventToApiEvent(event events.Event) Event {
 	return Event{
 		Id:                    &event.ID,
 		Name:                  event.Name,
-		EventDateTime:         event.EventDateTime,
+		Location:              locationToApiLocation(event.EventLocation),
+		StartTime:             event.StartTime,
+		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
+	}
+}
+
+func apiEventToEvent(event Event) events.Event {
+	return events.Event{
+		ID:                    *event.Id,
+		Name:                  event.Name,
+		EventLocation:         apiLocationToLocation(event.Location),
+		StartTime:             event.StartTime,
+		EndTime:               event.EndTime,
+		RegistrationCloseTime: event.RegistrationCloseTime,
+	}
+}
+
+func locationToApiLocation(location events.Location) Location {
+	return Location{
+		Name:    location.Name,
+		Address: addressToApiAddress(location.LocAddress),
+	}
+}
+
+func apiLocationToLocation(location Location) events.Location {
+	return events.Location{
+		Name:       location.Name,
+		LocAddress: apiAddressToAddress(location.Address),
+	}
+}
+
+func addressToApiAddress(address events.Address) Address {
+	return Address{
+		City:       address.City,
+		Country:    address.Country,
+		PostalCode: address.PostalCode,
+		State:      address.State,
+		Street:     address.Street,
+	}
+}
+
+func apiAddressToAddress(address Address) events.Address {
+	return events.Address{
+		City:       address.City,
+		Country:    address.Country,
+		PostalCode: address.PostalCode,
+		State:      address.State,
+		Street:     address.Street,
 	}
 }
 
@@ -64,7 +111,9 @@ func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (
 	event := events.Event{
 		ID:                    uuid.New(),
 		Name:                  request.Body.Name,
-		EventDateTime:         request.Body.EventDateTime,
+		EventLocation:         apiLocationToLocation(request.Body.Location),
+		StartTime:             request.Body.StartTime,
+		EndTime:               request.Body.EndTime,
 		RegistrationCloseTime: request.Body.RegistrationCloseTime,
 	}
 
@@ -79,4 +128,8 @@ func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (
 	}
 
 	return PostEvents200JSONResponse(eventToApiEvent(event)), nil
+}
+
+func (a *API) GetEventsId(ctx context.Context, request GetEventsIdRequestObject) (GetEventsIdResponseObject, error) {
+	panic("unimplemented")
 }

@@ -25,7 +25,9 @@ type eventDynamo struct {
 	GSI1SK                string
 	ID                    uuid.UUID
 	Name                  string
-	EventDateTime         time.Time
+	EventLocation         events.Location
+	StartTime             time.Time
+	EndTime               time.Time
 	RegistrationCloseTime time.Time
 }
 
@@ -33,15 +35,25 @@ const (
 	eventPKPrefix = "EVENT"
 )
 
+func eventPK(id uuid.UUID) string {
+	return fmt.Sprintf("%s#%s", eventPKPrefix, id)
+}
+
+func eventSK(id uuid.UUID) string {
+	return fmt.Sprintf("%s#%s", eventPKPrefix, id)
+}
+
 func newEventDynamo(event events.Event) eventDynamo {
 	return eventDynamo{
-		PK:                    fmt.Sprintf("%s#%s", eventPKPrefix, event.ID),
-		SK:                    fmt.Sprintf("%s#%s", eventPKPrefix, event.ID),
+		PK:                    eventPK(event.ID),
+		SK:                    eventSK(event.ID),
 		GSI1PK:                eventPKPrefix,
-		GSI1SK:                fmt.Sprintf("%s#%s#%s", eventPKPrefix, event.EventDateTime, event.ID),
+		GSI1SK:                fmt.Sprintf("%s#%s#%s", eventPKPrefix, event.StartTime, event.ID),
 		ID:                    event.ID,
 		Name:                  event.Name,
-		EventDateTime:         event.EventDateTime,
+		EventLocation:         event.EventLocation,
+		StartTime:             event.StartTime,
+		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
 	}
 }
@@ -50,9 +62,35 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 	return events.Event{
 		ID:                    event.ID,
 		Name:                  event.Name,
-		EventDateTime:         event.EventDateTime,
+		EventLocation:         event.EventLocation,
+		StartTime:             event.StartTime,
+		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
 	}
+}
+
+func (d *DB) GetEvent(ctx context.Context, id uuid.UUID) (events.Event, error) {
+	resp, err := d.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(d.tableName),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: eventPK(id)},
+			"SK": &types.AttributeValueMemberS{Value: eventSK(id)},
+		},
+	})
+	if err != nil {
+		return events.Event{}, events.NewFailedToFetchError(fmt.Sprintf("Failed to fetch event with ID %q", id), err)
+	}
+
+	if len(resp.Item) == 0 {
+		return events.Event{}, events.NewEventDoesNotExistsError(fmt.Sprintf("Event with ID %q not found", id), nil)
+	}
+
+	var event events.Event
+	err = attributevalue.UnmarshalMap(resp.Item, &event)
+	if err != nil {
+		panic(fmt.Sprintf("failed to unmarshal event from DB: %s", err))
+	}
+	return event, nil
 }
 
 func (d *DB) CreateEvent(ctx context.Context, event events.Event) error {

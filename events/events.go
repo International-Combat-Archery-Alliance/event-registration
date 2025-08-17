@@ -11,7 +11,9 @@ import (
 type Event struct {
 	ID                    uuid.UUID
 	Name                  string
-	EventDateTime         time.Time
+	EventLocation         Location
+	StartTime             time.Time
+	EndTime               time.Time
 	RegistrationCloseTime time.Time
 }
 
@@ -22,6 +24,7 @@ type GetEventsResponse struct {
 }
 
 type EventRepository interface {
+	GetEvent(ctx context.Context, id uuid.UUID) (Event, error)
 	GetEvents(ctx context.Context, limit int32, cursor *string) (GetEventsResponse, error)
 	CreateEvent(ctx context.Context, event Event) error
 	UpdateEvent(ctx context.Context, event Event) error

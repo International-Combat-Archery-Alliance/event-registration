@@ -69,20 +69,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - name
-                - eventDateTime
-                - registrationCloseTime
-              properties:
-                name:
-                  type: string
-                eventDateTime:
-                  type: string
-                  format: date-time
-                registrationCloseTime:
-                  type: string
-                  format: date-time
+              $ref: '#/components/schemas/Event'
       responses:
         '200':
           description: The created event.
@@ -90,6 +77,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Event'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /events/{id}:
+    get:
+      summary: Get an event
+      description: Get one event by id
+      parameters:
+        - name: id
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error' 
+        '404':
+          description: Event not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error' 
         '500':
           description: Unknown server error.
           content:
@@ -104,7 +128,9 @@ components:
       required:
         - id
         - name
-        - eventDateTime
+        - location
+        - startTime
+        - endTime
         - registrationCloseTime
       properties:
         id:
@@ -113,12 +139,51 @@ components:
           readOnly: true
         name:
           type: string
-        eventDateTime:
+        location:
+          $ref: '#/components/schemas/Location'
+        startTime:
+          type: string
+          format: date-time
+        endTime:
           type: string
           format: date-time
         registrationCloseTime:
           type: string
           format: date-time
+    Location:
+      type: object
+      required:
+        - name
+        - address
+      properties:
+        name:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+          description: Street address
+        city:
+          type: string
+          description: City or town
+        state:
+          type: string
+          description: State or province
+        postalCode:
+          type: string
+          description: Postal code
+        country:
+          type: string
+          description: Country
+      required:
+        - street
+        - city
+        - state
+        - postalCode
+        - country
     ErrorCode:
       type: string
       enum:
