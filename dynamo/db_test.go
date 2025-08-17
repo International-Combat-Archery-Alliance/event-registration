@@ -22,7 +22,7 @@ var db *DB
 const tableName = "EventRegistration-Test"
 
 func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 	defer cancel()
 
 	err := setupDynamo(ctx)
