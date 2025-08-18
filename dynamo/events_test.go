@@ -55,9 +55,25 @@ func TestCreateEvent(t *testing.T) {
 		event := events.Event{
 			ID:        uuid.New(),
 			Name:      "Test Event",
-			StartTime: time.Now().UTC().Truncate(time.Second),
-			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
-			Version:   1,
+			EventLocation: events.Location{
+				Name: "Test Location",
+				LocAddress: events.Address{
+					Street:     "123 Test St",
+					City:       "Test City",
+					State:      "TS",
+					PostalCode: "12345",
+					Country:    "Testland",
+				},
+			},
+			StartTime:             time.Now().UTC().Truncate(time.Second),
+			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
+			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
+			NumTeams:              10,
+			NumRosteredPlayers:    50,
+			NumTotalPlayers:       60,
+			Version:               1,
 		}
 
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -81,8 +97,15 @@ func TestCreateEvent(t *testing.T) {
 
 		assert.Equal(t, event.ID, savedEvent.ID)
 		assert.Equal(t, event.Name, savedEvent.Name)
+		assert.Equal(t, event.EventLocation, savedEvent.EventLocation)
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
+		assert.WithinDuration(t, event.RegistrationCloseTime, savedEvent.RegistrationCloseTime, time.Second)
+		assert.Equal(t, event.RegistrationTypes, savedEvent.RegistrationTypes)
+		assert.Equal(t, event.AllowedTeamSizeRange, savedEvent.AllowedTeamSizeRange)
+		assert.Equal(t, event.NumTeams, savedEvent.NumTeams)
+		assert.Equal(t, event.NumRosteredPlayers, savedEvent.NumRosteredPlayers)
+		assert.Equal(t, event.NumTotalPlayers, savedEvent.NumTotalPlayers)
 		assert.Equal(t, event.Version, savedEvent.Version)
 	})
 }
@@ -95,9 +118,25 @@ func TestGetEvent(t *testing.T) {
 		event := events.Event{
 			ID:        uuid.New(),
 			Name:      "Test Event",
-			StartTime: time.Now().UTC().Truncate(time.Second),
-			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
-			Version:   1,
+			EventLocation: events.Location{
+				Name: "Test Location",
+				LocAddress: events.Address{
+					Street:     "123 Test St",
+					City:       "Test City",
+					State:      "TS",
+					PostalCode: "12345",
+					Country:    "Testland",
+				},
+			},
+			StartTime:             time.Now().UTC().Truncate(time.Second),
+			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
+			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
+			NumTeams:              10,
+			NumRosteredPlayers:    50,
+			NumTotalPlayers:       60,
+			Version:               1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
@@ -106,8 +145,15 @@ func TestGetEvent(t *testing.T) {
 
 		assert.Equal(t, event.ID, actual.ID)
 		assert.Equal(t, event.Name, actual.Name)
+		assert.Equal(t, event.EventLocation, actual.EventLocation)
 		assert.WithinDuration(t, event.StartTime, actual.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, actual.EndTime, time.Second)
+		assert.WithinDuration(t, event.RegistrationCloseTime, actual.RegistrationCloseTime, time.Second)
+		assert.Equal(t, event.RegistrationTypes, actual.RegistrationTypes)
+		assert.Equal(t, event.AllowedTeamSizeRange, actual.AllowedTeamSizeRange)
+		assert.Equal(t, event.NumTeams, actual.NumTeams)
+		assert.Equal(t, event.NumRosteredPlayers, actual.NumRosteredPlayers)
+		assert.Equal(t, event.NumTotalPlayers, actual.NumTotalPlayers)
 		assert.Equal(t, event.Version, actual.Version)
 	})
 
@@ -138,9 +184,25 @@ func TestGetEvents(t *testing.T) {
 		event := events.Event{
 			ID:        uuid.New(),
 			Name:      "Test Event",
-			StartTime: time.Now(),
-			EndTime:   time.Now().Add(time.Hour),
-			Version:   1,
+			EventLocation: events.Location{
+				Name: "Test Location",
+				LocAddress: events.Address{
+					Street:     "123 Test St",
+					City:       "Test City",
+					State:      "TS",
+					PostalCode: "12345",
+					Country:    "Testland",
+				},
+			},
+			StartTime:             time.Now().UTC().Truncate(time.Second),
+			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
+			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
+			NumTeams:              10,
+			NumRosteredPlayers:    50,
+			NumTotalPlayers:       60,
+			Version:               1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
@@ -158,9 +220,25 @@ func TestGetEvents(t *testing.T) {
 			event := events.Event{
 				ID:        uuid.New(),
 				Name:      fmt.Sprintf("Test Event %d", i),
-				StartTime: time.Now().Add(time.Duration(i) * time.Hour),
-				EndTime:   time.Now().Add(time.Duration(i+1) * time.Hour),
-				Version:   1,
+				EventLocation: events.Location{
+					Name: fmt.Sprintf("Test Location %d", i),
+					LocAddress: events.Address{
+						Street:     fmt.Sprintf("%d Test St", i),
+						City:       "Test City",
+						State:      "TS",
+						PostalCode: "12345",
+						Country:    "Testland",
+					},
+				},
+				StartTime:             time.Now().Add(time.Duration(i) * time.Hour).UTC().Truncate(time.Second),
+				EndTime:               time.Now().Add(time.Duration(i+1) * time.Hour).UTC().Truncate(time.Second),
+				RegistrationCloseTime: time.Now().Add(time.Duration(i)*time.Hour + 30*time.Minute).UTC().Truncate(time.Second),
+				RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+				AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
+				NumTeams:              10 + i,
+				NumRosteredPlayers:    50 + i,
+				NumTotalPlayers:       60 + i,
+				Version:               1,
 			}
 			require.Nil(t, db.CreateEvent(ctx, event))
 		}
@@ -180,9 +258,25 @@ func TestGetEvents(t *testing.T) {
 			event := events.Event{
 				ID:        uuid.New(),
 				Name:      fmt.Sprintf("Test Event %d", i),
-				StartTime: time.Now().Add(time.Duration(i) * time.Hour),
-				EndTime:   time.Now().Add(time.Duration(i+1) * time.Hour),
-				Version:   1,
+				EventLocation: events.Location{
+					Name: fmt.Sprintf("Test Location %d", i),
+					LocAddress: events.Address{
+						Street:     fmt.Sprintf("%d Test St", i),
+						City:       "Test City",
+						State:      "TS",
+						PostalCode: "12345",
+						Country:    "Testland",
+					},
+				},
+				StartTime:             time.Now().Add(time.Duration(i) * time.Hour).UTC().Truncate(time.Second),
+				EndTime:               time.Now().Add(time.Duration(i+1) * time.Hour).UTC().Truncate(time.Second),
+				RegistrationCloseTime: time.Now().Add(time.Duration(i)*time.Hour + 30*time.Minute).UTC().Truncate(time.Second),
+				RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+				AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
+				NumTeams:              10 + i,
+				NumRosteredPlayers:    50 + i,
+				NumTotalPlayers:       60 + i,
+				Version:               1,
 			}
 			require.Nil(t, db.CreateEvent(ctx, event))
 		}
@@ -249,9 +343,25 @@ func TestUpdateEvent(t *testing.T) {
 		event := events.Event{
 			ID:        uuid.New(),
 			Name:      "Test Event",
-			StartTime: time.Now().UTC().Truncate(time.Second),
-			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
-			Version:   1,
+			EventLocation: events.Location{
+				Name: "Test Location",
+				LocAddress: events.Address{
+					Street:     "123 Test St",
+					City:       "Test City",
+					State:      "TS",
+					PostalCode: "12345",
+					Country:    "Testland",
+				},
+			},
+			StartTime:             time.Now().UTC().Truncate(time.Second),
+			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
+			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
+			NumTeams:              10,
+			NumRosteredPlayers:    50,
+			NumTotalPlayers:       60,
+			Version:               1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
@@ -280,8 +390,15 @@ func TestUpdateEvent(t *testing.T) {
 
 		assert.Equal(t, event.ID, savedEvent.ID)
 		assert.Equal(t, event.Name, savedEvent.Name)
+		assert.Equal(t, event.EventLocation, savedEvent.EventLocation)
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
+		assert.WithinDuration(t, event.RegistrationCloseTime, savedEvent.RegistrationCloseTime, time.Second)
+		assert.Equal(t, event.RegistrationTypes, savedEvent.RegistrationTypes)
+		assert.Equal(t, event.AllowedTeamSizeRange, savedEvent.AllowedTeamSizeRange)
+		assert.Equal(t, event.NumTeams, savedEvent.NumTeams)
+		assert.Equal(t, event.NumRosteredPlayers, savedEvent.NumRosteredPlayers)
+		assert.Equal(t, event.NumTotalPlayers, savedEvent.NumTotalPlayers)
 		assert.Equal(t, event.Version, savedEvent.Version)
 	})
 }

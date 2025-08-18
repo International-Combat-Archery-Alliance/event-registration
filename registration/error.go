@@ -1,6 +1,10 @@
 package registration
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+)
 
 type ErrorReason string
 
@@ -14,6 +18,7 @@ const (
 	REASON_ASSOCIATED_EVENT_DOES_NOT_EXIST ErrorReason = "ASSOCIATED_EVENT_DOES_NOT_EXIST"
 	REASON_UNKNOWN_REGISTRATION_TYPE       ErrorReason = "UNKNOWN_REGISTRATION_TYPE"
 	REASON_TEAM_SIZE_NOT_ALLOWED           ErrorReason = "TEAM_SIZE_NOT_ALLOWED"
+	REASON_NOT_ALLOWED_TO_SIGN_UP_AS_TYPE  ErrorReason = "NOT_ALLOWED_TO_SIGN_UP_AS_TYPE"
 )
 
 type Error struct {
@@ -72,4 +77,8 @@ func NewUnknownRegistrationTypeError(message string) *Error {
 
 func NewTeamSizeNotAllowedError(teamSize, minSize, maxSize int) *Error {
 	return newRegistrationError(REASON_TEAM_SIZE_NOT_ALLOWED, fmt.Sprintf("Team size must be within %d and %d. Size is %d", minSize, maxSize, teamSize), nil)
+}
+
+func NewNotAllowedToSignUpAsTypeError(regType events.RegistrationType) *Error {
+	return newRegistrationError(REASON_NOT_ALLOWED_TO_SIGN_UP_AS_TYPE, fmt.Sprintf("Not allowed to sign up for event as type: %s", regType), nil)
 }

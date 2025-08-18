@@ -1,3 +1,5 @@
+//go:generate go tool stringer -type=RegistrationType
+
 package events
 
 type RegistrationType int

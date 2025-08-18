@@ -31,6 +31,10 @@ type eventDynamo struct {
 	EndTime               time.Time
 	RegistrationCloseTime time.Time
 	RegistrationTypes     []events.RegistrationType
+	AllowedTeamSizeRange  events.Range
+	NumTeams              int
+	NumRosteredPlayers    int
+	NumTotalPlayers       int
 }
 
 const (
@@ -59,6 +63,10 @@ func newEventDynamo(event events.Event) eventDynamo {
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
 		RegistrationTypes:     event.RegistrationTypes,
+		AllowedTeamSizeRange:  event.AllowedTeamSizeRange,
+		NumTotalPlayers:       event.NumTotalPlayers,
+		NumRosteredPlayers:    event.NumRosteredPlayers,
+		NumTeams:              event.NumTeams,
 	}
 }
 
@@ -72,6 +80,10 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
 		RegistrationTypes:     event.RegistrationTypes,
+		AllowedTeamSizeRange:  event.AllowedTeamSizeRange,
+		NumTeams:              event.NumTeams,
+		NumRosteredPlayers:    event.NumRosteredPlayers,
+		NumTotalPlayers:       event.NumTotalPlayers,
 	}
 }
 

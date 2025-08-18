@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
@@ -103,12 +104,20 @@ func AttemptRegistration(ctx context.Context, registrationRequest Registration, 
 }
 
 func registerIndividualAsFreeAgent(event *events.Event, reg IndividualRegistration) error {
+	if !slices.Contains(event.RegistrationTypes, events.BY_INDIVIDUAL) {
+		return NewNotAllowedToSignUpAsTypeError(events.BY_INDIVIDUAL)
+	}
+
 	event.NumTotalPlayers++
 
 	return nil
 }
 
 func registerTeam(event *events.Event, reg TeamRegistration) error {
+	if !slices.Contains(event.RegistrationTypes, events.BY_TEAM) {
+		return NewNotAllowedToSignUpAsTypeError(events.BY_TEAM)
+	}
+
 	teamSize := len(reg.Players)
 
 	if teamSize < event.AllowedTeamSizeRange.Min || teamSize > event.AllowedTeamSizeRange.Max {
