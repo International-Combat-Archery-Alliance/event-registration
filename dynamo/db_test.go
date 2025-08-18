@@ -92,7 +92,7 @@ func setupDynamoInCI(ctx context.Context) error {
 	}
 
 	dynamoClient = dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-		o.BaseEndpoint = aws.String("http://dynamodb:8000")
+		o.BaseEndpoint = aws.String("http://localhost:8000")
 	})
 
 	err = makeTable(ctx)
