@@ -15,7 +15,7 @@ import (
 var noopLogger = slog.New(slog.DiscardHandler)
 
 type mockDB struct {
-	events.EventRepository
+	events.Repository
 	GetEventsFunc   func(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error)
 	CreateEventFunc func(ctx context.Context, event events.Event) error
 	GetEventFunc    func(ctx context.Context, id uuid.UUID) (events.Event, error)
@@ -216,3 +216,4 @@ func TestGetEventsId(t *testing.T) {
 		}
 	})
 }
+
