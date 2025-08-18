@@ -25,6 +25,7 @@ func TestCreateEvent(t *testing.T) {
 			Name:      "Test Event",
 			StartTime: time.Now(),
 			EndTime:   time.Now().Add(time.Hour),
+			Version:   1,
 		}
 
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -37,6 +38,7 @@ func TestCreateEvent(t *testing.T) {
 			Name:      "Test Event",
 			StartTime: time.Now(),
 			EndTime:   time.Now().Add(time.Hour),
+			Version:   1,
 		}
 
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -55,6 +57,7 @@ func TestCreateEvent(t *testing.T) {
 			Name:      "Test Event",
 			StartTime: time.Now().UTC().Truncate(time.Second),
 			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			Version:   1,
 		}
 
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -80,6 +83,7 @@ func TestCreateEvent(t *testing.T) {
 		assert.Equal(t, event.Name, savedEvent.Name)
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
+		assert.Equal(t, event.Version, savedEvent.Version)
 	})
 }
 
@@ -93,6 +97,7 @@ func TestGetEvent(t *testing.T) {
 			Name:      "Test Event",
 			StartTime: time.Now().UTC().Truncate(time.Second),
 			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			Version:   1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
@@ -103,6 +108,7 @@ func TestGetEvent(t *testing.T) {
 		assert.Equal(t, event.Name, actual.Name)
 		assert.WithinDuration(t, event.StartTime, actual.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, actual.EndTime, time.Second)
+		assert.Equal(t, event.Version, actual.Version)
 	})
 
 	t.Run("fail to get an event that does not exist", func(t *testing.T) {
@@ -134,6 +140,7 @@ func TestGetEvents(t *testing.T) {
 			Name:      "Test Event",
 			StartTime: time.Now(),
 			EndTime:   time.Now().Add(time.Hour),
+			Version:   1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
@@ -142,6 +149,7 @@ func TestGetEvents(t *testing.T) {
 		assert.Len(t, resp.Data, 1)
 		assert.Equal(t, event.ID, resp.Data[0].ID)
 		assert.False(t, resp.HasNextPage)
+		assert.Equal(t, event.Version, resp.Data[0].Version)
 	})
 
 	t.Run("successfully get multiple events", func(t *testing.T) {
@@ -152,6 +160,7 @@ func TestGetEvents(t *testing.T) {
 				Name:      fmt.Sprintf("Test Event %d", i),
 				StartTime: time.Now().Add(time.Duration(i) * time.Hour),
 				EndTime:   time.Now().Add(time.Duration(i+1) * time.Hour),
+				Version:   1,
 			}
 			require.Nil(t, db.CreateEvent(ctx, event))
 		}
@@ -160,6 +169,9 @@ func TestGetEvents(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, resp.Data, 5)
 		assert.False(t, resp.HasNextPage)
+		for _, e := range resp.Data {
+			assert.Equal(t, 1, e.Version)
+		}
 	})
 
 	t.Run("pagination", func(t *testing.T) {
@@ -170,6 +182,7 @@ func TestGetEvents(t *testing.T) {
 				Name:      fmt.Sprintf("Test Event %d", i),
 				StartTime: time.Now().Add(time.Duration(i) * time.Hour),
 				EndTime:   time.Now().Add(time.Duration(i+1) * time.Hour),
+				Version:   1,
 			}
 			require.Nil(t, db.CreateEvent(ctx, event))
 		}
@@ -179,12 +192,18 @@ func TestGetEvents(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, resp.Data, 10)
 		assert.True(t, resp.HasNextPage)
+		for _, e := range resp.Data {
+			assert.Equal(t, 1, e.Version)
+		}
 
 		// Get second page
 		resp2, err := db.GetEvents(ctx, 10, resp.Cursor)
 		require.NoError(t, err)
 		assert.Len(t, resp2.Data, 5)
 		assert.False(t, resp2.HasNextPage)
+		for _, e := range resp2.Data {
+			assert.Equal(t, 1, e.Version)
+		}
 	})
 }
 
@@ -198,10 +217,12 @@ func TestUpdateEvent(t *testing.T) {
 			Name:      "Test Event",
 			StartTime: time.Now(),
 			EndTime:   time.Now().Add(time.Hour),
+			Version:   1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
 		event.Name = "New name"
+		event.Version++
 		require.NoError(t, db.UpdateEvent(ctx, event))
 	})
 
@@ -212,8 +233,10 @@ func TestUpdateEvent(t *testing.T) {
 			Name:      "Test Event",
 			StartTime: time.Now(),
 			EndTime:   time.Now().Add(time.Hour),
+			Version:   1,
 		}
 
+		event.Version++
 		eventErr := db.UpdateEvent(ctx, event)
 		require.Error(t, eventErr)
 		var eventError *events.Error
@@ -228,12 +251,14 @@ func TestUpdateEvent(t *testing.T) {
 			Name:      "Test Event",
 			StartTime: time.Now().UTC().Truncate(time.Second),
 			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			Version:   1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
 		event.Name = "New name"
 		event.StartTime = time.Now().Add(time.Hour).UTC().Truncate(time.Second)
 		event.EndTime = time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second)
+		event.Version++
 		require.NoError(t, db.UpdateEvent(ctx, event))
 
 		dynamoEvent := newEventDynamo(event)
@@ -257,5 +282,6 @@ func TestUpdateEvent(t *testing.T) {
 		assert.Equal(t, event.Name, savedEvent.Name)
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
+		assert.Equal(t, event.Version, savedEvent.Version)
 	})
 }

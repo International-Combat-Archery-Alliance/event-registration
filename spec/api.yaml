@@ -171,7 +171,7 @@ components:
         - endTime
         - registrationCloseTime
         - registrationTypes
-        - teamSizeRange
+        - allowedTeamSizeRange
         - signUpStats
       properties:
         id:
@@ -201,6 +201,10 @@ components:
           $ref: '#/components/schemas/SignUpStats'
     SignUpStats:
       type: object
+      required:
+        - numTeams
+        - numRosteredPlayers
+        - numTotalPlayers
       properties:
         numTeams:
           type: integer
@@ -220,6 +224,7 @@ components:
       required:
         - id
         - eventId
+        - registeredAt
         - email
         - homeCity
         - playerInfo
@@ -255,10 +260,12 @@ components:
       required:
         - id
         - eventId
+        - registeredAt
         - teamName
         - homeCity
         - captainEmail
         - players
+        - paid
       properties:
         id:
           type: string

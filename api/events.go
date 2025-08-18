@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
 	"github.com/google/uuid"
 )
@@ -61,6 +62,11 @@ func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (
 
 	id := uuid.New()
 	request.Body.Id = &id
+	request.Body.SignUpStats = SignUpStats{
+		NumTeams:           ptr.Int(0),
+		NumRosteredPlayers: ptr.Int(0),
+		NumTotalPlayers:    ptr.Int(0),
+	}
 	event := apiEventToEvent(*request.Body)
 
 	err := a.db.CreateEvent(ctx, event)
@@ -110,6 +116,15 @@ func eventToApiEvent(event events.Event) Event {
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
 		RegistrationTypes:     slices.Map(event.RegistrationTypes, func(t events.RegistrationType) RegistrationType { return registrationTypeToApiRegistrationType(t) }),
+		AllowedTeamSizeRange: Range{
+			Min: event.AllowedTeamSizeRange.Min,
+			Max: event.AllowedTeamSizeRange.Max,
+		},
+		SignUpStats: SignUpStats{
+			NumTeams:           &event.NumTeams,
+			NumRosteredPlayers: &event.NumRosteredPlayers,
+			NumTotalPlayers:    &event.NumTotalPlayers,
+		},
 	}
 }
 
@@ -122,6 +137,13 @@ func apiEventToEvent(event Event) events.Event {
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
 		RegistrationTypes:     slices.Map(event.RegistrationTypes, func(t RegistrationType) events.RegistrationType { return apiRegistrationTypeToRegistrationType(t) }),
+		NumTotalPlayers:       *event.SignUpStats.NumTotalPlayers,
+		NumRosteredPlayers:    *event.SignUpStats.NumRosteredPlayers,
+		NumTeams:              *event.SignUpStats.NumTeams,
+		AllowedTeamSizeRange: events.Range{
+			Min: event.AllowedTeamSizeRange.Min,
+			Max: event.AllowedTeamSizeRange.Max,
+		},
 	}
 }
 

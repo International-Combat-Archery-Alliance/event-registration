@@ -168,9 +168,12 @@ func (d *DB) CreateRegistration(ctx context.Context, reg registration.Registrati
 		},
 	})
 	if err != nil {
-		var condCheckFailedErr *types.ConditionalCheckFailedException
-		if errors.As(err, &condCheckFailedErr) {
-			return registration.NewRegistrationAlreadyExistsError(fmt.Sprintf("Registration with ID %q already exists", dynamoReg.ID), err)
+		var transactionFailedErr *types.TransactionCanceledException
+		if errors.As(err, &transactionFailedErr) {
+			if transactionFailedErr.CancellationReasons[0].Code != nil {
+				return registration.NewRegistrationAlreadyExistsError(fmt.Sprintf("Registration with ID %q already exists", dynamoReg.ID), err)
+			}
+			return registration.NewFailedToWriteError("Version conflict error", err)
 		} else {
 			return registration.NewFailedToWriteError("Failed PutItem call", err)
 		}
