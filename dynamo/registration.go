@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
@@ -23,10 +26,11 @@ type registrationDynamo struct {
 	Type events.RegistrationType
 
 	// Both type attributes
-	ID       uuid.UUID
-	EventID  uuid.UUID
-	HomeCity string
-	Paid     bool
+	ID           uuid.UUID
+	EventID      uuid.UUID
+	RegisteredAt time.Time
+	HomeCity     string
+	Paid         bool
 
 	// Individual attributes
 	Email      string
@@ -56,16 +60,17 @@ func registrationToDynamo(reg registration.Registration) registrationDynamo {
 	case events.BY_INDIVIDUAL:
 		indivReg := reg.(registration.IndividualRegistration)
 		return registrationDynamo{
-			PK:         registrationPK(indivReg.EventID),
-			SK:         registrationSK(indivReg.ID),
-			Type:       indivReg.Type(),
-			ID:         indivReg.ID,
-			EventID:    indivReg.EventID,
-			HomeCity:   indivReg.HomeCity,
-			Paid:       indivReg.Paid,
-			Email:      indivReg.Email,
-			PlayerInfo: indivReg.PlayerInfo,
-			Experience: indivReg.Experience,
+			PK:           registrationPK(indivReg.EventID),
+			SK:           registrationSK(indivReg.ID),
+			Type:         indivReg.Type(),
+			ID:           indivReg.ID,
+			EventID:      indivReg.EventID,
+			RegisteredAt: indivReg.RegisteredAt,
+			HomeCity:     indivReg.HomeCity,
+			Paid:         indivReg.Paid,
+			Email:        indivReg.Email,
+			PlayerInfo:   indivReg.PlayerInfo,
+			Experience:   indivReg.Experience,
 		}
 	case events.BY_TEAM:
 		teamReg := reg.(registration.TeamRegistration)
@@ -75,6 +80,7 @@ func registrationToDynamo(reg registration.Registration) registrationDynamo {
 			Type:         teamReg.Type(),
 			ID:           teamReg.ID,
 			EventID:      teamReg.EventID,
+			RegisteredAt: teamReg.RegisteredAt,
 			HomeCity:     teamReg.HomeCity,
 			Paid:         teamReg.Paid,
 			TeamName:     teamReg.TeamName,
@@ -90,18 +96,20 @@ func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 	switch dynReg.Type {
 	case events.BY_INDIVIDUAL:
 		return registration.IndividualRegistration{
-			ID:         dynReg.ID,
-			EventID:    dynReg.EventID,
-			HomeCity:   dynReg.HomeCity,
-			Paid:       dynReg.Paid,
-			Email:      dynReg.Email,
-			PlayerInfo: dynReg.PlayerInfo,
-			Experience: dynReg.Experience,
+			ID:           dynReg.ID,
+			EventID:      dynReg.EventID,
+			RegisteredAt: dynReg.RegisteredAt,
+			HomeCity:     dynReg.HomeCity,
+			Paid:         dynReg.Paid,
+			Email:        dynReg.Email,
+			PlayerInfo:   dynReg.PlayerInfo,
+			Experience:   dynReg.Experience,
 		}
 	case events.BY_TEAM:
 		return registration.TeamRegistration{
 			ID:           dynReg.ID,
 			EventID:      dynReg.EventID,
+			RegisteredAt: dynReg.RegisteredAt,
 			HomeCity:     dynReg.HomeCity,
 			Paid:         dynReg.Paid,
 			TeamName:     dynReg.TeamName,
@@ -161,4 +169,63 @@ func (d *DB) GetRegistration(ctx context.Context, eventId uuid.UUID, id uuid.UUI
 	}
 
 	return dynamoToRegistration(dynReg), nil
+}
+
+func (d *DB) GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID, cursor *string, limit int32) (registration.GetAllRegistrationsResponse, error) {
+	keyCond := expression.Key("PK").Equal(expression.Value(registrationPK(eventId))).
+		And(expression.Key("SK").BeginsWith(registrationEntityName))
+
+	expr, err := expression.NewBuilder().WithKeyCondition(keyCond).Build()
+	if err != nil {
+		panic(fmt.Sprintf("failed to build dynamo key expression: %s", err))
+	}
+
+	var startKey map[string]types.AttributeValue
+	if cursor != nil {
+		startKey, err = cursorToLastEval(*cursor)
+		if err != nil {
+			return registration.GetAllRegistrationsResponse{}, registration.NewInvalidCursorError("Invalid cursor", err)
+		}
+	}
+
+	result, err := d.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(d.tableName),
+		KeyConditionExpression:    expr.KeyCondition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		// Fetch 1 more than limit to check if there is another page or not
+		Limit:             aws.Int32(limit + 1),
+		ExclusiveStartKey: startKey,
+	})
+	if err != nil {
+		return registration.GetAllRegistrationsResponse{}, registration.NewFailedToFetchError("Failed to fetch registrations from dynamo", err)
+	}
+
+	var dynamoItems []registrationDynamo
+	err = attributevalue.UnmarshalListOfMaps(result.Items, &dynamoItems)
+	if err != nil {
+		panic(fmt.Sprintf("failed to unmarshal dynamo registrations: %s", err))
+	}
+
+	hasNextPage := len(dynamoItems) > int(limit)
+
+	var newCursor *string
+	if hasNextPage && len(result.LastEvaluatedKey) > 0 {
+		// Can't use LastEvalKey directly because we grabbed an extra item to check for next page
+		lastItemGivenToUser := result.Items[len(result.Items)-2]
+		lastItemKey := getKeyFromItem(result.LastEvaluatedKey, lastItemGivenToUser)
+		c, err := lastEvalKeyToCursor(lastItemKey)
+		if err != nil {
+			panic(fmt.Sprintf("failed to make cursor from lastEvalKey: %s", err))
+		}
+		newCursor = &c
+	}
+
+	return registration.GetAllRegistrationsResponse{
+		Data: slices.Map(dynamoItems, func(v registrationDynamo) registration.Registration {
+			return dynamoToRegistration(v)
+		})[:min(int(limit), len(dynamoItems))],
+		Cursor:      newCursor,
+		HasNextPage: hasNextPage,
+	}, nil
 }

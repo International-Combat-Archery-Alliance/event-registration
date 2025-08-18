@@ -3,6 +3,7 @@ package registration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/google/uuid"
@@ -11,6 +12,13 @@ import (
 type Repository interface {
 	GetRegistration(ctx context.Context, eventId uuid.UUID, id uuid.UUID) (Registration, error)
 	CreateRegistration(ctx context.Context, registration Registration) error
+	GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID, cursor *string, limit int32) (GetAllRegistrationsResponse, error)
+}
+
+type GetAllRegistrationsResponse struct {
+	Data        []Registration
+	Cursor      *string
+	HasNextPage bool
 }
 
 type Registration interface {
@@ -18,13 +26,14 @@ type Registration interface {
 }
 
 type IndividualRegistration struct {
-	ID         uuid.UUID
-	EventID    uuid.UUID
-	HomeCity   string
-	Paid       bool
-	Email      string
-	PlayerInfo PlayerInfo
-	Experience ExperienceLevel
+	ID           uuid.UUID
+	EventID      uuid.UUID
+	RegisteredAt time.Time
+	HomeCity     string
+	Paid         bool
+	Email        string
+	PlayerInfo   PlayerInfo
+	Experience   ExperienceLevel
 }
 
 func (r IndividualRegistration) Type() events.RegistrationType {
@@ -34,6 +43,7 @@ func (r IndividualRegistration) Type() events.RegistrationType {
 type TeamRegistration struct {
 	ID           uuid.UUID
 	EventID      uuid.UUID
+	RegisteredAt time.Time
 	HomeCity     string
 	Paid         bool
 	TeamName     string

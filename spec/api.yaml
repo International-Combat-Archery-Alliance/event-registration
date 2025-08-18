@@ -218,6 +218,10 @@ components:
           type: string
           format: uuid
           readOnly: true
+        registeredAt:
+          type: string
+          format: date-time
+          readOnly: true
         email:
           type: string
           format: email
@@ -247,6 +251,10 @@ components:
         eventId:
           type: string
           format: uuid
+          readOnly: true
+        registeredAt:
+          type: string
+          format: date-time
           readOnly: true
         teamName:
           type: string
