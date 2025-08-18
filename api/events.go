@@ -26,7 +26,7 @@ func (a *API) GetEvents(ctx context.Context, request GetEventsRequestObject) (Ge
 	if err != nil {
 		a.logger.Error("Failed to get events from the DB", "error", err)
 
-		var eventErr *events.EventError
+		var eventErr *events.Error
 		if errors.As(err, &eventErr) {
 			switch eventErr.Reason {
 			case events.REASON_INVALID_CURSOR:
@@ -81,7 +81,7 @@ func (a *API) GetEventsId(ctx context.Context, request GetEventsIdRequestObject)
 	if err != nil {
 		a.logger.Error("Failed to fetch an event", "error", err)
 
-		var eventErr *events.EventError
+		var eventErr *events.Error
 		if errors.As(err, &eventErr) {
 			switch eventErr.Reason {
 			case events.REASON_EVENT_DOES_NOT_EXIST:

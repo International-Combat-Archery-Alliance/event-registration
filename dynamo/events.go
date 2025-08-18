@@ -24,6 +24,7 @@ type eventDynamo struct {
 	GSI1PK                string
 	GSI1SK                string
 	ID                    uuid.UUID
+	Version               int
 	Name                  string
 	EventLocation         events.Location
 	StartTime             time.Time
@@ -51,6 +52,7 @@ func newEventDynamo(event events.Event) eventDynamo {
 		GSI1PK:                eventEntityName,
 		GSI1SK:                fmt.Sprintf("%s#%s#%s", eventEntityName, event.StartTime, event.ID),
 		ID:                    event.ID,
+		Version:               event.Version,
 		Name:                  event.Name,
 		EventLocation:         event.EventLocation,
 		StartTime:             event.StartTime,
@@ -63,6 +65,7 @@ func newEventDynamo(event events.Event) eventDynamo {
 func eventFromEventDynamo(event eventDynamo) events.Event {
 	return events.Event{
 		ID:                    event.ID,
+		Version:               event.Version,
 		Name:                  event.Name,
 		EventLocation:         event.EventLocation,
 		StartTime:             event.StartTime,
@@ -104,10 +107,15 @@ func (d *DB) CreateEvent(ctx context.Context, event events.Event) error {
 		return events.NewFailedToTranslateToDBModelError("Failed to convert Event to eventDynamo", err)
 	}
 
+	expr := exprMustBuild(expression.NewBuilder().
+		WithCondition(newEntityVersionConditional(dynamoItem.Version)))
+
 	_, err = d.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(d.tableName),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(PK)"),
+		TableName:                 aws.String(d.tableName),
+		Item:                      item,
+		ConditionExpression:       expr.Condition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
 	})
 	if err != nil {
 		var condCheckFailedErr *types.ConditionalCheckFailedException
@@ -189,10 +197,15 @@ func (d *DB) UpdateEvent(ctx context.Context, event events.Event) error {
 		return events.NewFailedToTranslateToDBModelError("Failed to convert Event to eventDynamo", err)
 	}
 
+	expr := exprMustBuild(expression.NewBuilder().
+		WithCondition(existingEntityVersionConditional(dynamoItem.Version)))
+
 	_, err = d.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(d.tableName),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_exists(PK)"),
+		TableName:                 aws.String(d.tableName),
+		Item:                      item,
+		ConditionExpression:       expr.Condition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
 	})
 	if err != nil {
 		var condCheckFailedErr *types.ConditionalCheckFailedException

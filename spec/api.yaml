@@ -171,6 +171,8 @@ components:
         - endTime
         - registrationCloseTime
         - registrationTypes
+        - teamSizeRange
+        - signUpStats
       properties:
         id:
           type: string
@@ -193,8 +195,22 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RegistrationType'
-        teamSizeRange:
+        allowedTeamSizeRange:
           $ref: '#/components/schemas/Range'
+        signUpStats:
+          $ref: '#/components/schemas/SignUpStats'
+    SignUpStats:
+      type: object
+      properties:
+        numTeams:
+          type: integer
+          readOnly: true
+        numRosteredPlayers:
+          type: integer
+          readOnly: true
+        numTotalPlayers:
+          type: integer
+          readOnly: true
     Registration:
       oneOf:
         - $ref: '#/components/schemas/IndividualRegistration'

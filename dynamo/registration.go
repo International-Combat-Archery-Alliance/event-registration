@@ -27,6 +27,7 @@ type registrationDynamo struct {
 
 	// Both type attributes
 	ID           uuid.UUID
+	Version      int
 	EventID      uuid.UUID
 	RegisteredAt time.Time
 	HomeCity     string
@@ -64,6 +65,7 @@ func registrationToDynamo(reg registration.Registration) registrationDynamo {
 			SK:           registrationSK(indivReg.ID),
 			Type:         indivReg.Type(),
 			ID:           indivReg.ID,
+			Version:      indivReg.Version,
 			EventID:      indivReg.EventID,
 			RegisteredAt: indivReg.RegisteredAt,
 			HomeCity:     indivReg.HomeCity,
@@ -79,6 +81,7 @@ func registrationToDynamo(reg registration.Registration) registrationDynamo {
 			SK:           registrationSK(teamReg.ID),
 			Type:         teamReg.Type(),
 			ID:           teamReg.ID,
+			Version:      teamReg.Version,
 			EventID:      teamReg.EventID,
 			RegisteredAt: teamReg.RegisteredAt,
 			HomeCity:     teamReg.HomeCity,
@@ -97,6 +100,7 @@ func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 	case events.BY_INDIVIDUAL:
 		return registration.IndividualRegistration{
 			ID:           dynReg.ID,
+			Version:      dynReg.Version,
 			EventID:      dynReg.EventID,
 			RegisteredAt: dynReg.RegisteredAt,
 			HomeCity:     dynReg.HomeCity,
@@ -108,6 +112,7 @@ func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 	case events.BY_TEAM:
 		return registration.TeamRegistration{
 			ID:           dynReg.ID,
+			Version:      dynReg.Version,
 			EventID:      dynReg.EventID,
 			RegisteredAt: dynReg.RegisteredAt,
 			HomeCity:     dynReg.HomeCity,
@@ -121,18 +126,46 @@ func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 	}
 }
 
-func (d *DB) CreateRegistration(ctx context.Context, reg registration.Registration) error {
+func (d *DB) CreateRegistration(ctx context.Context, reg registration.Registration, event events.Event) error {
 	dynamoReg := registrationToDynamo(reg)
 
-	item, err := attributevalue.MarshalMap(dynamoReg)
+	regItem, err := attributevalue.MarshalMap(dynamoReg)
 	if err != nil {
 		return registration.NewFailedToTranslateToDBModelError("Failed to translate registration to dynamo model", err)
 	}
+	regExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(newEntityVersionConditional(dynamoReg.Version)))
 
-	_, err = d.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(d.tableName),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(SK)"),
+	dynamoEvent := newEventDynamo(event)
+
+	eventItem, err := attributevalue.MarshalMap(dynamoEvent)
+	if err != nil {
+		return registration.NewFailedToTranslateToDBModelError("Failed to translate event to dynamo model", err)
+	}
+	eventExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(existingEntityVersionConditional(event.Version)))
+
+	_, err = d.dynamoClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{
+			{
+				Put: &types.Put{
+					TableName:                 aws.String(d.tableName),
+					Item:                      regItem,
+					ConditionExpression:       regExpr.Condition(),
+					ExpressionAttributeNames:  regExpr.Names(),
+					ExpressionAttributeValues: regExpr.Values(),
+				},
+			},
+			{
+				Put: &types.Put{
+					TableName:                 aws.String(d.tableName),
+					Item:                      eventItem,
+					ConditionExpression:       eventExpr.Condition(),
+					ExpressionAttributeNames:  eventExpr.Names(),
+					ExpressionAttributeValues: eventExpr.Values(),
+				},
+			},
+		},
 	})
 	if err != nil {
 		var condCheckFailedErr *types.ConditionalCheckFailedException

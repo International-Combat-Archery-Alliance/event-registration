@@ -2,6 +2,7 @@ package registration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 
 type Repository interface {
 	GetRegistration(ctx context.Context, eventId uuid.UUID, id uuid.UUID) (Registration, error)
-	CreateRegistration(ctx context.Context, registration Registration) error
+	CreateRegistration(ctx context.Context, registration Registration, event events.Event) error
 	GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID, cursor *string, limit int32) (GetAllRegistrationsResponse, error)
 }
 
@@ -22,11 +23,13 @@ type GetAllRegistrationsResponse struct {
 }
 
 type Registration interface {
+	GetEventID() uuid.UUID
 	Type() events.RegistrationType
 }
 
 type IndividualRegistration struct {
 	ID           uuid.UUID
+	Version      int
 	EventID      uuid.UUID
 	RegisteredAt time.Time
 	HomeCity     string
@@ -36,12 +39,17 @@ type IndividualRegistration struct {
 	Experience   ExperienceLevel
 }
 
+func (r IndividualRegistration) GetEventID() uuid.UUID {
+	return r.EventID
+}
+
 func (r IndividualRegistration) Type() events.RegistrationType {
 	return events.BY_INDIVIDUAL
 }
 
 type TeamRegistration struct {
 	ID           uuid.UUID
+	Version      int
 	EventID      uuid.UUID
 	RegisteredAt time.Time
 	HomeCity     string
@@ -51,63 +59,65 @@ type TeamRegistration struct {
 	Players      []PlayerInfo
 }
 
+func (r TeamRegistration) GetEventID() uuid.UUID {
+	return r.EventID
+}
+
 func (r TeamRegistration) Type() events.RegistrationType {
 	return events.BY_TEAM
 }
 
-type ErrorReason string
+func AttemptRegistration(ctx context.Context, registrationRequest Registration, eventRepo events.Repository, registrationRepo Repository) error {
+	eventId := registrationRequest.GetEventID()
 
-const (
-	REASON_FAILED_TO_TRANSLATE_TO_DB_MODEL ErrorReason = "FAILED_TO_TRANSLATE_TO_DB_MODEL"
-	REASON_FAILED_TO_WRITE                 ErrorReason = "FAILED_TO_WRITE"
-	REASON_REGISTRATION_DOES_NOT_EXIST     ErrorReason = "EVENT_DOES_NOT_EXIST"
-	REASON_REGISTRATION_ALREADY_EXISTS     ErrorReason = "EVENT_ALREADY_EXISTS"
-	REASON_FAILED_TO_FETCH                 ErrorReason = "FAILED_TO_FETCH"
-	REASON_INVALID_CURSOR                  ErrorReason = "INVALID_CURSOR"
-)
+	event, err := eventRepo.GetEvent(ctx, eventId)
+	if err != nil {
+		var eventErr *events.Error
+		if errors.As(err, &eventErr) {
+			switch eventErr.Reason {
+			case events.REASON_EVENT_DOES_NOT_EXIST:
+				return NewAssociatedEventDoesNotExistError(fmt.Sprintf("Event does not exist with ID %q", eventId), err)
+			}
+		}
 
-type RegistrationError struct {
-	Reason  ErrorReason
-	Message string
-	Cause   error
-}
-
-func (e *RegistrationError) Error() string {
-	return fmt.Sprintf("%s: %s. Reason: %s", e.Reason, e.Message, e.Cause)
-}
-
-func (e *RegistrationError) Unwrap() error {
-	return e.Cause
-}
-
-func newRegistrationError(reason ErrorReason, message string, cause error) *RegistrationError {
-	return &RegistrationError{
-		Reason:  reason,
-		Message: message,
-		Cause:   cause,
+		return NewFailedToFetchError(fmt.Sprintf("Failed to fetch event with ID %q", eventId), err)
 	}
+
+	switch registrationRequest.Type() {
+	case events.BY_INDIVIDUAL:
+		err = registerIndividualAsFreeAgent(&event, registrationRequest.(IndividualRegistration))
+		if err != nil {
+			return err
+		}
+	case events.BY_TEAM:
+		err = registerTeam(&event, registrationRequest.(TeamRegistration))
+		if err != nil {
+			return err
+		}
+	default:
+		return NewUnknownRegistrationTypeError(fmt.Sprintf("Unknown registration type: %d", registrationRequest.Type()))
+	}
+
+	event.Version++
+	return registrationRepo.CreateRegistration(ctx, registrationRequest, event)
 }
 
-func NewFailedToWriteError(message string, cause error) *RegistrationError {
-	return newRegistrationError(REASON_FAILED_TO_WRITE, message, cause)
+func registerIndividualAsFreeAgent(event *events.Event, reg IndividualRegistration) error {
+	event.NumTotalPlayers++
+
+	return nil
 }
 
-func NewFailedToTranslateToDBModelError(message string, cause error) *RegistrationError {
-	return newRegistrationError(REASON_FAILED_TO_TRANSLATE_TO_DB_MODEL, message, cause)
-}
+func registerTeam(event *events.Event, reg TeamRegistration) error {
+	teamSize := len(reg.Players)
 
-func NewRegistrationAlreadyExistsError(message string, cause error) *RegistrationError {
-	return newRegistrationError(REASON_REGISTRATION_ALREADY_EXISTS, message, cause)
-}
+	if teamSize < event.AllowedTeamSizeRange.Min || teamSize > event.AllowedTeamSizeRange.Max {
+		return NewTeamSizeNotAllowedError(teamSize, event.AllowedTeamSizeRange.Min, event.AllowedTeamSizeRange.Max)
+	}
 
-func NewRegistrationDoesNotExistsError(message string, cause error) *RegistrationError {
-	return newRegistrationError(REASON_REGISTRATION_DOES_NOT_EXIST, message, cause)
-}
+	event.NumTeams++
+	event.NumTotalPlayers += teamSize
+	event.NumRosteredPlayers += teamSize
 
-func NewFailedToFetchError(message string, cause error) *RegistrationError {
-	return newRegistrationError(REASON_FAILED_TO_FETCH, message, cause)
-}
-
-func NewInvalidCursorError(message string, cause error) *RegistrationError {
-	return newRegistrationError(REASON_INVALID_CURSOR, message, cause)
+	return nil
 }

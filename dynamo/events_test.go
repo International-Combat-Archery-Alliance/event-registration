@@ -43,7 +43,7 @@ func TestCreateEvent(t *testing.T) {
 
 		eventErr := db.CreateEvent(ctx, event)
 		require.Error(t, eventErr)
-		var eventError *events.EventError
+		var eventError *events.Error
 		require.ErrorAs(t, eventErr, &eventError)
 		assert.Equal(t, events.REASON_EVENT_ALREADY_EXISTS, eventError.Reason)
 	})
@@ -110,7 +110,7 @@ func TestGetEvent(t *testing.T) {
 
 		_, err := db.GetEvent(ctx, uuid.New())
 		require.Error(t, err)
-		var eventError *events.EventError
+		var eventError *events.Error
 		require.ErrorAs(t, err, &eventError)
 		assert.Equal(t, events.REASON_EVENT_DOES_NOT_EXIST, eventError.Reason)
 	})
@@ -216,7 +216,7 @@ func TestUpdateEvent(t *testing.T) {
 
 		eventErr := db.UpdateEvent(ctx, event)
 		require.Error(t, eventErr)
-		var eventError *events.EventError
+		var eventError *events.Error
 		require.ErrorAs(t, eventErr, &eventError)
 		assert.Equal(t, events.REASON_EVENT_DOES_NOT_EXIST, eventError.Reason)
 	})

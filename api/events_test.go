@@ -172,7 +172,7 @@ func TestGetEventsId(t *testing.T) {
 		id := uuid.New()
 		mock := &mockDB{
 			GetEventFunc: func(ctx context.Context, eventId uuid.UUID) (events.Event, error) {
-				return events.Event{}, &events.EventError{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
+				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
 		api := NewAPI(mock, noopLogger)

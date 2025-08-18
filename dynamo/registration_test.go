@@ -3,7 +3,6 @@ package dynamo
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/google/uuid"
@@ -17,12 +16,11 @@ func TestCreateRegistration(t *testing.T) {
 	t.Run("successfully create an individual registration", func(t *testing.T) {
 		resetTable(ctx)
 		reg := registration.IndividualRegistration{
-			ID:           uuid.New(),
-			EventID:      uuid.New(),
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
-			HomeCity:     "Test City",
-			Paid:         true,
-			Email:        "test@example.com",
+			ID:         uuid.New(),
+			EventID:    uuid.New(),
+			HomeCity:   "Test City",
+			Paid:       true,
+			Email:      "test@example.com",
 			PlayerInfo: registration.PlayerInfo{FirstName: "John", LastName: "Doe"},
 			Experience: registration.NOVICE,
 		}
@@ -40,7 +38,6 @@ func TestCreateRegistration(t *testing.T) {
 		reg := registration.TeamRegistration{
 			ID:           uuid.New(),
 			EventID:      uuid.New(),
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
 			HomeCity:     "Team City",
 			Paid:         false,
 			TeamName:     "Test Team",
@@ -72,7 +69,7 @@ func TestCreateRegistration(t *testing.T) {
 
 		err := db.CreateRegistration(ctx, reg)
 		require.Error(t, err)
-		var regError *registration.RegistrationError
+		var regError *registration.Error
 		require.ErrorAs(t, err, &regError)
 		assert.Equal(t, registration.REASON_REGISTRATION_ALREADY_EXISTS, regError.Reason)
 	})
@@ -84,12 +81,11 @@ func TestGetRegistration(t *testing.T) {
 	t.Run("successfully get an individual registration", func(t *testing.T) {
 		resetTable(ctx)
 		reg := registration.IndividualRegistration{
-			ID:           uuid.New(),
-			EventID:      uuid.New(),
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
-			HomeCity:     "Test City",
-			Paid:         true,
-			Email:        "test@example.com",
+			ID:         uuid.New(),
+			EventID:    uuid.New(),
+			HomeCity:   "Test City",
+			Paid:       true,
+			Email:      "test@example.com",
 			PlayerInfo: registration.PlayerInfo{FirstName: "John", LastName: "Doe"},
 			Experience: registration.NOVICE,
 		}
@@ -105,7 +101,6 @@ func TestGetRegistration(t *testing.T) {
 		reg := registration.TeamRegistration{
 			ID:           uuid.New(),
 			EventID:      uuid.New(),
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
 			HomeCity:     "Team City",
 			Paid:         false,
 			TeamName:     "Test Team",
@@ -124,7 +119,7 @@ func TestGetRegistration(t *testing.T) {
 
 		_, err := db.GetRegistration(ctx, uuid.New(), uuid.New())
 		require.Error(t, err)
-		var regError *registration.RegistrationError
+		var regError *registration.Error
 		require.ErrorAs(t, err, &regError)
 		assert.Equal(t, registration.REASON_REGISTRATION_DOES_NOT_EXIST, regError.Reason)
 	})
@@ -152,22 +147,20 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		eventID := uuid.New()
 
 		reg1 := registration.IndividualRegistration{
-			ID:           uuid.New(),
-			EventID:      eventID,
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
-			HomeCity:     "City A",
-			Paid:         true,
-			Email:        "a@example.com",
+			ID:         uuid.New(),
+			EventID:    eventID,
+			HomeCity:   "City A",
+			Paid:       true,
+			Email:      "a@example.com",
 			PlayerInfo: registration.PlayerInfo{FirstName: "Alice", LastName: "Smith"},
 			Experience: registration.NOVICE,
 		}
 		reg2 := registration.IndividualRegistration{
-			ID:           uuid.New(),
-			EventID:      eventID,
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
-			HomeCity:     "City B",
-			Paid:         false,
-			Email:        "b@example.com",
+			ID:         uuid.New(),
+			EventID:    eventID,
+			HomeCity:   "City B",
+			Paid:       false,
+			Email:      "b@example.com",
 			PlayerInfo: registration.PlayerInfo{FirstName: "Bob", LastName: "Johnson"},
 			Experience: registration.INTERMEDIATE,
 		}
@@ -205,7 +198,6 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		teamReg1 := registration.TeamRegistration{
 			ID:           uuid.New(),
 			EventID:      eventID,
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
 			HomeCity:     "Team City 1",
 			Paid:         true,
 			TeamName:     "Team Alpha",
@@ -215,7 +207,6 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		teamReg2 := registration.TeamRegistration{
 			ID:           uuid.New(),
 			EventID:      eventID,
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
 			HomeCity:     "Team City 2",
 			Paid:         false,
 			TeamName:     "Team Beta",
@@ -265,19 +256,17 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		eventID := uuid.New()
 
 		regIndiv := registration.IndividualRegistration{
-			ID:           uuid.New(),
-			EventID:      eventID,
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
-			HomeCity:     "Mixed City",
-			Paid:         true,
-			Email:        "mixed@example.com",
+			ID:         uuid.New(),
+			EventID:    eventID,
+			HomeCity:   "Mixed City",
+			Paid:       true,
+			Email:      "mixed@example.com",
 			PlayerInfo: registration.PlayerInfo{FirstName: "Mixed", LastName: "User"},
 			Experience: registration.NOVICE,
 		}
 		regTeam := registration.TeamRegistration{
 			ID:           uuid.New(),
 			EventID:      eventID,
-			RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
 			HomeCity:     "Mixed Team City",
 			Paid:         false,
 			TeamName:     "Mixed Team",
@@ -315,9 +304,9 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		eventID := uuid.New()
 
 		// Create 3 registrations
-		reg1 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC), PlayerInfo: registration.PlayerInfo{FirstName: "P1"}}
-		reg2 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC), PlayerInfo: registration.PlayerInfo{FirstName: "P2"}}
-		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC), PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
+		reg1 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, PlayerInfo: registration.PlayerInfo{FirstName: "P1"}}
+		reg2 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, PlayerInfo: registration.PlayerInfo{FirstName: "P2"}}
+		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
 
 		require.NoError(t, db.CreateRegistration(ctx, reg1))
 		require.NoError(t, db.CreateRegistration(ctx, reg2))
@@ -344,9 +333,9 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		eventID := uuid.New()
 
 		// Create 3 registrations
-		reg1 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC), PlayerInfo: registration.PlayerInfo{FirstName: "P1"}}
-		reg2 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC), PlayerInfo: registration.PlayerInfo{FirstName: "P2"}}
-		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, RegisteredAt: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC), PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
+		reg1 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, PlayerInfo: registration.PlayerInfo{FirstName: "P1"}}
+		reg2 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, PlayerInfo: registration.PlayerInfo{FirstName: "P2"}}
+		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
 
 		require.NoError(t, db.CreateRegistration(ctx, reg1))
 		require.NoError(t, db.CreateRegistration(ctx, reg2))
@@ -376,4 +365,3 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		a.Len(returnedIDs, 3) // All three should be found across both pages
 	})
 }
-
