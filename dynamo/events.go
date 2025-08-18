@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var _ events.EventRepository = &DB{}
+var _ events.Repository = &DB{}
 
 type eventDynamo struct {
 	PK                    string
@@ -29,32 +29,34 @@ type eventDynamo struct {
 	StartTime             time.Time
 	EndTime               time.Time
 	RegistrationCloseTime time.Time
+	RegistrationTypes     []events.RegistrationType
 }
 
 const (
-	eventPKPrefix = "EVENT"
+	eventEntityName = "EVENT"
 )
 
 func eventPK(id uuid.UUID) string {
-	return fmt.Sprintf("%s#%s", eventPKPrefix, id)
+	return fmt.Sprintf("%s#%s", eventEntityName, id)
 }
 
 func eventSK(id uuid.UUID) string {
-	return fmt.Sprintf("%s#%s", eventPKPrefix, id)
+	return fmt.Sprintf("%s#%s", eventEntityName, id)
 }
 
 func newEventDynamo(event events.Event) eventDynamo {
 	return eventDynamo{
 		PK:                    eventPK(event.ID),
 		SK:                    eventSK(event.ID),
-		GSI1PK:                eventPKPrefix,
-		GSI1SK:                fmt.Sprintf("%s#%s#%s", eventPKPrefix, event.StartTime, event.ID),
+		GSI1PK:                eventEntityName,
+		GSI1SK:                fmt.Sprintf("%s#%s#%s", eventEntityName, event.StartTime, event.ID),
 		ID:                    event.ID,
 		Name:                  event.Name,
 		EventLocation:         event.EventLocation,
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
+		RegistrationTypes:     event.RegistrationTypes,
 	}
 }
 
@@ -66,6 +68,7 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
+		RegistrationTypes:     event.RegistrationTypes,
 	}
 }
 
@@ -119,8 +122,8 @@ func (d *DB) CreateEvent(ctx context.Context, event events.Event) error {
 }
 
 func (d *DB) GetEvents(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error) {
-	keyCond := expression.Key("GSI1PK").Equal(expression.Value(eventPKPrefix)).
-		And(expression.Key("GSI1SK").BeginsWith(eventPKPrefix))
+	keyCond := expression.Key("GSI1PK").Equal(expression.Value(eventEntityName)).
+		And(expression.Key("GSI1SK").BeginsWith(eventEntityName))
 
 	expr, err := expression.NewBuilder().WithKeyCondition(keyCond).Build()
 	if err != nil {

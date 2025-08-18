@@ -8,7 +8,7 @@ import (
 )
 
 type DB interface {
-	events.EventRepository
+	events.Repository
 }
 
 type API struct {

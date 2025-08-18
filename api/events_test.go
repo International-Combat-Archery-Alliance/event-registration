@@ -44,6 +44,7 @@ func TestGetEvents(t *testing.T) {
 				StartTime:             now,
 				EndTime:               now.Add(time.Hour),
 				RegistrationCloseTime: now,
+				RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL},
 			},
 		}
 		mock := &mockDB{
@@ -68,6 +69,7 @@ func TestGetEvents(t *testing.T) {
 			assert.Equal(t, len(expectedEvents), len(r.Data))
 			assert.Equal(t, &expectedEvents[0].ID, r.Data[0].Id)
 			assert.Equal(t, expectedEvents[0].Name, r.Data[0].Name)
+			assert.Equal(t, []RegistrationType{ByIndividual}, r.Data[0].RegistrationTypes)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
@@ -102,6 +104,7 @@ func TestPostEvents(t *testing.T) {
 			StartTime:             now,
 			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
+			RegistrationTypes:     []RegistrationType{ByIndividual},
 		}
 		mock := &mockDB{
 			CreateEventFunc: func(ctx context.Context, event events.Event) error {
@@ -121,6 +124,7 @@ func TestPostEvents(t *testing.T) {
 		case PostEvents200JSONResponse:
 			assert.NotNil(t, r.Id)
 			assert.Equal(t, reqBody.Name, r.Name)
+			assert.Equal(t, reqBody.RegistrationTypes, r.RegistrationTypes)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
@@ -137,6 +141,7 @@ func TestGetEventsId(t *testing.T) {
 			StartTime:             now,
 			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
+			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL},
 		}
 		mock := &mockDB{
 			GetEventFunc: func(ctx context.Context, eventId uuid.UUID) (events.Event, error) {
@@ -157,6 +162,7 @@ func TestGetEventsId(t *testing.T) {
 		case GetEventsId200JSONResponse:
 			assert.Equal(t, &expectedEvent.ID, r.Id)
 			assert.Equal(t, expectedEvent.Name, r.Name)
+			assert.Equal(t, []RegistrationType{ByIndividual}, r.RegistrationTypes)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}

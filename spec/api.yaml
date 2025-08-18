@@ -77,6 +77,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Event'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Unknown server error.
           content:
@@ -120,6 +126,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /events/{id}/registration:
+    post:
+      summary: Sign up for an event
+      description: Sign up for an event
+      parameters:
+        - name: id
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Registration to be created
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Registration'
+      responses:
+        '200':
+          description: The created registration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 components:
   schemas:
@@ -132,6 +170,7 @@ components:
         - startTime
         - endTime
         - registrationCloseTime
+        - registrationTypes
       properties:
         id:
           type: string
@@ -150,6 +189,89 @@ components:
         registrationCloseTime:
           type: string
           format: date-time
+        registrationTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistrationType'
+        teamSizeRange:
+          $ref: '#/components/schemas/Range'
+    Registration:
+      oneOf:
+        - $ref: '#/components/schemas/IndividualRegistration'
+        - $ref: '#/components/schemas/TeamRegistration'
+    IndividualRegistration:
+      type: object
+      required:
+        - id
+        - eventId
+        - email
+        - homeCity
+        - playerInfo
+        - experience
+        - paid
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        eventId:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+        homeCity:
+          type: string
+        playerInfo:
+          $ref: '#/components/schemas/PlayerInfo'
+        experience:
+          $ref: '#/components/schemas/ExperienceLevel'
+        paid:
+          type: boolean
+          readOnly: true
+    TeamRegistration:
+      type: object
+      required:
+        - id
+        - eventId
+        - teamName
+        - homeCity
+        - captainEmail
+        - players
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        eventId:
+          type: string
+          format: uuid
+          readOnly: true
+        teamName:
+          type: string
+        homeCity:
+          type: string
+        captainEmail:
+          type: string
+          format: email
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerInfo'
+        paid:
+          type: boolean
+          readOnly: true
+    PlayerInfo:
+      type: object
+      required:
+        - firstName
+        - lastName
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
     Location:
       type: object
       required:
@@ -184,6 +306,27 @@ components:
         - state
         - postalCode
         - country
+    Range:
+      type: object
+      required:
+        - min
+        - max
+      properties:
+        min:
+          type: integer
+        max:
+          type: integer
+    RegistrationType:
+      type: string
+      enum:
+        - ByIndividual
+        - ByTeam
+    ExperienceLevel:
+      type: string
+      enum:
+        - Novice
+        - Intermediate
+        - Advanced
     ErrorCode:
       type: string
       enum:
@@ -191,6 +334,7 @@ components:
         - LimitOutOfBounds
         - InvalidCursor
         - NotFound
+        - EmptyBody
     Error:
       type: object
       required:
