@@ -15,6 +15,8 @@ import (
 
 func (a *API) PostEventsEventIdRegister(ctx context.Context, request PostEventsEventIdRegisterRequestObject) (PostEventsEventIdRegisterResponseObject, error) {
 	if request.Body == nil {
+		a.logger.Warn("Nil body for registration")
+
 		return PostEventsEventIdRegister400JSONResponse{
 			Code:    EmptyBody,
 			Message: "Must specify a body",
@@ -23,6 +25,8 @@ func (a *API) PostEventsEventIdRegister(ctx context.Context, request PostEventsE
 
 	reg, err := apiRegistrationToRegistration(*request.Body, request.EventId)
 	if err != nil {
+		a.logger.Warn("Invalid body for registration", "error", err)
+
 		return PostEventsEventIdRegister400JSONResponse{
 			Code:    InvalidBody,
 			Message: "Invalid body",
@@ -30,6 +34,8 @@ func (a *API) PostEventsEventIdRegister(ctx context.Context, request PostEventsE
 	}
 	err = registration.AttemptRegistration(ctx, reg, a.db, a.db)
 	if err != nil {
+		a.logger.Error("Error trying to register", "error", err)
+
 		var registrationErr *registration.Error
 
 		if errors.As(err, &registrationErr) {
@@ -55,12 +61,13 @@ func (a *API) PostEventsEventIdRegister(ctx context.Context, request PostEventsE
 
 	respReg, err := registrationToApiRegistration(reg)
 	if err != nil {
+		a.logger.Error("Failed to convert registration to api registration", "error", err)
+
 		return PostEventsEventIdRegister500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to register",
 		}, nil
 	}
-	fmt.Printf("%s\n", respReg)
 
 	return PostEventsEventIdRegister200JSONResponse{Registration: respReg}, nil
 }
@@ -71,6 +78,8 @@ func (a *API) GetEventsEventIdRegistrations(ctx context.Context, request GetEven
 	if request.Params.Limit != nil {
 		userLimit := *request.Params.Limit
 		if userLimit < 1 || userLimit > 50 {
+			a.logger.Warn("Limit out of bounds", "limit", userLimit)
+
 			return GetEventsEventIdRegistrations400JSONResponse{
 				Code:    LimitOutOfBounds,
 				Message: "Limit must be between 1 and 50",

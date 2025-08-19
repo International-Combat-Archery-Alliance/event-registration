@@ -310,6 +310,9 @@ components:
         - $ref: '#/components/schemas/TeamRegistration'
       discriminator:
         propertyName: registrationType
+        mapping:
+          ByIndividual: '#/components/schemas/IndividualRegistration'
+          ByTeam: '#/components/schemas/TeamRegistration'
     IndividualRegistration:
       type: object
       required:
