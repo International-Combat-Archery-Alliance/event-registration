@@ -88,6 +88,9 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 }
 
 func (d *DB) GetEvent(ctx context.Context, id uuid.UUID) (events.Event, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
 	resp, err := d.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(d.tableName),
 		Key: map[string]types.AttributeValue{
@@ -96,6 +99,9 @@ func (d *DB) GetEvent(ctx context.Context, id uuid.UUID) (events.Event, error) {
 		},
 	})
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return events.Event{}, events.NewTimeoutError("GetEvent timed out")
+		}
 		return events.Event{}, events.NewFailedToFetchError(fmt.Sprintf("Failed to fetch event with ID %q", id), err)
 	}
 
@@ -112,6 +118,9 @@ func (d *DB) GetEvent(ctx context.Context, id uuid.UUID) (events.Event, error) {
 }
 
 func (d *DB) CreateEvent(ctx context.Context, event events.Event) error {
+	ctx, cancel := context.WithTimeoutCause(ctx, time.Second, events.NewTimeoutError("CreateEvent to DB took too long"))
+	defer cancel()
+
 	dynamoItem := newEventDynamo(event)
 
 	item, err := attributevalue.MarshalMap(dynamoItem)
@@ -133,6 +142,8 @@ func (d *DB) CreateEvent(ctx context.Context, event events.Event) error {
 		var condCheckFailedErr *types.ConditionalCheckFailedException
 		if errors.As(err, &condCheckFailedErr) {
 			return events.NewEventAlreadyExistsError(fmt.Sprintf("Event with ID %q already exists", event.ID), err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			return events.NewTimeoutError("CreateEvent timed out")
 		} else {
 			return events.NewFailedToWriteError("Failed PutItem call", err)
 		}
@@ -142,6 +153,9 @@ func (d *DB) CreateEvent(ctx context.Context, event events.Event) error {
 }
 
 func (d *DB) GetEvents(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
 	keyCond := expression.Key("GSI1PK").Equal(expression.Value(eventEntityName)).
 		And(expression.Key("GSI1SK").BeginsWith(eventEntityName))
 
@@ -169,6 +183,9 @@ func (d *DB) GetEvents(ctx context.Context, limit int32, cursor *string) (events
 		ExclusiveStartKey: startKey,
 	})
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return events.GetEventsResponse{}, events.NewTimeoutError("GetEvents timed out")
+		}
 		return events.GetEventsResponse{}, events.NewFailedToFetchError("Failed to fetch events from dynamo", err)
 	}
 
@@ -202,6 +219,9 @@ func (d *DB) GetEvents(ctx context.Context, limit int32, cursor *string) (events
 }
 
 func (d *DB) UpdateEvent(ctx context.Context, event events.Event) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
 	dynamoItem := newEventDynamo(event)
 
 	item, err := attributevalue.MarshalMap(dynamoItem)
@@ -223,6 +243,8 @@ func (d *DB) UpdateEvent(ctx context.Context, event events.Event) error {
 		var condCheckFailedErr *types.ConditionalCheckFailedException
 		if errors.As(err, &condCheckFailedErr) {
 			return events.NewEventDoesNotExistsError(fmt.Sprintf("Event with ID %q does not exists", event.ID), err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			return events.NewTimeoutError("UpdateEvent timed out")
 		} else {
 			return events.NewFailedToWriteError("Failed PutItem call", err)
 		}

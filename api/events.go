@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
@@ -11,6 +12,9 @@ import (
 )
 
 func (a *API) GetEvents(ctx context.Context, request GetEventsRequestObject) (GetEventsResponseObject, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	limit := 10
 
 	if request.Params.Limit != nil {
@@ -66,6 +70,9 @@ func (a *API) GetEvents(ctx context.Context, request GetEventsRequestObject) (Ge
 }
 
 func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (PostEventsResponseObject, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	if request.Body == nil {
 		return PostEvents400JSONResponse{
 			Code:    EmptyBody,
@@ -105,6 +112,9 @@ func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (
 }
 
 func (a *API) GetEventsId(ctx context.Context, request GetEventsIdRequestObject) (GetEventsIdResponseObject, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	event, err := a.db.GetEvent(ctx, request.Id)
 	if err != nil {
 		a.logger.Error("Failed to fetch an event", "error", err)

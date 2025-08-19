@@ -11,6 +11,7 @@ const (
 	REASON_EVENT_ALREADY_EXISTS            ErrorReason = "EVENT_ALREADY_EXISTS"
 	REASON_FAILED_TO_FETCH                 ErrorReason = "FAILED_TO_FETCH"
 	REASON_INVALID_CURSOR                  ErrorReason = "INVALID_CURSOR"
+	REASON_TIMEOUT                         ErrorReason = "TIMEOUT"
 )
 
 type Error struct {
@@ -20,7 +21,11 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-	return fmt.Sprintf("%s: %s. Cause: %s", e.Reason, e.Message, e.Cause)
+	s := fmt.Sprintf("%s: %s.", e.Reason, e.Message)
+	if e.Cause != nil {
+		s += fmt.Sprintf(" Cause: %s", e.Cause)
+	}
+	return s
 }
 
 func (e *Error) Unwrap() error {
@@ -57,4 +62,8 @@ func NewFailedToFetchError(message string, cause error) *Error {
 
 func NewInvalidCursorError(message string, cause error) *Error {
 	return newEventError(REASON_INVALID_CURSOR, message, cause)
+}
+
+func NewTimeoutError(message string) *Error {
+	return newEventError(REASON_TIMEOUT, message, nil)
 }
