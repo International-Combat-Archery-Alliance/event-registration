@@ -17,15 +17,7 @@ func (a *API) PostEventsEventIdRegister(ctx context.Context, request PostEventsE
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	if request.Body == nil {
-		a.logger.Warn("Nil body for registration")
-
-		return PostEventsEventIdRegister400JSONResponse{
-			Code:    EmptyBody,
-			Message: "Must specify a body",
-		}, nil
-	}
-
+	// request.Body is guaranteed to be non-nil from openapi doc
 	reg, err := apiRegistrationToRegistration(*request.Body, request.EventId)
 	if err != nil {
 		a.logger.Warn("Invalid body for registration", "error", err)
@@ -84,20 +76,8 @@ func (a *API) GetEventsEventIdRegistrations(ctx context.Context, request GetEven
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	limit := 10
-
-	if request.Params.Limit != nil {
-		userLimit := *request.Params.Limit
-		if userLimit < 1 || userLimit > 50 {
-			a.logger.Warn("Limit out of bounds", "limit", userLimit)
-
-			return GetEventsEventIdRegistrations400JSONResponse{
-				Code:    LimitOutOfBounds,
-				Message: "Limit must be between 1 and 50",
-			}, nil
-		}
-		limit = userLimit
-	}
+	// limit is guaranteed to be non-nil from openapi doc
+	limit := *request.Params.Limit
 
 	result, err := a.db.GetAllRegistrationsForEvent(ctx, request.EventId, int32(limit), request.Params.Cursor)
 	if err != nil {

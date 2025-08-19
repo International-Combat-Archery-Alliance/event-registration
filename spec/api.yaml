@@ -277,6 +277,8 @@ components:
           readOnly: true
         name:
           type: string
+          minLength: 3
+          maxLength: 255
         location:
           $ref: '#/components/schemas/Location'
         startTime:
@@ -353,8 +355,12 @@ components:
         email:
           type: string
           format: email
+          minLength: 3
+          maxLength: 100
         homeCity:
           type: string
+          minLength: 3
+          maxLength: 100
         playerInfo:
           $ref: '#/components/schemas/PlayerInfo'
         experience:
@@ -395,11 +401,16 @@ components:
           readOnly: true
         teamName:
           type: string
+          minLength: 3
+          maxLength: 100
         homeCity:
           type: string
+          minLength: 3
+          maxLength: 100
         captainEmail:
           type: string
           format: email
+          maxLength: 100
         players:
           type: array
           items:
@@ -415,8 +426,12 @@ components:
       properties:
         firstName:
           type: string
+          minLength: 1
+          maxLength: 50
         lastName:
           type: string
+          minLength: 1
+          maxLength: 50
     Location:
       type: object
       required:
@@ -425,6 +440,8 @@ components:
       properties:
         name:
           type: string
+          minLength: 3
+          maxLength: 100
         address:
           $ref: '#/components/schemas/Address'
     Address:
@@ -433,18 +450,28 @@ components:
         street:
           type: string
           description: Street address
+          minLength: 3
+          maxLength: 255
         city:
           type: string
           description: City or town
+          minLength: 3
+          maxLength: 50
         state:
           type: string
           description: State or province
+          minLength: 2
+          maxLength: 50
         postalCode:
           type: string
           description: Postal code
+          minLength: 3
+          maxLength: 20
         country:
           type: string
           description: Country
+          minLength: 2
+          maxLength: 50
       required:
         - street
         - city
@@ -483,6 +510,8 @@ components:
         - InvalidBody
         - AlreadyExists
         - RegistrationClosed
+        - InputValidationError
+        - AuthError
     Error:
       type: object
       required:
