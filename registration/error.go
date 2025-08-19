@@ -21,6 +21,7 @@ const (
 	REASON_TEAM_SIZE_NOT_ALLOWED           ErrorReason = "TEAM_SIZE_NOT_ALLOWED"
 	REASON_NOT_ALLOWED_TO_SIGN_UP_AS_TYPE  ErrorReason = "NOT_ALLOWED_TO_SIGN_UP_AS_TYPE"
 	REASON_REGISTRATION_IS_CLOSED          ErrorReason = "REGISTRATION_IS_CLOSED"
+	REASON_TIMEOUT                         ErrorReason = "TIMEOUT"
 )
 
 type Error struct {
@@ -87,4 +88,8 @@ func NewNotAllowedToSignUpAsTypeError(regType events.RegistrationType) *Error {
 
 func NewRegistrationIsClosedError(closedAt time.Time) *Error {
 	return newRegistrationError(REASON_REGISTRATION_IS_CLOSED, fmt.Sprintf("Past registration closed at time for this event: %s", closedAt), nil)
+}
+
+func NewTimeoutError(message string) *Error {
+	return newRegistrationError(REASON_TIMEOUT, message, nil)
 }

@@ -127,6 +127,9 @@ func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 }
 
 func (d *DB) CreateRegistration(ctx context.Context, reg registration.Registration, event events.Event) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
 	dynamoReg := registrationToDynamo(reg)
 
 	regItem, err := attributevalue.MarshalMap(dynamoReg)
@@ -174,6 +177,8 @@ func (d *DB) CreateRegistration(ctx context.Context, reg registration.Registrati
 				return registration.NewRegistrationAlreadyExistsError(fmt.Sprintf("Registration with ID %q already exists", dynamoReg.ID), err)
 			}
 			return registration.NewFailedToWriteError("Version conflict error", err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			return registration.NewTimeoutError("CreateRegistration timed out")
 		} else {
 			return registration.NewFailedToWriteError("Failed PutItem call", err)
 		}
@@ -183,6 +188,9 @@ func (d *DB) CreateRegistration(ctx context.Context, reg registration.Registrati
 }
 
 func (d *DB) GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
 	keyCond := expression.Key("PK").Equal(expression.Value(registrationPK(eventId))).
 		And(expression.Key("SK").BeginsWith(registrationEntityName))
 
@@ -209,6 +217,9 @@ func (d *DB) GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID,
 		ExclusiveStartKey: startKey,
 	})
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return registration.GetAllRegistrationsResponse{}, registration.NewTimeoutError("GetAllRegistrationsForEvent timed out")
+		}
 		return registration.GetAllRegistrationsResponse{}, registration.NewFailedToFetchError("Failed to fetch registrations from dynamo", err)
 	}
 

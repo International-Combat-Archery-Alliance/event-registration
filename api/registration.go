@@ -14,6 +14,9 @@ import (
 )
 
 func (a *API) PostEventsEventIdRegister(ctx context.Context, request PostEventsEventIdRegisterRequestObject) (PostEventsEventIdRegisterResponseObject, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	if request.Body == nil {
 		a.logger.Warn("Nil body for registration")
 
@@ -78,6 +81,9 @@ func (a *API) PostEventsEventIdRegister(ctx context.Context, request PostEventsE
 }
 
 func (a *API) GetEventsEventIdRegistrations(ctx context.Context, request GetEventsEventIdRegistrationsRequestObject) (GetEventsEventIdRegistrationsResponseObject, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	limit := 10
 
 	if request.Params.Limit != nil {
