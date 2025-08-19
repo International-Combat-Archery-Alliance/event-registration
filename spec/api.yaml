@@ -107,7 +107,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Event'
+                type: object
+                required:
+                  - event
+                properties:
+                  event:
+                    $ref: '#/components/schemas/Event'
         '400':
           description: Bad request.
           content:
@@ -126,12 +131,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /events/{id}/registration:
+  /events/{eventId}/register:
     post:
       summary: Sign up for an event
       description: Sign up for an event
       parameters:
-        - name: id
+        - name: eventId
           in: path
           description: ID of the event
           required: true
@@ -151,13 +156,95 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Registration'
+                type: object
+                required:
+                  - registration
+                properties:
+                  registration:
+                    $ref: '#/components/schemas/Registration'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event is not found to register with
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Someone is already signed up under this email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Unknown server error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /events/{eventId}/registrations:
+    get:
+      summary: Get all registrations for an event
+      description: Get all registrations for an event
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          description: Cursor of where to start from
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Max amount of registrations to fetch
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: A list of registrations.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - hasNextPage
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Registration'
+                  cursor:
+                    type: string
+                  hasNextPage:
+                    type: boolean
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error' 
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          
 
 components:
   schemas:
@@ -165,6 +252,7 @@ components:
       type: object
       required:
         - id
+        - version
         - name
         - location
         - startTime
@@ -177,6 +265,9 @@ components:
         id:
           type: string
           format: uuid
+          readOnly: true
+        version:
+          type: integer
           readOnly: true
         name:
           type: string
@@ -201,6 +292,7 @@ components:
           $ref: '#/components/schemas/SignUpStats'
     SignUpStats:
       type: object
+      readOnly: true
       required:
         - numTeams
         - numRosteredPlayers
@@ -208,21 +300,22 @@ components:
       properties:
         numTeams:
           type: integer
-          readOnly: true
         numRosteredPlayers:
           type: integer
-          readOnly: true
         numTotalPlayers:
           type: integer
-          readOnly: true
     Registration:
       oneOf:
         - $ref: '#/components/schemas/IndividualRegistration'
         - $ref: '#/components/schemas/TeamRegistration'
+      discriminator:
+        propertyName: registrationType
     IndividualRegistration:
       type: object
       required:
+        - registrationType
         - id
+        - version
         - eventId
         - registeredAt
         - email
@@ -231,9 +324,14 @@ components:
         - experience
         - paid
       properties:
+        registrationType:
+          $ref: '#/components/schemas/RegistrationType'
         id:
           type: string
           format: uuid
+          readOnly: true
+        version:
+          type: integer
           readOnly: true
         eventId:
           type: string
@@ -258,7 +356,9 @@ components:
     TeamRegistration:
       type: object
       required:
+        - registrationType
         - id
+        - version
         - eventId
         - registeredAt
         - teamName
@@ -267,9 +367,14 @@ components:
         - players
         - paid
       properties:
+        registrationType:
+          $ref: '#/components/schemas/RegistrationType'
         id:
           type: string
           format: uuid
+          readOnly: true
+        version:
+          type: integer
           readOnly: true
         eventId:
           type: string
@@ -366,6 +471,8 @@ components:
         - InvalidCursor
         - NotFound
         - EmptyBody
+        - InvalidBody
+        - AlreadyExists
     Error:
       type: object
       required:

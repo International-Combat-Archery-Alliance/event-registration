@@ -23,7 +23,7 @@ type eventDynamo struct {
 	SK                    string
 	GSI1PK                string
 	GSI1SK                string
-	ID                    uuid.UUID
+	ID                    string
 	Version               int
 	Name                  string
 	EventLocation         events.Location
@@ -55,7 +55,7 @@ func newEventDynamo(event events.Event) eventDynamo {
 		SK:                    eventSK(event.ID),
 		GSI1PK:                eventEntityName,
 		GSI1SK:                fmt.Sprintf("%s#%s#%s", eventEntityName, event.StartTime, event.ID),
-		ID:                    event.ID,
+		ID:                    event.ID.String(),
 		Version:               event.Version,
 		Name:                  event.Name,
 		EventLocation:         event.EventLocation,
@@ -72,7 +72,7 @@ func newEventDynamo(event events.Event) eventDynamo {
 
 func eventFromEventDynamo(event eventDynamo) events.Event {
 	return events.Event{
-		ID:                    event.ID,
+		ID:                    uuid.MustParse(event.ID),
 		Version:               event.Version,
 		Name:                  event.Name,
 		EventLocation:         event.EventLocation,
@@ -103,12 +103,12 @@ func (d *DB) GetEvent(ctx context.Context, id uuid.UUID) (events.Event, error) {
 		return events.Event{}, events.NewEventDoesNotExistsError(fmt.Sprintf("Event with ID %q not found", id), nil)
 	}
 
-	var event events.Event
+	var event eventDynamo
 	err = attributevalue.UnmarshalMap(resp.Item, &event)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal event from DB: %s", err))
 	}
-	return event, nil
+	return eventFromEventDynamo(event), nil
 }
 
 func (d *DB) CreateEvent(ctx context.Context, event events.Event) error {

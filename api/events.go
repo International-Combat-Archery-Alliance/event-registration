@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
-	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
 	"github.com/google/uuid"
 )
 
@@ -21,6 +21,7 @@ func (a *API) GetEvents(ctx context.Context, request GetEventsRequestObject) (Ge
 				Message: "Limit must be between 1 and 50",
 			}, nil
 		}
+		limit = userLimit
 	}
 
 	result, err := a.db.GetEvents(ctx, int32(limit), request.Params.Cursor)
@@ -39,14 +40,26 @@ func (a *API) GetEvents(ctx context.Context, request GetEventsRequestObject) (Ge
 		}
 		return GetEvents500JSONResponse{
 			Code:    InternalError,
-			Message: "Internal server error",
+			Message: "Failed to get events",
 		}, nil
 	}
 
+	respEvents := []Event{}
+	for _, v := range result.Data {
+		convEvent, err := eventToApiEvent(v)
+		if err != nil {
+			a.logger.Error("Failed to convert event to api event", "error", err)
+
+			return GetEvents500JSONResponse{
+				Code:    InternalError,
+				Message: "Failed to get events",
+			}, nil
+		}
+		respEvents = append(respEvents, convEvent)
+	}
+
 	return GetEvents200JSONResponse{
-		Data: slices.Map(result.Data, func(v events.Event) Event {
-			return eventToApiEvent(v)
-		}),
+		Data:        respEvents,
 		Cursor:      result.Cursor,
 		HasNextPage: result.HasNextPage,
 	}, nil
@@ -62,14 +75,23 @@ func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (
 
 	id := uuid.New()
 	request.Body.Id = &id
-	request.Body.SignUpStats = SignUpStats{
-		NumTeams:           ptr.Int(0),
-		NumRosteredPlayers: ptr.Int(0),
-		NumTotalPlayers:    ptr.Int(0),
+	request.Body.Version = ptr.Int(1)
+	request.Body.SignUpStats = &SignUpStats{
+		NumTeams:           0,
+		NumRosteredPlayers: 0,
+		NumTotalPlayers:    0,
 	}
-	event := apiEventToEvent(*request.Body)
+	event, err := apiEventToEvent(*request.Body)
+	if err != nil {
+		a.logger.Error("Failed to convert event into core type", "error", err)
 
-	err := a.db.CreateEvent(ctx, event)
+		return PostEvents400JSONResponse{
+			Code:    InvalidBody,
+			Message: "Failed to create the event",
+		}, nil
+	}
+
+	err = a.db.CreateEvent(ctx, event)
 	if err != nil {
 		a.logger.Error("Failed to create an event", "error", err)
 
@@ -79,7 +101,7 @@ func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (
 		}, nil
 	}
 
-	return PostEvents200JSONResponse(eventToApiEvent(event)), nil
+	return PostEvents200JSONResponse(*request.Body), nil
 }
 
 func (a *API) GetEventsId(ctx context.Context, request GetEventsIdRequestObject) (GetEventsIdResponseObject, error) {
@@ -104,47 +126,76 @@ func (a *API) GetEventsId(ctx context.Context, request GetEventsIdRequestObject)
 		}, nil
 	}
 
-	return GetEventsId200JSONResponse(eventToApiEvent(event)), nil
+	respEvent, err := eventToApiEvent(event)
+	if err != nil {
+		a.logger.Error("Failed to convert event into core type", "error", err)
+
+		return GetEventsId500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to get event",
+		}, nil
+	}
+	return GetEventsId200JSONResponse{Event: respEvent}, nil
 }
 
-func eventToApiEvent(event events.Event) Event {
+func eventToApiEvent(event events.Event) (Event, error) {
+	regTypes := []RegistrationType{}
+	for _, t := range event.RegistrationTypes {
+		convT, err := registrationTypeToApiRegistrationType(t)
+		if err != nil {
+			return Event{}, err
+		}
+		regTypes = append(regTypes, convT)
+	}
+
 	return Event{
 		Id:                    &event.ID,
+		Version:               &event.Version,
 		Name:                  event.Name,
 		Location:              locationToApiLocation(event.EventLocation),
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
-		RegistrationTypes:     slices.Map(event.RegistrationTypes, func(t events.RegistrationType) RegistrationType { return registrationTypeToApiRegistrationType(t) }),
+		RegistrationTypes:     regTypes,
 		AllowedTeamSizeRange: Range{
 			Min: event.AllowedTeamSizeRange.Min,
 			Max: event.AllowedTeamSizeRange.Max,
 		},
-		SignUpStats: SignUpStats{
-			NumTeams:           &event.NumTeams,
-			NumRosteredPlayers: &event.NumRosteredPlayers,
-			NumTotalPlayers:    &event.NumTotalPlayers,
+		SignUpStats: &SignUpStats{
+			NumTeams:           event.NumTeams,
+			NumRosteredPlayers: event.NumRosteredPlayers,
+			NumTotalPlayers:    event.NumTotalPlayers,
 		},
-	}
+	}, nil
 }
 
-func apiEventToEvent(event Event) events.Event {
+func apiEventToEvent(event Event) (events.Event, error) {
+	regTypes := []events.RegistrationType{}
+	for _, t := range event.RegistrationTypes {
+		convT, err := apiRegistrationTypeToRegistrationType(t)
+		if err != nil {
+			return events.Event{}, err
+		}
+		regTypes = append(regTypes, convT)
+	}
+
 	return events.Event{
 		ID:                    *event.Id,
+		Version:               *event.Version,
 		Name:                  event.Name,
 		EventLocation:         apiLocationToLocation(event.Location),
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
-		RegistrationTypes:     slices.Map(event.RegistrationTypes, func(t RegistrationType) events.RegistrationType { return apiRegistrationTypeToRegistrationType(t) }),
-		NumTotalPlayers:       *event.SignUpStats.NumTotalPlayers,
-		NumRosteredPlayers:    *event.SignUpStats.NumRosteredPlayers,
-		NumTeams:              *event.SignUpStats.NumTeams,
+		RegistrationTypes:     regTypes,
+		NumTotalPlayers:       event.SignUpStats.NumTotalPlayers,
+		NumRosteredPlayers:    event.SignUpStats.NumRosteredPlayers,
+		NumTeams:              event.SignUpStats.NumTeams,
 		AllowedTeamSizeRange: events.Range{
 			Min: event.AllowedTeamSizeRange.Min,
 			Max: event.AllowedTeamSizeRange.Max,
 		},
-	}
+	}, nil
 }
 
 func locationToApiLocation(location events.Location) Location {
@@ -181,24 +232,24 @@ func apiAddressToAddress(address Address) events.Address {
 	}
 }
 
-func registrationTypeToApiRegistrationType(t events.RegistrationType) RegistrationType {
+func registrationTypeToApiRegistrationType(t events.RegistrationType) (RegistrationType, error) {
 	switch t {
 	case events.BY_INDIVIDUAL:
-		return ByIndividual
+		return ByIndividual, nil
 	case events.BY_TEAM:
-		return ByTeam
+		return ByTeam, nil
 	default:
-		panic("unknown registration type")
+		return RegistrationType(""), fmt.Errorf("unknown registration type: %s", t)
 	}
 }
 
-func apiRegistrationTypeToRegistrationType(t RegistrationType) events.RegistrationType {
+func apiRegistrationTypeToRegistrationType(t RegistrationType) (events.RegistrationType, error) {
 	switch t {
 	case ByIndividual:
-		return events.BY_INDIVIDUAL
+		return events.BY_INDIVIDUAL, nil
 	case ByTeam:
-		return events.BY_TEAM
+		return events.BY_TEAM, nil
 	default:
-		panic("unknown registration type")
+		return events.RegistrationType(0), fmt.Errorf("unknown registration type: %s", t)
 	}
 }

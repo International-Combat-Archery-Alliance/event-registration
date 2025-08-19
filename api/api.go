@@ -5,10 +5,12 @@ import (
 	"log/slog"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 )
 
 type DB interface {
 	events.Repository
+	registration.Repository
 }
 
 type API struct {

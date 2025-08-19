@@ -26,9 +26,9 @@ type registrationDynamo struct {
 	Type events.RegistrationType
 
 	// Both type attributes
-	ID           uuid.UUID
+	ID           string
 	Version      int
-	EventID      uuid.UUID
+	EventID      string
 	RegisteredAt time.Time
 	HomeCity     string
 	Paid         bool
@@ -52,8 +52,8 @@ func registrationPK(eventId uuid.UUID) string {
 	return eventPK(eventId)
 }
 
-func registrationSK(id uuid.UUID) string {
-	return fmt.Sprintf("%s#%s", registrationEntityName, id)
+func registrationSK(email string) string {
+	return fmt.Sprintf("%s#%s", registrationEntityName, email)
 }
 
 func registrationToDynamo(reg registration.Registration) registrationDynamo {
@@ -62,11 +62,11 @@ func registrationToDynamo(reg registration.Registration) registrationDynamo {
 		indivReg := reg.(registration.IndividualRegistration)
 		return registrationDynamo{
 			PK:           registrationPK(indivReg.EventID),
-			SK:           registrationSK(indivReg.ID),
+			SK:           registrationSK(indivReg.Email),
 			Type:         indivReg.Type(),
-			ID:           indivReg.ID,
+			ID:           indivReg.ID.String(),
 			Version:      indivReg.Version,
-			EventID:      indivReg.EventID,
+			EventID:      indivReg.EventID.String(),
 			RegisteredAt: indivReg.RegisteredAt,
 			HomeCity:     indivReg.HomeCity,
 			Paid:         indivReg.Paid,
@@ -78,11 +78,11 @@ func registrationToDynamo(reg registration.Registration) registrationDynamo {
 		teamReg := reg.(registration.TeamRegistration)
 		return registrationDynamo{
 			PK:           registrationPK(teamReg.EventID),
-			SK:           registrationSK(teamReg.ID),
+			SK:           registrationSK(teamReg.CaptainEmail),
 			Type:         teamReg.Type(),
-			ID:           teamReg.ID,
+			ID:           teamReg.ID.String(),
 			Version:      teamReg.Version,
-			EventID:      teamReg.EventID,
+			EventID:      teamReg.EventID.String(),
 			RegisteredAt: teamReg.RegisteredAt,
 			HomeCity:     teamReg.HomeCity,
 			Paid:         teamReg.Paid,
@@ -99,9 +99,9 @@ func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 	switch dynReg.Type {
 	case events.BY_INDIVIDUAL:
 		return registration.IndividualRegistration{
-			ID:           dynReg.ID,
+			ID:           uuid.MustParse(dynReg.ID),
 			Version:      dynReg.Version,
-			EventID:      dynReg.EventID,
+			EventID:      uuid.MustParse(dynReg.EventID),
 			RegisteredAt: dynReg.RegisteredAt,
 			HomeCity:     dynReg.HomeCity,
 			Paid:         dynReg.Paid,
@@ -111,9 +111,9 @@ func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 		}
 	case events.BY_TEAM:
 		return registration.TeamRegistration{
-			ID:           dynReg.ID,
+			ID:           uuid.MustParse(dynReg.ID),
 			Version:      dynReg.Version,
-			EventID:      dynReg.EventID,
+			EventID:      uuid.MustParse(dynReg.EventID),
 			RegisteredAt: dynReg.RegisteredAt,
 			HomeCity:     dynReg.HomeCity,
 			Paid:         dynReg.Paid,
@@ -182,32 +182,7 @@ func (d *DB) CreateRegistration(ctx context.Context, reg registration.Registrati
 	return nil
 }
 
-func (d *DB) GetRegistration(ctx context.Context, eventId uuid.UUID, id uuid.UUID) (registration.Registration, error) {
-	resp, err := d.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(d.tableName),
-		Key: map[string]types.AttributeValue{
-			"PK": &types.AttributeValueMemberS{Value: registrationPK(eventId)},
-			"SK": &types.AttributeValueMemberS{Value: registrationSK(id)},
-		},
-	})
-	if err != nil {
-		return nil, registration.NewFailedToFetchError(fmt.Sprintf("Failed to fetch registration with event id %q and id %q", eventId, id), err)
-	}
-
-	if len(resp.Item) == 0 {
-		return nil, registration.NewRegistrationDoesNotExistsError(fmt.Sprintf("Registration with event id %q and id %q not found", eventId, id), err)
-	}
-
-	var dynReg registrationDynamo
-	err = attributevalue.UnmarshalMap(resp.Item, &dynReg)
-	if err != nil {
-		panic(fmt.Sprintf("failed to unmarshal registration from dynamo: %s", err))
-	}
-
-	return dynamoToRegistration(dynReg), nil
-}
-
-func (d *DB) GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID, cursor *string, limit int32) (registration.GetAllRegistrationsResponse, error) {
+func (d *DB) GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
 	keyCond := expression.Key("PK").Equal(expression.Value(registrationPK(eventId))).
 		And(expression.Key("SK").BeginsWith(registrationEntityName))
 

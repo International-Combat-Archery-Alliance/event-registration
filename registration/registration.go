@@ -12,9 +12,8 @@ import (
 )
 
 type Repository interface {
-	GetRegistration(ctx context.Context, eventId uuid.UUID, id uuid.UUID) (Registration, error)
 	CreateRegistration(ctx context.Context, registration Registration, event events.Event) error
-	GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID, cursor *string, limit int32) (GetAllRegistrationsResponse, error)
+	GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID, limit int32, cursor *string) (GetAllRegistrationsResponse, error)
 }
 
 type GetAllRegistrationsResponse struct {
