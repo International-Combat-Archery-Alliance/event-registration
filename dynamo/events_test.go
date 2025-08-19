@@ -95,7 +95,9 @@ func TestCreateEvent(t *testing.T) {
 		err = attributevalue.UnmarshalMap(out.Item, &savedEvent)
 		require.NoError(t, err)
 
-		assert.Equal(t, event.ID, savedEvent.ID)
+				actualID, err := uuid.Parse(savedEvent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, event.ID, actualID)
 		assert.Equal(t, event.Name, savedEvent.Name)
 		assert.Equal(t, event.EventLocation, savedEvent.EventLocation)
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
@@ -388,7 +390,9 @@ func TestUpdateEvent(t *testing.T) {
 		err = attributevalue.UnmarshalMap(out.Item, &savedEvent)
 		require.NoError(t, err)
 
-		assert.Equal(t, event.ID, savedEvent.ID)
+				actualID, err := uuid.Parse(savedEvent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, event.ID, actualID)
 		assert.Equal(t, event.Name, savedEvent.Name)
 		assert.Equal(t, event.EventLocation, savedEvent.EventLocation)
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)

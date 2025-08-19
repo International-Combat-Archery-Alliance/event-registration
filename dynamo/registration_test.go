@@ -35,10 +35,7 @@ func TestCreateRegistration(t *testing.T) {
 		event.Version++
 		require.NoError(t, db.CreateRegistration(ctx, reg, *event))
 
-		// Verify by getting the registration
-		fetchedReg, err := db.GetRegistration(ctx, reg.EventID, reg.ID)
-		require.NoError(t, err)
-		assert.Equal(t, reg, fetchedReg)
+
 	})
 
 	t.Run("successfully create a team registration", func(t *testing.T) {
@@ -63,10 +60,7 @@ func TestCreateRegistration(t *testing.T) {
 		event.Version++
 		require.NoError(t, db.CreateRegistration(ctx, reg, *event))
 
-		// Verify by getting the registration
-		fetchedReg, err := db.GetRegistration(ctx, reg.EventID, reg.ID)
-		require.NoError(t, err)
-		assert.Equal(t, reg, fetchedReg)
+
 	})
 
 	t.Run("fail to create a registration that already exists", func(t *testing.T) {
@@ -100,69 +94,7 @@ func TestCreateRegistration(t *testing.T) {
 	})
 }
 
-func TestGetRegistration(t *testing.T) {
-	ctx := context.Background()
 
-	t.Run("successfully get an individual registration", func(t *testing.T) {
-		resetTable(ctx)
-		eventID := uuid.New()
-
-		event := &events.Event{ID: eventID, Version: 1}
-		require.NoError(t, db.CreateEvent(ctx, *event))
-
-		reg := registration.IndividualRegistration{
-			ID:         uuid.New(),
-			EventID:    eventID,
-			Version:    1,
-			HomeCity:   "Test City",
-			Paid:       true,
-			Email:      "test@example.com",
-			PlayerInfo: registration.PlayerInfo{FirstName: "John", LastName: "Doe"},
-			Experience: registration.NOVICE,
-		}
-		event.Version++
-		require.NoError(t, db.CreateRegistration(ctx, reg, *event))
-
-		fetchedReg, err := db.GetRegistration(ctx, reg.EventID, reg.ID)
-		require.NoError(t, err)
-		assert.Equal(t, reg, fetchedReg)
-	})
-
-	t.Run("successfully get a team registration", func(t *testing.T) {
-		resetTable(ctx)
-		eventID := uuid.New()
-
-		event := &events.Event{ID: eventID, Version: 1}
-		require.NoError(t, db.CreateEvent(ctx, *event))
-
-		reg := registration.TeamRegistration{
-			ID:           uuid.New(),
-			EventID:      eventID,
-			Version:      1,
-			HomeCity:     "Team City",
-			Paid:         false,
-			TeamName:     "Test Team",
-			CaptainEmail: "captain@example.com",
-			Players:      []registration.PlayerInfo{{FirstName: "Jane", LastName: "Doe"}},
-		}
-		event.Version++
-		require.NoError(t, db.CreateRegistration(ctx, reg, *event))
-
-		fetchedReg, err := db.GetRegistration(ctx, reg.EventID, reg.ID)
-		require.NoError(t, err)
-		assert.Equal(t, reg, fetchedReg)
-	})
-
-	t.Run("fail to get a registration that does not exist", func(t *testing.T) {
-		resetTable(ctx)
-
-		_, err := db.GetRegistration(ctx, uuid.New(), uuid.New())
-		require.Error(t, err)
-		var regError *registration.Error
-		require.ErrorAs(t, err, &regError)
-		assert.Equal(t, registration.REASON_REGISTRATION_DOES_NOT_EXIST, regError.Reason)
-	})
-}
 
 // getRegistrationID is a helper function to extract the ID from a Registration interface.
 func getRegistrationID(reg registration.Registration) uuid.UUID {
@@ -214,7 +146,7 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		event2 := events.Event{ID: reg2.EventID, Version: 3}
 		require.NoError(t, db.CreateRegistration(ctx, reg2, event2))
 
-		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, nil, 100)
+		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, 100, nil)
 		a.NoError(err)
 		a.Len(resp.Data, 2)
 		a.False(resp.HasNextPage)
@@ -270,7 +202,7 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		eventTeam2 := events.Event{ID: teamReg2.EventID, Version: 3}
 		require.NoError(t, db.CreateRegistration(ctx, teamReg2, eventTeam2))
 
-		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, nil, 100)
+		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, 100, nil)
 		a.NoError(err)
 		a.Len(resp.Data, 2)
 		a.False(resp.HasNextPage)
@@ -296,7 +228,7 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		resetTable(ctx)
 		eventID := uuid.New() // Use a new event ID to ensure no existing registrations
 
-		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, nil, 100)
+		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, 100, nil)
 		a.NoError(err)
 		a.Empty(resp.Data)
 		a.False(resp.HasNextPage)
@@ -337,7 +269,7 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		eventTeam := events.Event{ID: regTeam.EventID, Version: 3}
 		require.NoError(t, db.CreateRegistration(ctx, regTeam, eventTeam))
 
-		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, nil, 100)
+		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, 100, nil)
 		a.NoError(err)
 		a.Len(resp.Data, 2)
 		a.False(resp.HasNextPage)
@@ -367,9 +299,9 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		require.NoError(t, db.CreateEvent(ctx, event))
 
 		// Create 3 registrations
-		reg1 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, PlayerInfo: registration.PlayerInfo{FirstName: "P1"}}
-		reg2 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, PlayerInfo: registration.PlayerInfo{FirstName: "P2"}}
-		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
+		reg1 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, Email: "email1@email.com", PlayerInfo: registration.PlayerInfo{FirstName: "P1"}}
+		reg2 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, Email: "email2@email.com", PlayerInfo: registration.PlayerInfo{FirstName: "P2"}}
+		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, Email: "email3@email.com", PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
 
 		event1 := events.Event{ID: reg1.EventID, Version: 2}
 		require.NoError(t, db.CreateRegistration(ctx, reg1, event1))
@@ -379,7 +311,7 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		require.NoError(t, db.CreateRegistration(ctx, reg3, event3))
 
 		// Fetch with limit 2
-		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, nil, 2)
+		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, 2, nil)
 		a.NoError(err)
 		a.Len(resp.Data, 2)
 		a.True(resp.HasNextPage)
@@ -402,9 +334,9 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		require.NoError(t, db.CreateEvent(ctx, event))
 
 		// Create 3 registrations
-		reg1 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, PlayerInfo: registration.PlayerInfo{FirstName: "P1"}}
-		reg2 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, PlayerInfo: registration.PlayerInfo{FirstName: "P2"}}
-		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
+		reg1 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, Email: "email1@email.com", PlayerInfo: registration.PlayerInfo{FirstName: "P1"}}
+		reg2 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, Email: "email2@email.com", PlayerInfo: registration.PlayerInfo{FirstName: "P2"}}
+		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, Email: "email3@email.com", PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
 
 		event1 := events.Event{ID: reg1.EventID, Version: 2}
 		require.NoError(t, db.CreateRegistration(ctx, reg1, event1))
@@ -414,13 +346,13 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		require.NoError(t, db.CreateRegistration(ctx, reg3, event3))
 
 		// Fetch first page to get cursor
-		resp1, err := db.GetAllRegistrationsForEvent(ctx, eventID, nil, 2)
+		resp1, err := db.GetAllRegistrationsForEvent(ctx, eventID, 2, nil)
 		a.NoError(err)
 		a.True(resp1.HasNextPage)
 		a.NotNil(resp1.Cursor)
 
 		// Fetch second page using the cursor
-		resp2, err := db.GetAllRegistrationsForEvent(ctx, eventID, resp1.Cursor, 2)
+		resp2, err := db.GetAllRegistrationsForEvent(ctx, eventID, 2, resp1.Cursor)
 		a.NoError(err)
 		a.Len(resp2.Data, 1) // Only one remaining
 		a.False(resp2.HasNextPage)

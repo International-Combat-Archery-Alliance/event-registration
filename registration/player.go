@@ -1,3 +1,5 @@
+//go:generate go tool stringer -type=ExperienceLevel
+
 package registration
 
 type PlayerInfo struct {

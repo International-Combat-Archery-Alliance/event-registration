@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,10 +16,12 @@ import (
 var noopLogger = slog.New(slog.DiscardHandler)
 
 type mockDB struct {
-	events.Repository
-	GetEventsFunc   func(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error)
-	CreateEventFunc func(ctx context.Context, event events.Event) error
-	GetEventFunc    func(ctx context.Context, id uuid.UUID) (events.Event, error)
+	GetEventsFunc                   func(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error)
+	CreateEventFunc                 func(ctx context.Context, event events.Event) error
+	GetEventFunc                    func(ctx context.Context, id uuid.UUID) (events.Event, error)
+	UpdateEventFunc                 func(ctx context.Context, event events.Event) error
+	CreateRegistrationFunc          func(ctx context.Context, registration registration.Registration, event events.Event) error
+	GetAllRegistrationsForEventFunc func(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error)
 }
 
 func (m *mockDB) GetEvents(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error) {
@@ -31,6 +34,18 @@ func (m *mockDB) CreateEvent(ctx context.Context, event events.Event) error {
 
 func (m *mockDB) GetEvent(ctx context.Context, id uuid.UUID) (events.Event, error) {
 	return m.GetEventFunc(ctx, id)
+}
+
+func (m *mockDB) UpdateEvent(ctx context.Context, event events.Event) error {
+	return m.UpdateEventFunc(ctx, event)
+}
+
+func (m *mockDB) CreateRegistration(ctx context.Context, reg registration.Registration, event events.Event) error {
+	return m.CreateRegistrationFunc(ctx, reg, event)
+}
+
+func (m *mockDB) GetAllRegistrationsForEvent(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
+	return m.GetAllRegistrationsForEventFunc(ctx, eventID, limit, cursor)
 }
 
 func TestGetEvents(t *testing.T) {
@@ -160,9 +175,9 @@ func TestGetEventsId(t *testing.T) {
 
 		switch r := resp.(type) {
 		case GetEventsId200JSONResponse:
-			assert.Equal(t, &expectedEvent.ID, r.Id)
-			assert.Equal(t, expectedEvent.Name, r.Name)
-			assert.Equal(t, []RegistrationType{ByIndividual}, r.RegistrationTypes)
+			assert.Equal(t, &expectedEvent.ID, r.Event.Id)
+			assert.Equal(t, expectedEvent.Name, r.Event.Name)
+			assert.Equal(t, []RegistrationType{ByIndividual}, r.Event.RegistrationTypes)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
