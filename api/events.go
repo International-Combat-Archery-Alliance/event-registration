@@ -15,20 +15,10 @@ func (a *API) GetEvents(ctx context.Context, request GetEventsRequestObject) (Ge
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	limit := 10
+	// guaranteed to be non-nil from openapi doc
+	limit := int32(*request.Params.Limit)
 
-	if request.Params.Limit != nil {
-		userLimit := *request.Params.Limit
-		if userLimit < 1 || userLimit > 50 {
-			return GetEvents400JSONResponse{
-				Code:    LimitOutOfBounds,
-				Message: "Limit must be between 1 and 50",
-			}, nil
-		}
-		limit = userLimit
-	}
-
-	result, err := a.db.GetEvents(ctx, int32(limit), request.Params.Cursor)
+	result, err := a.db.GetEvents(ctx, limit, request.Params.Cursor)
 	if err != nil {
 		a.logger.Error("Failed to get events from the DB", "error", err)
 
@@ -73,13 +63,6 @@ func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	if request.Body == nil {
-		return PostEvents400JSONResponse{
-			Code:    EmptyBody,
-			Message: "Must specify a JSON body in the request",
-		}, nil
-	}
-
 	id := uuid.New()
 	request.Body.Id = &id
 	request.Body.Version = ptr.Int(1)
@@ -88,6 +71,7 @@ func (a *API) PostEvents(ctx context.Context, request PostEventsRequestObject) (
 		NumRosteredPlayers: 0,
 		NumTotalPlayers:    0,
 	}
+	// request.Body is guaranteed to be non-nil from openapi doc
 	event, err := apiEventToEvent(*request.Body)
 	if err != nil {
 		a.logger.Error("Failed to convert event into core type", "error", err)

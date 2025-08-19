@@ -3,10 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
-	"net"
-	"net/http"
 	"os"
 	"time"
 
@@ -16,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	middleware "github.com/oapi-codegen/nethttp-middleware"
 )
 
 func main() {
@@ -33,29 +29,13 @@ func main() {
 
 	eventAPI := api.NewAPI(db, logger)
 
-	swagger, err := api.GetSwagger()
+	serverSettings := getServerSettingsFromEnv()
+	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
 	if err != nil {
-		logger.Error("Error loading swagger spec", "error", err)
+		logger.Error("error running server", "error", err)
 		os.Exit(1)
 	}
-
-	swagger.Servers = nil
-
-	strictHandler := api.NewStrictHandler(eventAPI, []api.StrictMiddlewareFunc{})
-
-	r := http.NewServeMux()
-
-	api.HandlerFromMux(strictHandler, r)
-
-	h := middleware.OapiRequestValidator(swagger)(r)
-
-	serverSettings := getServerSettingsFromEnv()
-	s := &http.Server{
-		Handler: h,
-		Addr:    net.JoinHostPort(serverSettings.Host, serverSettings.Port),
-	}
-
-	log.Fatal(s.ListenAndServe())
+	logger.Info("shutting down")
 }
 
 type ServerSettings struct {

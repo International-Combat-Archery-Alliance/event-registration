@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +74,9 @@ func TestGetEvents(t *testing.T) {
 		api := NewAPI(mock, noopLogger)
 
 		req := GetEventsRequestObject{
-			Params: GetEventsParams{},
+			Params: GetEventsParams{
+				Limit: ptr.Int(10),
+			},
 		}
 
 		resp, err := api.GetEvents(context.Background(), req)
@@ -85,26 +88,6 @@ func TestGetEvents(t *testing.T) {
 			assert.Equal(t, &expectedEvents[0].ID, r.Data[0].Id)
 			assert.Equal(t, expectedEvents[0].Name, r.Data[0].Name)
 			assert.Equal(t, []RegistrationType{ByIndividual}, r.Data[0].RegistrationTypes)
-		default:
-			t.Fatalf("unexpected response type: %T", resp)
-		}
-	})
-
-	t.Run("invalid limit", func(t *testing.T) {
-		limit := int(100)
-		api := NewAPI(&mockDB{}, noopLogger)
-		req := GetEventsRequestObject{
-			Params: GetEventsParams{
-				Limit: &limit,
-			},
-		}
-
-		resp, err := api.GetEvents(context.Background(), req)
-		assert.NoError(t, err)
-
-		switch r := resp.(type) {
-		case GetEvents400JSONResponse:
-			assert.Equal(t, LimitOutOfBounds, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}

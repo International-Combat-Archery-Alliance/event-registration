@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/google/uuid"
 	"github.com/oapi-codegen/runtime/types"
@@ -15,23 +16,6 @@ import (
 )
 
 func TestPostEventsEventIdRegister(t *testing.T) {
-	t.Run("no body", func(t *testing.T) {
-		api := NewAPI(&mockDB{}, noopLogger)
-		req := PostEventsEventIdRegisterRequestObject{
-			EventId: uuid.New(),
-		}
-
-		resp, err := api.PostEventsEventIdRegister(context.Background(), req)
-		assert.NoError(t, err)
-
-		switch r := resp.(type) {
-		case PostEventsEventIdRegister400JSONResponse:
-			assert.Equal(t, EmptyBody, r.Code)
-		default:
-			t.Fatalf("unexpected response type: %T", resp)
-		}
-	})
-
 	t.Run("invalid body", func(t *testing.T) {
 		api := NewAPI(&mockDB{}, noopLogger)
 		reg := Registration{}
@@ -191,27 +175,6 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 }
 
 func TestGetEventsEventIdRegistrations(t *testing.T) {
-	t.Run("limit out of bounds", func(t *testing.T) {
-		api := NewAPI(&mockDB{}, noopLogger)
-		limit := 0
-		req := GetEventsEventIdRegistrationsRequestObject{
-			EventId: uuid.New(),
-			Params: GetEventsEventIdRegistrationsParams{
-				Limit: &limit,
-			},
-		}
-
-		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
-		assert.NoError(t, err)
-
-		switch r := resp.(type) {
-		case GetEventsEventIdRegistrations400JSONResponse:
-			assert.Equal(t, LimitOutOfBounds, r.Code)
-		default:
-			t.Fatalf("unexpected response type: %T", resp)
-		}
-	})
-
 	t.Run("internal server error", func(t *testing.T) {
 		mock := &mockDB{
 			GetAllRegistrationsForEventFunc: func(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
@@ -221,6 +184,9 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 		api := NewAPI(mock, noopLogger)
 		req := GetEventsEventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
+			Params: GetEventsEventIdRegistrationsParams{
+				Limit: ptr.Int(10),
+			},
 		}
 
 		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
@@ -243,6 +209,9 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 		api := NewAPI(mock, noopLogger)
 		req := GetEventsEventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
+			Params: GetEventsEventIdRegistrationsParams{
+				Limit: ptr.Int(10),
+			},
 		}
 
 		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
@@ -269,6 +238,9 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 		api := NewAPI(mock, noopLogger)
 		req := GetEventsEventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
+			Params: GetEventsEventIdRegistrationsParams{
+				Limit: ptr.Int(10),
+			},
 		}
 
 		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
@@ -298,6 +270,9 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 		api := NewAPI(mock, noopLogger)
 		req := GetEventsEventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
+			Params: GetEventsEventIdRegistrationsParams{
+				Limit: ptr.Int(10),
+			},
 		}
 
 		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
@@ -324,4 +299,3 @@ func (m *mockRegistration) GetEventID() uuid.UUID {
 func (m *mockRegistration) Type() events.RegistrationType {
 	return m.TypeFunc()
 }
-
