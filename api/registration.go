@@ -45,6 +45,11 @@ func (a *API) PostEventsEventIdRegister(ctx context.Context, request PostEventsE
 					Code:    NotFound,
 					Message: "Event to register with was not found",
 				}, nil
+			case registration.REASON_REGISTRATION_IS_CLOSED:
+				return PostEventsEventIdRegister403JSONResponse{
+					Code:    RegistrationClosed,
+					Message: "Registration has closed for this event",
+				}, nil
 			case registration.REASON_REGISTRATION_ALREADY_EXISTS:
 				return PostEventsEventIdRegister409JSONResponse{
 					Code:    AlreadyExists,

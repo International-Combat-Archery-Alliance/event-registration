@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
@@ -89,7 +90,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 	t.Run("registration already exists", func(t *testing.T) {
 		mock := &mockDB{
 			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
-				return events.Event{RegistrationTypes: []events.RegistrationType{events.BY_INDIVIDUAL}}, nil
+				return events.Event{RegistrationTypes: []events.RegistrationType{events.BY_INDIVIDUAL}, RegistrationCloseTime: time.Now().Add(time.Hour * 1000)}, nil
 			},
 			CreateRegistrationFunc: func(ctx context.Context, reg registration.Registration, event events.Event) error {
 				return &registration.Error{Reason: registration.REASON_REGISTRATION_ALREADY_EXISTS}
@@ -116,6 +117,41 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 		switch r := resp.(type) {
 		case PostEventsEventIdRegister409JSONResponse:
 			assert.Equal(t, AlreadyExists, r.Code)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("registration is closed", func(t *testing.T) {
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{RegistrationTypes: []events.RegistrationType{events.BY_INDIVIDUAL}}, nil
+			},
+			CreateRegistrationFunc: func(ctx context.Context, reg registration.Registration, event events.Event) error {
+				return &registration.Error{Reason: registration.REASON_REGISTRATION_IS_CLOSED}
+			},
+		}
+		api := NewAPI(mock, noopLogger)
+		reg := Registration{}
+		indivReg := IndividualRegistration{
+			HomeCity:   "test city",
+			Email:      types.Email("test@test.com"),
+			PlayerInfo: PlayerInfo{FirstName: "first", LastName: "last"},
+			Experience: Novice,
+		}
+		reg.FromIndividualRegistration(indivReg)
+
+		req := PostEventsEventIdRegisterRequestObject{
+			EventId: uuid.New(),
+			Body:    &reg,
+		}
+
+		resp, err := api.PostEventsEventIdRegister(context.Background(), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PostEventsEventIdRegister403JSONResponse:
+			assert.Equal(t, RegistrationClosed, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
@@ -288,3 +324,4 @@ func (m *mockRegistration) GetEventID() uuid.UUID {
 func (m *mockRegistration) Type() events.RegistrationType {
 	return m.TypeFunc()
 }
+

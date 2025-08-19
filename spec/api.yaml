@@ -168,6 +168,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '403':
+          description: Not allowed to register.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Event is not found to register with
           content:
@@ -476,6 +482,7 @@ components:
         - EmptyBody
         - InvalidBody
         - AlreadyExists
+        - RegistrationClosed
     Error:
       type: object
       required:

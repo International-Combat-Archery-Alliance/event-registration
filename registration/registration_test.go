@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/google/uuid"
@@ -259,6 +260,22 @@ func TestRegisterIndividualAsFreeAgent(t *testing.T) {
 		assert.True(t, errors.As(err, &registrationErr))
 		assert.Equal(t, REASON_NOT_ALLOWED_TO_SIGN_UP_AS_TYPE, registrationErr.Reason)
 	})
+
+	t.Run("registration closed", func(t *testing.T) {
+		event := &events.Event{
+			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL},
+			RegistrationCloseTime: time.Now().Add(-time.Hour),
+		}
+		reg := IndividualRegistration{
+			RegisteredAt: time.Now(),
+		}
+
+		err := registerIndividualAsFreeAgent(event, reg)
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_REGISTRATION_IS_CLOSED, registrationErr.Reason)
+	})
 }
 
 func TestRegisterTeam(t *testing.T) {
@@ -321,5 +338,23 @@ func TestRegisterTeam(t *testing.T) {
 		var registrationErr *Error
 		assert.True(t, errors.As(err, &registrationErr))
 		assert.Equal(t, REASON_TEAM_SIZE_NOT_ALLOWED, registrationErr.Reason)
+	})
+
+	t.Run("registration closed", func(t *testing.T) {
+		event := &events.Event{
+			RegistrationTypes:     []events.RegistrationType{events.BY_TEAM},
+			AllowedTeamSizeRange:  events.Range{Min: 1, Max: 5},
+			RegistrationCloseTime: time.Now().Add(-time.Hour),
+		}
+		reg := TeamRegistration{
+			RegisteredAt: time.Now(),
+			Players:      []PlayerInfo{{}},
+		}
+
+		err := registerTeam(event, reg)
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_REGISTRATION_IS_CLOSED, registrationErr.Reason)
 	})
 }

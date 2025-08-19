@@ -2,6 +2,7 @@ package registration
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 )
@@ -19,6 +20,7 @@ const (
 	REASON_UNKNOWN_REGISTRATION_TYPE       ErrorReason = "UNKNOWN_REGISTRATION_TYPE"
 	REASON_TEAM_SIZE_NOT_ALLOWED           ErrorReason = "TEAM_SIZE_NOT_ALLOWED"
 	REASON_NOT_ALLOWED_TO_SIGN_UP_AS_TYPE  ErrorReason = "NOT_ALLOWED_TO_SIGN_UP_AS_TYPE"
+	REASON_REGISTRATION_IS_CLOSED          ErrorReason = "REGISTRATION_IS_CLOSED"
 )
 
 type Error struct {
@@ -81,4 +83,8 @@ func NewTeamSizeNotAllowedError(teamSize, minSize, maxSize int) *Error {
 
 func NewNotAllowedToSignUpAsTypeError(regType events.RegistrationType) *Error {
 	return newRegistrationError(REASON_NOT_ALLOWED_TO_SIGN_UP_AS_TYPE, fmt.Sprintf("Not allowed to sign up for event as type: %s", regType), nil)
+}
+
+func NewRegistrationIsClosedError(closedAt time.Time) *Error {
+	return newRegistrationError(REASON_REGISTRATION_IS_CLOSED, fmt.Sprintf("Past registration closed at time for this event: %s", closedAt), nil)
 }

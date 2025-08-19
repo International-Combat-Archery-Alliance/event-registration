@@ -107,6 +107,10 @@ func registerIndividualAsFreeAgent(event *events.Event, reg IndividualRegistrati
 		return NewNotAllowedToSignUpAsTypeError(events.BY_INDIVIDUAL)
 	}
 
+	if reg.RegisteredAt.After(event.RegistrationCloseTime) {
+		return NewRegistrationIsClosedError(event.RegistrationCloseTime)
+	}
+
 	event.NumTotalPlayers++
 
 	return nil
@@ -115,6 +119,10 @@ func registerIndividualAsFreeAgent(event *events.Event, reg IndividualRegistrati
 func registerTeam(event *events.Event, reg TeamRegistration) error {
 	if !slices.Contains(event.RegistrationTypes, events.BY_TEAM) {
 		return NewNotAllowedToSignUpAsTypeError(events.BY_TEAM)
+	}
+
+	if reg.RegisteredAt.After(event.RegistrationCloseTime) {
+		return NewRegistrationIsClosedError(event.RegistrationCloseTime)
 	}
 
 	teamSize := len(reg.Players)
