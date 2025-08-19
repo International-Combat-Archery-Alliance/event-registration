@@ -20,6 +20,7 @@ paths:
           required: false
           schema:
             type: string
+            example: "Y29uZ3JhdHMsIHlvdSBmb3VuZCB0aGUgZWFzdGVyIGVnZw=="
         - name: limit
           in: query
           description: Max amount of events to fetch
@@ -29,6 +30,7 @@ paths:
             default: 10
             minimum: 1
             maximum: 50
+            example: 10
       responses:
         '200':
           description: A list of events.
@@ -46,8 +48,10 @@ paths:
                       $ref: '#/components/schemas/Event'
                   cursor:
                     type: string
+                    example: "Y29uZ3JhdHMsIHlvdSBmb3VuZCB0aGUgZWFzdGVyIGVnZw=="
                   hasNextPage:
                     type: boolean
+                    example: true
         '400':
           description: Bad request.
           content:
@@ -101,6 +105,7 @@ paths:
           schema:
             type: string
             format: uuid
+            example: 00000000-0000-0000-0000-000000000000
       responses:
         '200':
           description: The event
@@ -143,6 +148,7 @@ paths:
           schema:
             type: string
             format: uuid
+            example: 00000000-0000-0000-0000-000000000000
       requestBody:
         description: Registration to be created
         required: true
@@ -204,12 +210,14 @@ paths:
           schema:
             type: string
             format: uuid
+            example: 00000000-0000-0000-0000-000000000000
         - name: cursor
           in: query
           description: Cursor of where to start from
           required: false
           schema:
             type: string
+            example: "12345"
         - name: limit
           in: query
           description: Max amount of registrations to fetch
@@ -219,6 +227,7 @@ paths:
             default: 10
             minimum: 1
             maximum: 50
+            example: 10
       responses:
         '200':
           description: A list of registrations.
@@ -236,8 +245,10 @@ paths:
                       $ref: '#/components/schemas/Registration'
                   cursor:
                     type: string
+                    example: "54321"
                   hasNextPage:
                     type: boolean
+                    example: true
         '400':
           description: Bad request.
           content:
@@ -250,7 +261,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          
 
 components:
   schemas:
@@ -272,26 +282,33 @@ components:
           type: string
           format: uuid
           readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
         version:
           type: integer
           readOnly: true
+          example: 1
         name:
           type: string
           minLength: 3
           maxLength: 255
+          example: ICAA Cup 2025
         location:
           $ref: '#/components/schemas/Location'
         startTime:
           type: string
           format: date-time
+          example: "2025-08-19T18:46:53.185Z"
         endTime:
           type: string
           format: date-time
+          example: "2025-08-19T22:00:00.000Z"
         registrationCloseTime:
           type: string
           format: date-time
+          example: "2025-08-17T23:59:59.000Z"
         registrationTypes:
           type: array
+          minItems: 1
           items:
             $ref: '#/components/schemas/RegistrationType'
         allowedTeamSizeRange:
@@ -308,10 +325,16 @@ components:
       properties:
         numTeams:
           type: integer
+          example: 10
+          minimum: 0
         numRosteredPlayers:
           type: integer
+          example: 50
+          minimum: 0
         numTotalPlayers:
           type: integer
+          example: 55
+          minimum: 0
     Registration:
       oneOf:
         - $ref: '#/components/schemas/IndividualRegistration'
@@ -341,26 +364,32 @@ components:
           type: string
           format: uuid
           readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
         version:
           type: integer
           readOnly: true
+          example: 1
         eventId:
           type: string
           format: uuid
           readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
         registeredAt:
           type: string
           format: date-time
           readOnly: true
+          example: "2025-08-19T18:46:53.185Z"
         email:
           type: string
           format: email
           minLength: 3
           maxLength: 100
+          example: jane.doe@example.com
         homeCity:
           type: string
           minLength: 3
           maxLength: 100
+          example: Anytown, USA
         playerInfo:
           $ref: '#/components/schemas/PlayerInfo'
         experience:
@@ -368,6 +397,7 @@ components:
         paid:
           type: boolean
           readOnly: true
+          example: true
     TeamRegistration:
       type: object
       required:
@@ -388,36 +418,46 @@ components:
           type: string
           format: uuid
           readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
         version:
           type: integer
           readOnly: true
+          example: 1
         eventId:
           type: string
           format: uuid
           readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
         registeredAt:
           type: string
           format: date-time
           readOnly: true
+          example: "2025-08-19T18:46:53.185Z"
         teamName:
           type: string
           minLength: 3
           maxLength: 100
+          example: The Fighting Mongooses
         homeCity:
           type: string
           minLength: 3
           maxLength: 100
+          example: Anytown, USA
         captainEmail:
           type: string
           format: email
+          minLength: 3
           maxLength: 100
+          example: captain@example.com
         players:
           type: array
+          minItems: 1
           items:
             $ref: '#/components/schemas/PlayerInfo'
         paid:
           type: boolean
           readOnly: true
+          example: true
     PlayerInfo:
       type: object
       required:
@@ -428,10 +468,12 @@ components:
           type: string
           minLength: 1
           maxLength: 50
+          example: Jane
         lastName:
           type: string
           minLength: 1
           maxLength: 50
+          example: Doe
     Location:
       type: object
       required:
@@ -442,6 +484,7 @@ components:
           type: string
           minLength: 3
           maxLength: 100
+          example: Anytown Community Center
         address:
           $ref: '#/components/schemas/Address'
     Address:
@@ -452,26 +495,31 @@ components:
           description: Street address
           minLength: 3
           maxLength: 255
+          example: 123 Main St
         city:
           type: string
           description: City or town
           minLength: 3
           maxLength: 50
+          example: Anytown
         state:
           type: string
           description: State or province
           minLength: 2
           maxLength: 50
+          example: CA
         postalCode:
           type: string
           description: Postal code
           minLength: 3
           maxLength: 20
+          example: "90210"
         country:
           type: string
           description: Country
           minLength: 2
           maxLength: 50
+          example: USA
       required:
         - street
         - city
@@ -486,19 +534,25 @@ components:
       properties:
         min:
           type: integer
+          example: 1
+          minimum: 0
         max:
           type: integer
+          example: 5
+          minimum: 1
     RegistrationType:
       type: string
       enum:
         - ByIndividual
         - ByTeam
+      example: ByIndividual
     ExperienceLevel:
       type: string
       enum:
         - Novice
         - Intermediate
         - Advanced
+      example: Intermediate
     ErrorCode:
       type: string
       enum:
@@ -520,5 +574,7 @@ components:
       properties:
         code:
           $ref: '#/components/schemas/ErrorCode'
+          example: InternalError
         message:
           type: string
+          example: An unexpected error occurred.
