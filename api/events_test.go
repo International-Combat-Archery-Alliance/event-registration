@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var noopLogger = slog.Default()
+var noopLogger = slog.New(slog.DiscardHandler)
 
 type mockDB struct {
 	GetEventsFunc                   func(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error)

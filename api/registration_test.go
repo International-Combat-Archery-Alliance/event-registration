@@ -153,3 +153,138 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 		}
 	})
 }
+
+func TestGetEventsEventIdRegistrations(t *testing.T) {
+	t.Run("limit out of bounds", func(t *testing.T) {
+		api := NewAPI(&mockDB{}, noopLogger)
+		limit := 0
+		req := GetEventsEventIdRegistrationsRequestObject{
+			EventId: uuid.New(),
+			Params: GetEventsEventIdRegistrationsParams{
+				Limit: &limit,
+			},
+		}
+
+		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case GetEventsEventIdRegistrations400JSONResponse:
+			assert.Equal(t, LimitOutOfBounds, r.Code)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("internal server error", func(t *testing.T) {
+		mock := &mockDB{
+			GetAllRegistrationsForEventFunc: func(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
+				return registration.GetAllRegistrationsResponse{}, errors.New("some error")
+			},
+		}
+		api := NewAPI(mock, noopLogger)
+		req := GetEventsEventIdRegistrationsRequestObject{
+			EventId: uuid.New(),
+		}
+
+		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case GetEventsEventIdRegistrations500JSONResponse:
+			assert.Equal(t, InternalError, r.Code)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("invalid cursor", func(t *testing.T) {
+		mock := &mockDB{
+			GetAllRegistrationsForEventFunc: func(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
+				return registration.GetAllRegistrationsResponse{}, &registration.Error{Reason: registration.REASON_INVALID_CURSOR}
+			},
+		}
+		api := NewAPI(mock, noopLogger)
+		req := GetEventsEventIdRegistrationsRequestObject{
+			EventId: uuid.New(),
+		}
+
+		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case GetEventsEventIdRegistrations400JSONResponse:
+			assert.Equal(t, InvalidCursor, r.Code)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("failed to convert registration", func(t *testing.T) {
+		mock := &mockDB{
+			GetAllRegistrationsForEventFunc: func(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
+				return registration.GetAllRegistrationsResponse{
+					Data: []registration.Registration{
+						&mockRegistration{TypeFunc: func() events.RegistrationType { return 99 }},
+					},
+				}, nil
+			},
+		}
+		api := NewAPI(mock, noopLogger)
+		req := GetEventsEventIdRegistrationsRequestObject{
+			EventId: uuid.New(),
+		}
+
+		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case GetEventsEventIdRegistrations500JSONResponse:
+			assert.Equal(t, InternalError, r.Code)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		mock := &mockDB{
+			GetAllRegistrationsForEventFunc: func(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
+				return registration.GetAllRegistrationsResponse{
+					Data: []registration.Registration{
+						registration.IndividualRegistration{
+							Email:      "test@test.com",
+							Experience: registration.NOVICE,
+						},
+					},
+				}, nil
+			},
+		}
+		api := NewAPI(mock, noopLogger)
+		req := GetEventsEventIdRegistrationsRequestObject{
+			EventId: uuid.New(),
+		}
+
+		resp, err := api.GetEventsEventIdRegistrations(context.Background(), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case GetEventsEventIdRegistrations200JSONResponse:
+			assert.Len(t, r.Data, 1)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+}
+
+type mockRegistration struct {
+	GetEventIDFunc func() uuid.UUID
+	TypeFunc       func() events.RegistrationType
+}
+
+func (m *mockRegistration) GetEventID() uuid.UUID {
+	return m.GetEventIDFunc()
+}
+
+func (m *mockRegistration) Type() events.RegistrationType {
+	return m.TypeFunc()
+}
