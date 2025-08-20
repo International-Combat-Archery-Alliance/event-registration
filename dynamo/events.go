@@ -35,6 +35,7 @@ type eventDynamo struct {
 	NumTeams              int
 	NumRosteredPlayers    int
 	NumTotalPlayers       int
+	RulesDocLink          *string
 }
 
 const (
@@ -67,6 +68,7 @@ func newEventDynamo(event events.Event) eventDynamo {
 		NumTotalPlayers:       event.NumTotalPlayers,
 		NumRosteredPlayers:    event.NumRosteredPlayers,
 		NumTeams:              event.NumTeams,
+		RulesDocLink:          event.RulesDocLink,
 	}
 }
 
@@ -84,6 +86,7 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		NumTeams:              event.NumTeams,
 		NumRosteredPlayers:    event.NumRosteredPlayers,
 		NumTotalPlayers:       event.NumTotalPlayers,
+		RulesDocLink:          event.RulesDocLink,
 	}
 }
 

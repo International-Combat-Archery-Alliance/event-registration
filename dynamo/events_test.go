@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -21,11 +22,12 @@ func TestCreateEvent(t *testing.T) {
 	t.Run("successfully create an event", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:        uuid.New(),
-			Name:      "Test Event",
-			StartTime: time.Now(),
-			EndTime:   time.Now().Add(time.Hour),
-			Version:   1,
+			ID:           uuid.New(),
+			Name:         "Test Event",
+			StartTime:    time.Now(),
+			EndTime:      time.Now().Add(time.Hour),
+			RulesDocLink: ptr.String("https://example.com/rules"),
+			Version:      1,
 		}
 
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -73,6 +75,7 @@ func TestCreateEvent(t *testing.T) {
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
 			NumTotalPlayers:       60,
+			RulesDocLink:          ptr.String("https://example.com/rules"),
 			Version:               1,
 		}
 
@@ -95,7 +98,7 @@ func TestCreateEvent(t *testing.T) {
 		err = attributevalue.UnmarshalMap(out.Item, &savedEvent)
 		require.NoError(t, err)
 
-				actualID, err := uuid.Parse(savedEvent.ID)
+		actualID, err := uuid.Parse(savedEvent.ID)
 		require.NoError(t, err)
 		assert.Equal(t, event.ID, actualID)
 		assert.Equal(t, event.Name, savedEvent.Name)
@@ -108,6 +111,7 @@ func TestCreateEvent(t *testing.T) {
 		assert.Equal(t, event.NumTeams, savedEvent.NumTeams)
 		assert.Equal(t, event.NumRosteredPlayers, savedEvent.NumRosteredPlayers)
 		assert.Equal(t, event.NumTotalPlayers, savedEvent.NumTotalPlayers)
+		assert.Equal(t, event.RulesDocLink, savedEvent.RulesDocLink)
 		assert.Equal(t, event.Version, savedEvent.Version)
 	})
 }
@@ -138,6 +142,7 @@ func TestGetEvent(t *testing.T) {
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
 			NumTotalPlayers:       60,
+			RulesDocLink:          ptr.String("https://example.com/rules"),
 			Version:               1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -156,6 +161,7 @@ func TestGetEvent(t *testing.T) {
 		assert.Equal(t, event.NumTeams, actual.NumTeams)
 		assert.Equal(t, event.NumRosteredPlayers, actual.NumRosteredPlayers)
 		assert.Equal(t, event.NumTotalPlayers, actual.NumTotalPlayers)
+		assert.Equal(t, event.RulesDocLink, actual.RulesDocLink)
 		assert.Equal(t, event.Version, actual.Version)
 	})
 
@@ -204,6 +210,7 @@ func TestGetEvents(t *testing.T) {
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
 			NumTotalPlayers:       60,
+			RulesDocLink:          ptr.String("https://example.com/rules"),
 			Version:               1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -240,6 +247,7 @@ func TestGetEvents(t *testing.T) {
 				NumTeams:              10 + i,
 				NumRosteredPlayers:    50 + i,
 				NumTotalPlayers:       60 + i,
+				RulesDocLink:          ptr.String("https://example.com/rules"),
 				Version:               1,
 			}
 			require.Nil(t, db.CreateEvent(ctx, event))
@@ -278,6 +286,7 @@ func TestGetEvents(t *testing.T) {
 				NumTeams:              10 + i,
 				NumRosteredPlayers:    50 + i,
 				NumTotalPlayers:       60 + i,
+				RulesDocLink:          ptr.String("https://example.com/rules"),
 				Version:               1,
 			}
 			require.Nil(t, db.CreateEvent(ctx, event))
@@ -309,11 +318,12 @@ func TestUpdateEvent(t *testing.T) {
 	t.Run("successfully update an event", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:        uuid.New(),
-			Name:      "Test Event",
-			StartTime: time.Now(),
-			EndTime:   time.Now().Add(time.Hour),
-			Version:   1,
+			ID:           uuid.New(),
+			Name:         "Test Event",
+			StartTime:    time.Now(),
+			EndTime:      time.Now().Add(time.Hour),
+			RulesDocLink: ptr.String("https://example.com/rules"),
+			Version:      1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
 
@@ -363,6 +373,7 @@ func TestUpdateEvent(t *testing.T) {
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
 			NumTotalPlayers:       60,
+			RulesDocLink:          ptr.String("https://example.com/rules"),
 			Version:               1,
 		}
 		require.NoError(t, db.CreateEvent(ctx, event))
@@ -370,6 +381,7 @@ func TestUpdateEvent(t *testing.T) {
 		event.Name = "New name"
 		event.StartTime = time.Now().Add(time.Hour).UTC().Truncate(time.Second)
 		event.EndTime = time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second)
+		event.RulesDocLink = ptr.String("https://example.com/new-rules")
 		event.Version++
 		require.NoError(t, db.UpdateEvent(ctx, event))
 
@@ -390,7 +402,7 @@ func TestUpdateEvent(t *testing.T) {
 		err = attributevalue.UnmarshalMap(out.Item, &savedEvent)
 		require.NoError(t, err)
 
-				actualID, err := uuid.Parse(savedEvent.ID)
+		actualID, err := uuid.Parse(savedEvent.ID)
 		require.NoError(t, err)
 		assert.Equal(t, event.ID, actualID)
 		assert.Equal(t, event.Name, savedEvent.Name)
@@ -403,6 +415,7 @@ func TestUpdateEvent(t *testing.T) {
 		assert.Equal(t, event.NumTeams, savedEvent.NumTeams)
 		assert.Equal(t, event.NumRosteredPlayers, savedEvent.NumRosteredPlayers)
 		assert.Equal(t, event.NumTotalPlayers, savedEvent.NumTotalPlayers)
+		assert.Equal(t, event.RulesDocLink, savedEvent.RulesDocLink)
 		assert.Equal(t, event.Version, savedEvent.Version)
 	})
 }

@@ -315,6 +315,10 @@ components:
           $ref: '#/components/schemas/Range'
         signUpStats:
           $ref: '#/components/schemas/SignUpStats'
+        rulesDocLink:
+          type: string
+          maxLength: 500
+          example: https://docs.google.com/document/d/adsffafsafsadfd/view
     SignUpStats:
       type: object
       readOnly: true
