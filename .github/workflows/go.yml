@@ -3,8 +3,7 @@
 
 name: Go
 permissions:
-  content: read
-  pull-requests: write
+  contents: read
 
 on:
   push:
