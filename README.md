@@ -35,3 +35,5 @@ To run the project locally, ensure you have Docker, Docker Compose, Go, and AWS 
     -   Start the SAM local API gateway, making the API accessible on your local machine.
 
     You can then interact with the API endpoints, typically available at `http://localhost:3000` (or a similar port reported by SAM CLI).
+
+    testing
