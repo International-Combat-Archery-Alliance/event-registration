@@ -49,6 +49,7 @@ Represents an event in the system.
 | `NumTeams`            | Number        | Number of teams registered for the event        | `5`                                             |
 | `NumRosteredPlayers`  | Number        | Number of players rostered across all teams     | `20`                                            |
 | `NumTotalPlayers`     | Number        | Total number of players registered for the event| `25`                                            |
+| `RulesDocLink`        | String        | Link to the rules document                      | `https://example.com/rules.pdf`                 |
 
 ### Registration Entity
 

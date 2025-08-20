@@ -20,6 +20,7 @@ type Event struct {
 	NumTeams              int
 	NumRosteredPlayers    int
 	NumTotalPlayers       int
+	RulesDocLink          *string
 }
 
 type Range struct {

@@ -61,6 +61,7 @@ func TestGetEvents(t *testing.T) {
 				EndTime:               now.Add(time.Hour),
 				RegistrationCloseTime: now,
 				RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL},
+				RulesDocLink:          ptr.String("https://example.com/rules"),
 			},
 		}
 		mock := &mockDB{
@@ -88,6 +89,7 @@ func TestGetEvents(t *testing.T) {
 			assert.Equal(t, &expectedEvents[0].ID, r.Data[0].Id)
 			assert.Equal(t, expectedEvents[0].Name, r.Data[0].Name)
 			assert.Equal(t, []RegistrationType{ByIndividual}, r.Data[0].RegistrationTypes)
+			assert.Equal(t, expectedEvents[0].RulesDocLink, r.Data[0].RulesDocLink)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
@@ -103,6 +105,7 @@ func TestPostEvents(t *testing.T) {
 			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
 			RegistrationTypes:     []RegistrationType{ByIndividual},
+			RulesDocLink:          ptr.String("https://example.com/rules"),
 		}
 		mock := &mockDB{
 			CreateEventFunc: func(ctx context.Context, event events.Event) error {
@@ -123,6 +126,7 @@ func TestPostEvents(t *testing.T) {
 			assert.NotNil(t, r.Id)
 			assert.Equal(t, reqBody.Name, r.Name)
 			assert.Equal(t, reqBody.RegistrationTypes, r.RegistrationTypes)
+			assert.Equal(t, reqBody.RulesDocLink, r.RulesDocLink)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
@@ -140,6 +144,7 @@ func TestGetEventsId(t *testing.T) {
 			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
 			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL},
+			RulesDocLink:          ptr.String("https://example.com/rules"),
 		}
 		mock := &mockDB{
 			GetEventFunc: func(ctx context.Context, eventId uuid.UUID) (events.Event, error) {
@@ -161,6 +166,7 @@ func TestGetEventsId(t *testing.T) {
 			assert.Equal(t, &expectedEvent.ID, r.Event.Id)
 			assert.Equal(t, expectedEvent.Name, r.Event.Name)
 			assert.Equal(t, []RegistrationType{ByIndividual}, r.Event.RegistrationTypes)
+			assert.Equal(t, expectedEvent.RulesDocLink, r.Event.RulesDocLink)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
