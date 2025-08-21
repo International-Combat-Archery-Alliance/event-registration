@@ -72,19 +72,19 @@ func TestGetEvents(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger)
+		api := NewAPI(mock, noopLogger, LOCAL)
 
-		req := GetEventsRequestObject{
-			Params: GetEventsParams{
+		req := GetV1EventsRequestObject{
+			Params: GetV1EventsParams{
 				Limit: ptr.Int(10),
 			},
 		}
 
-		resp, err := api.GetEvents(context.Background(), req)
+		resp, err := api.GetV1Events(context.Background(), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case GetEvents200JSONResponse:
+		case GetV1Events200JSONResponse:
 			assert.Equal(t, len(expectedEvents), len(r.Data))
 			assert.Equal(t, &expectedEvents[0].ID, r.Data[0].Id)
 			assert.Equal(t, expectedEvents[0].Name, r.Data[0].Name)
@@ -99,7 +99,7 @@ func TestGetEvents(t *testing.T) {
 func TestPostEvents(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		now := time.Now()
-		reqBody := PostEventsJSONRequestBody{
+		reqBody := PostV1EventsJSONRequestBody{
 			Name:                  "Test Event",
 			StartTime:             now,
 			EndTime:               now.Add(time.Hour),
@@ -112,17 +112,17 @@ func TestPostEvents(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger)
+		api := NewAPI(mock, noopLogger, LOCAL)
 
-		req := PostEventsRequestObject{
+		req := PostV1EventsRequestObject{
 			Body: &reqBody,
 		}
 
-		resp, err := api.PostEvents(context.Background(), req)
+		resp, err := api.PostV1Events(context.Background(), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case PostEvents200JSONResponse:
+		case PostV1Events200JSONResponse:
 			assert.NotNil(t, r.Id)
 			assert.Equal(t, reqBody.Name, r.Name)
 			assert.Equal(t, reqBody.RegistrationTypes, r.RegistrationTypes)
@@ -152,17 +152,17 @@ func TestGetEventsId(t *testing.T) {
 				return expectedEvent, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger)
+		api := NewAPI(mock, noopLogger, LOCAL)
 
-		req := GetEventsIdRequestObject{
+		req := GetV1EventsIdRequestObject{
 			Id: id,
 		}
 
-		resp, err := api.GetEventsId(context.Background(), req)
+		resp, err := api.GetV1EventsId(context.Background(), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case GetEventsId200JSONResponse:
+		case GetV1EventsId200JSONResponse:
 			assert.Equal(t, &expectedEvent.ID, r.Event.Id)
 			assert.Equal(t, expectedEvent.Name, r.Event.Name)
 			assert.Equal(t, []RegistrationType{ByIndividual}, r.Event.RegistrationTypes)
@@ -179,17 +179,17 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger)
+		api := NewAPI(mock, noopLogger, LOCAL)
 
-		req := GetEventsIdRequestObject{
+		req := GetV1EventsIdRequestObject{
 			Id: id,
 		}
 
-		resp, err := api.GetEventsId(context.Background(), req)
+		resp, err := api.GetV1EventsId(context.Background(), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case GetEventsId404JSONResponse:
+		case GetV1EventsId404JSONResponse:
 			assert.Equal(t, NotFound, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -203,20 +203,21 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger)
+		api := NewAPI(mock, noopLogger, LOCAL)
 
-		req := GetEventsIdRequestObject{
+		req := GetV1EventsIdRequestObject{
 			Id: id,
 		}
 
-		resp, err := api.GetEventsId(context.Background(), req)
+		resp, err := api.GetV1EventsId(context.Background(), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case GetEventsId500JSONResponse:
+		case GetV1EventsId500JSONResponse:
 			assert.Equal(t, InternalError, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
 	})
 }
+
