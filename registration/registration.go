@@ -103,7 +103,7 @@ func AttemptRegistration(ctx context.Context, registrationRequest Registration, 
 }
 
 func registerIndividualAsFreeAgent(event *events.Event, reg IndividualRegistration) error {
-	if !slices.Contains(event.RegistrationTypes, events.BY_INDIVIDUAL) {
+	if !slices.ContainsFunc(event.RegistrationOptions, func(v events.EventRegistrationOption) bool { return v.RegType == events.BY_INDIVIDUAL }) {
 		return NewNotAllowedToSignUpAsTypeError(events.BY_INDIVIDUAL)
 	}
 
@@ -117,7 +117,7 @@ func registerIndividualAsFreeAgent(event *events.Event, reg IndividualRegistrati
 }
 
 func registerTeam(event *events.Event, reg TeamRegistration) error {
-	if !slices.Contains(event.RegistrationTypes, events.BY_TEAM) {
+	if !slices.ContainsFunc(event.RegistrationOptions, func(v events.EventRegistrationOption) bool { return v.RegType == events.BY_TEAM }) {
 		return NewNotAllowedToSignUpAsTypeError(events.BY_TEAM)
 	}
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
+	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 )
 
@@ -133,13 +134,13 @@ func (a *API) GetV1EventsId(ctx context.Context, request GetV1EventsIdRequestObj
 }
 
 func eventToApiEvent(event events.Event) (Event, error) {
-	regTypes := []RegistrationType{}
-	for _, t := range event.RegistrationTypes {
-		convT, err := registrationTypeToApiRegistrationType(t)
+	regOptions := []EventRegistrationOption{}
+	for _, t := range event.RegistrationOptions {
+		convT, err := registrationOptionToApiRegistrationOption(t)
 		if err != nil {
 			return Event{}, err
 		}
-		regTypes = append(regTypes, convT)
+		regOptions = append(regOptions, convT)
 	}
 
 	return Event{
@@ -150,7 +151,7 @@ func eventToApiEvent(event events.Event) (Event, error) {
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
-		RegistrationTypes:     regTypes,
+		RegistrationOptions:   regOptions,
 		AllowedTeamSizeRange: Range{
 			Min: event.AllowedTeamSizeRange.Min,
 			Max: event.AllowedTeamSizeRange.Max,
@@ -161,17 +162,18 @@ func eventToApiEvent(event events.Event) (Event, error) {
 			NumTotalPlayers:    event.NumTotalPlayers,
 		},
 		RulesDocLink: event.RulesDocLink,
+		ImageName:    event.ImageName,
 	}, nil
 }
 
 func apiEventToEvent(event Event) (events.Event, error) {
-	regTypes := []events.RegistrationType{}
-	for _, t := range event.RegistrationTypes {
-		convT, err := apiRegistrationTypeToRegistrationType(t)
+	regOptions := []events.EventRegistrationOption{}
+	for _, t := range event.RegistrationOptions {
+		convT, err := apiRegistrationOptionToRegistrationOption(t)
 		if err != nil {
 			return events.Event{}, err
 		}
-		regTypes = append(regTypes, convT)
+		regOptions = append(regOptions, convT)
 	}
 
 	return events.Event{
@@ -182,7 +184,7 @@ func apiEventToEvent(event Event) (events.Event, error) {
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
-		RegistrationTypes:     regTypes,
+		RegistrationOptions:   regOptions,
 		NumTotalPlayers:       event.SignUpStats.NumTotalPlayers,
 		NumRosteredPlayers:    event.SignUpStats.NumRosteredPlayers,
 		NumTeams:              event.SignUpStats.NumTeams,
@@ -191,6 +193,7 @@ func apiEventToEvent(event Event) (events.Event, error) {
 			Max: event.AllowedTeamSizeRange.Max,
 		},
 		RulesDocLink: event.RulesDocLink,
+		ImageName:    event.ImageName,
 	}, nil
 }
 
@@ -248,4 +251,31 @@ func apiRegistrationTypeToRegistrationType(t RegistrationType) (events.Registrat
 	default:
 		return events.RegistrationType(0), fmt.Errorf("unknown registration type: %s", t)
 	}
+}
+
+func apiRegistrationOptionToRegistrationOption(t EventRegistrationOption) (events.EventRegistrationOption, error) {
+	regType, err := apiRegistrationTypeToRegistrationType(t.RegistrationType)
+	if err != nil {
+		return events.EventRegistrationOption{}, err
+	}
+
+	return events.EventRegistrationOption{
+		RegType: regType,
+		Price:   *money.New(int64(t.Price.Amount), t.Price.Currency),
+	}, nil
+}
+
+func registrationOptionToApiRegistrationOption(t events.EventRegistrationOption) (EventRegistrationOption, error) {
+	regType, err := registrationTypeToApiRegistrationType(t.RegType)
+	if err != nil {
+		return EventRegistrationOption{}, err
+	}
+
+	return EventRegistrationOption{
+		RegistrationType: regType,
+		Price: Money{
+			Amount:   int(t.Price.Amount()),
+			Currency: t.Price.Currency().Code,
+		},
+	}, nil
 }

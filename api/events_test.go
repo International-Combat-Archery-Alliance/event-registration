@@ -10,6 +10,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,7 +61,7 @@ func TestGetEvents(t *testing.T) {
 				StartTime:             now,
 				EndTime:               now.Add(time.Hour),
 				RegistrationCloseTime: now,
-				RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL},
+				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: *money.New(5000, "USD")}},
 				RulesDocLink:          ptr.String("https://example.com/rules"),
 			},
 		}
@@ -88,7 +89,7 @@ func TestGetEvents(t *testing.T) {
 			assert.Equal(t, len(expectedEvents), len(r.Data))
 			assert.Equal(t, &expectedEvents[0].ID, r.Data[0].Id)
 			assert.Equal(t, expectedEvents[0].Name, r.Data[0].Name)
-			assert.Equal(t, []RegistrationType{ByIndividual}, r.Data[0].RegistrationTypes)
+			assert.Equal(t, []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}}, r.Data[0].RegistrationOptions)
 			assert.Equal(t, expectedEvents[0].RulesDocLink, r.Data[0].RulesDocLink)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -104,7 +105,7 @@ func TestPostEvents(t *testing.T) {
 			StartTime:             now,
 			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
-			RegistrationTypes:     []RegistrationType{ByIndividual},
+			RegistrationOptions:   []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}},
 			RulesDocLink:          ptr.String("https://example.com/rules"),
 		}
 		mock := &mockDB{
@@ -125,7 +126,7 @@ func TestPostEvents(t *testing.T) {
 		case PostV1Events200JSONResponse:
 			assert.NotNil(t, r.Id)
 			assert.Equal(t, reqBody.Name, r.Name)
-			assert.Equal(t, reqBody.RegistrationTypes, r.RegistrationTypes)
+			assert.Equal(t, reqBody.RegistrationOptions, r.RegistrationOptions)
 			assert.Equal(t, reqBody.RulesDocLink, r.RulesDocLink)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -143,7 +144,7 @@ func TestGetEventsId(t *testing.T) {
 			StartTime:             now,
 			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
-			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: *money.New(5000, "USD")}},
 			RulesDocLink:          ptr.String("https://example.com/rules"),
 		}
 		mock := &mockDB{
@@ -165,7 +166,7 @@ func TestGetEventsId(t *testing.T) {
 		case GetV1EventsId200JSONResponse:
 			assert.Equal(t, &expectedEvent.ID, r.Event.Id)
 			assert.Equal(t, expectedEvent.Name, r.Event.Name)
-			assert.Equal(t, []RegistrationType{ByIndividual}, r.Event.RegistrationTypes)
+			assert.Equal(t, []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}}, r.Event.RegistrationOptions)
 			assert.Equal(t, expectedEvent.RulesDocLink, r.Event.RulesDocLink)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -220,4 +221,3 @@ func TestGetEventsId(t *testing.T) {
 		}
 	})
 }
-

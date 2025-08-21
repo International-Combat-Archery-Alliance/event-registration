@@ -274,7 +274,7 @@ components:
         - startTime
         - endTime
         - registrationCloseTime
-        - registrationTypes
+        - registrationOptions
         - allowedTeamSizeRange
         - signUpStats
       properties:
@@ -306,11 +306,11 @@ components:
           type: string
           format: date-time
           example: "2025-08-17T23:59:59.000Z"
-        registrationTypes:
+        registrationOptions:
           type: array
           minItems: 1
           items:
-            $ref: '#/components/schemas/RegistrationType'
+            $ref: '#/components/schemas/EventRegistrationOption'
         allowedTeamSizeRange:
           $ref: '#/components/schemas/Range'
         signUpStats:
@@ -319,6 +319,11 @@ components:
           type: string
           maxLength: 500
           example: https://docs.google.com/document/d/adsffafsafsadfd/view
+        imageName:
+          type: string
+          maxLength: 500
+          description: A file name that exists in the UI assets to use as the logo.
+          example: boston-tournament.jpg
     SignUpStats:
       type: object
       readOnly: true
@@ -544,6 +549,30 @@ components:
           type: integer
           example: 5
           minimum: 1
+    Money:
+      type: object
+      required:
+        - currency
+        - amount
+      properties:
+        currency:
+          type: string
+          format: iso-4217
+          example: USD`
+        amount:
+          type: integer
+          description: Minor units of money (i.e. 100 == $1 in USD)
+          example: 100
+    EventRegistrationOption:
+      type: object
+      required:
+        - registrationType
+        - price
+      properties:
+        registrationType:
+          $ref: '#/components/schemas/RegistrationType'
+        price:
+          $ref: '#/components/schemas/Money'
     RegistrationType:
       type: string
       enum:
