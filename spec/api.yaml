@@ -4,12 +4,12 @@ info:
   version: 1.0.0
   description: An API for managing events and signing up for events.
 servers:
-  - url: https://api.icaa.world/v1
+  - url: https://api.icaa.world/
     description: Production server
-  - url: http://localhost:8080/v1
+  - url: http://localhost:3000/
     description: Local dev server
 paths:
-  /events:
+  /v1/events:
     get:
       summary: Get all events
       description: Retrieves a list of all events
@@ -93,7 +93,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /events/{id}:
+  /v1/events/{id}:
     get:
       summary: Get an event
       description: Get one event by id
@@ -136,7 +136,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /events/{eventId}/register:
+  /v1/events/{eventId}/register:
     post:
       summary: Sign up for an event
       description: Sign up for an event
@@ -198,7 +198,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /events/{eventId}/registrations:
+  /v1/events/{eventId}/registrations:
     get:
       summary: Get all registrations for an event
       description: Get all registrations for an event

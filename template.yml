@@ -24,6 +24,22 @@ Globals:
     Environment:
       Variables:
         DYNAMO_TABLE_NAME: !FindInMap [attributes, dynamo, tableName]
+  Api:
+    Cors:
+      AllowOrigins:
+        - 'https://example.com'
+        - '*' # Allows all origins (for development/testing only)
+      AllowHeaders:
+        - 'Content-Type'
+        - 'X-Amz-Date'
+        - 'Authorization'
+      AllowMethods:
+        - 'GET'
+        - 'POST'
+        - 'PUT'
+        - 'DELETE'
+        - 'OPTIONS'
+
 
 Resources:
   ICAAEventRegistration:
