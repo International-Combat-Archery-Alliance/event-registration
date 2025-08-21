@@ -22,6 +22,7 @@ type Event struct {
 	NumRosteredPlayers    int
 	NumTotalPlayers       int
 	RulesDocLink          *string
+	ImageName             *string
 }
 
 type EventRegistrationOption struct {

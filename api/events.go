@@ -162,6 +162,7 @@ func eventToApiEvent(event events.Event) (Event, error) {
 			NumTotalPlayers:    event.NumTotalPlayers,
 		},
 		RulesDocLink: event.RulesDocLink,
+		ImageName:    event.ImageName,
 	}, nil
 }
 
@@ -192,6 +193,7 @@ func apiEventToEvent(event Event) (events.Event, error) {
 			Max: event.AllowedTeamSizeRange.Max,
 		},
 		RulesDocLink: event.RulesDocLink,
+		ImageName:    event.ImageName,
 	}, nil
 }
 
