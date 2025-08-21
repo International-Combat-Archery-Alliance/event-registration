@@ -27,7 +27,7 @@ type Event struct {
 
 type EventRegistrationOption struct {
 	RegType RegistrationType
-	Price   money.Money
+	Price   *money.Money
 }
 
 type Range struct {

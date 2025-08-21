@@ -8,6 +8,8 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
+	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
+	"github.com/Rhymond/go-money"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -70,7 +72,7 @@ func TestCreateEvent(t *testing.T) {
 			StartTime:             time.Now().UTC().Truncate(time.Second),
 			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
-			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")}, {RegType: events.BY_TEAM, Price: money.New(4000, "USD")}},
 			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
@@ -106,7 +108,9 @@ func TestCreateEvent(t *testing.T) {
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
 		assert.WithinDuration(t, event.RegistrationCloseTime, savedEvent.RegistrationCloseTime, time.Second)
-		assert.Equal(t, event.RegistrationOptions, savedEvent.RegistrationOptions)
+		assert.Equal(t, event.RegistrationOptions, slices.Map(savedEvent.RegistrationOptions, func(o eventRegistrationOptionDynamo) events.EventRegistrationOption {
+			return dynamoEventRegOptionToEventRegOption(o)
+		}))
 		assert.Equal(t, event.AllowedTeamSizeRange, savedEvent.AllowedTeamSizeRange)
 		assert.Equal(t, event.NumTeams, savedEvent.NumTeams)
 		assert.Equal(t, event.NumRosteredPlayers, savedEvent.NumRosteredPlayers)
@@ -137,7 +141,7 @@ func TestGetEvent(t *testing.T) {
 			StartTime:             time.Now().UTC().Truncate(time.Second),
 			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
-			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(1000, "USD")}, {RegType: events.BY_TEAM, Price: money.New(2500, "USD")}},
 			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
@@ -205,7 +209,7 @@ func TestGetEvents(t *testing.T) {
 			StartTime:             time.Now().UTC().Truncate(time.Second),
 			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
-			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(1500, "USD")}, {RegType: events.BY_TEAM, Price: money.New(2500, "EUR")}},
 			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
@@ -242,7 +246,7 @@ func TestGetEvents(t *testing.T) {
 				StartTime:             time.Now().Add(time.Duration(i) * time.Hour).UTC().Truncate(time.Second),
 				EndTime:               time.Now().Add(time.Duration(i+1) * time.Hour).UTC().Truncate(time.Second),
 				RegistrationCloseTime: time.Now().Add(time.Duration(i)*time.Hour + 30*time.Minute).UTC().Truncate(time.Second),
-				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
+				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(3000, "EUR")}, {RegType: events.BY_TEAM, Price: money.New(3500, "EUR")}},
 				AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 				NumTeams:              10 + i,
 				NumRosteredPlayers:    50 + i,
@@ -281,7 +285,7 @@ func TestGetEvents(t *testing.T) {
 				StartTime:             time.Now().Add(time.Duration(i) * time.Hour).UTC().Truncate(time.Second),
 				EndTime:               time.Now().Add(time.Duration(i+1) * time.Hour).UTC().Truncate(time.Second),
 				RegistrationCloseTime: time.Now().Add(time.Duration(i)*time.Hour + 30*time.Minute).UTC().Truncate(time.Second),
-				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
+				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(1200, "USD")}, {RegType: events.BY_TEAM, Price: money.New(1750, "USD")}},
 				AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 				NumTeams:              10 + i,
 				NumRosteredPlayers:    50 + i,
@@ -368,7 +372,7 @@ func TestUpdateEvent(t *testing.T) {
 			StartTime:             time.Now().UTC().Truncate(time.Second),
 			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
-			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(7500, "USD")}, {RegType: events.BY_TEAM, Price: money.New(10000, "USD")}},
 			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
@@ -410,12 +414,178 @@ func TestUpdateEvent(t *testing.T) {
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
 		assert.WithinDuration(t, event.RegistrationCloseTime, savedEvent.RegistrationCloseTime, time.Second)
-		assert.Equal(t, event.RegistrationOptions, savedEvent.RegistrationOptions)
+		assert.Equal(t, event.RegistrationOptions, slices.Map(savedEvent.RegistrationOptions, func(o eventRegistrationOptionDynamo) events.EventRegistrationOption {
+			return dynamoEventRegOptionToEventRegOption(o)
+		}))
 		assert.Equal(t, event.AllowedTeamSizeRange, savedEvent.AllowedTeamSizeRange)
 		assert.Equal(t, event.NumTeams, savedEvent.NumTeams)
 		assert.Equal(t, event.NumRosteredPlayers, savedEvent.NumRosteredPlayers)
 		assert.Equal(t, event.NumTotalPlayers, savedEvent.NumTotalPlayers)
 		assert.Equal(t, event.RulesDocLink, savedEvent.RulesDocLink)
 		assert.Equal(t, event.Version, savedEvent.Version)
+	})
+}
+
+func TestEventMoneyPriceSavingAndFetching(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("successfully save and fetch event with Money price in registration options", func(t *testing.T) {
+		resetTable(ctx)
+		event := events.Event{
+			ID:   uuid.New(),
+			Name: "Test Event with Pricing",
+			EventLocation: events.Location{
+				Name: "Test Location",
+				LocAddress: events.Address{
+					Street:     "123 Test St",
+					City:       "Test City",
+					State:      "TS",
+					PostalCode: "12345",
+					Country:    "Testland",
+				},
+			},
+			StartTime:             time.Now().UTC().Truncate(time.Second),
+			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
+			RegistrationOptions: []events.EventRegistrationOption{
+				{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")},
+				{RegType: events.BY_TEAM, Price: money.New(15000, "USD")},
+			},
+			AllowedTeamSizeRange: events.Range{Min: 3, Max: 5},
+			NumTeams:             10,
+			NumRosteredPlayers:   50,
+			NumTotalPlayers:      60,
+			RulesDocLink:         ptr.String("https://example.com/rules"),
+			Version:              1,
+		}
+
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		retrieved, err := db.GetEvent(ctx, event.ID)
+		require.NoError(t, err)
+
+		require.Len(t, retrieved.RegistrationOptions, 2)
+
+		// Test individual registration price
+		assert.Equal(t, events.BY_INDIVIDUAL, retrieved.RegistrationOptions[0].RegType)
+		require.NotNil(t, retrieved.RegistrationOptions[0].Price)
+		assert.Equal(t, int64(5000), retrieved.RegistrationOptions[0].Price.Amount())
+		assert.Equal(t, "USD", retrieved.RegistrationOptions[0].Price.Currency().Code)
+
+		// Test team registration price
+		assert.Equal(t, events.BY_TEAM, retrieved.RegistrationOptions[1].RegType)
+		require.NotNil(t, retrieved.RegistrationOptions[1].Price)
+		assert.Equal(t, int64(15000), retrieved.RegistrationOptions[1].Price.Amount())
+		assert.Equal(t, "USD", retrieved.RegistrationOptions[1].Price.Currency().Code)
+	})
+
+	t.Run("successfully save and fetch event with different currencies", func(t *testing.T) {
+		resetTable(ctx)
+		event := events.Event{
+			ID:   uuid.New(),
+			Name: "Multi-Currency Event",
+			EventLocation: events.Location{
+				Name: "International Location",
+			},
+			StartTime:             time.Now().UTC().Truncate(time.Second),
+			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
+			RegistrationOptions: []events.EventRegistrationOption{
+				{RegType: events.BY_INDIVIDUAL, Price: money.New(2500, "EUR")},
+				{RegType: events.BY_TEAM, Price: money.New(750000, "JPY")},
+			},
+			Version: 1,
+		}
+
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		retrieved, err := db.GetEvent(ctx, event.ID)
+		require.NoError(t, err)
+
+		require.Len(t, retrieved.RegistrationOptions, 2)
+
+		// Test EUR pricing
+		assert.Equal(t, int64(2500), retrieved.RegistrationOptions[0].Price.Amount())
+		assert.Equal(t, "EUR", retrieved.RegistrationOptions[0].Price.Currency().Code)
+
+		// Test JPY pricing
+		assert.Equal(t, int64(750000), retrieved.RegistrationOptions[1].Price.Amount())
+		assert.Equal(t, "JPY", retrieved.RegistrationOptions[1].Price.Currency().Code)
+	})
+
+	t.Run("successfully update event with changed prices", func(t *testing.T) {
+		resetTable(ctx)
+		event := events.Event{
+			ID:   uuid.New(),
+			Name: "Price Update Event",
+			EventLocation: events.Location{
+				Name: "Test Location",
+			},
+			StartTime:             time.Now().UTC().Truncate(time.Second),
+			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
+			RegistrationOptions: []events.EventRegistrationOption{
+				{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")},
+			},
+			Version: 1,
+		}
+
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		// Update the price
+		event.RegistrationOptions[0].Price = money.New(7500, "USD")
+		event.Version++
+		require.NoError(t, db.UpdateEvent(ctx, event))
+
+		retrieved, err := db.GetEvent(ctx, event.ID)
+		require.NoError(t, err)
+
+		require.Len(t, retrieved.RegistrationOptions, 1)
+		require.NotNil(t, retrieved.RegistrationOptions[0].Price)
+		assert.Equal(t, int64(7500), retrieved.RegistrationOptions[0].Price.Amount())
+		assert.Equal(t, "USD", retrieved.RegistrationOptions[0].Price.Currency().Code)
+		assert.Equal(t, 2, retrieved.Version)
+	})
+
+	t.Run("verify direct dynamo storage of Money fields", func(t *testing.T) {
+		resetTable(ctx)
+		event := events.Event{
+			ID:   uuid.New(),
+			Name: "Direct Storage Test",
+			EventLocation: events.Location{
+				Name: "Test Location",
+			},
+			StartTime:             time.Now().UTC().Truncate(time.Second),
+			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
+			RegistrationOptions: []events.EventRegistrationOption{
+				{RegType: events.BY_INDIVIDUAL, Price: money.New(12345, "GBP")},
+			},
+			Version: 1,
+		}
+
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		// Verify data was saved correctly by checking raw DynamoDB item
+		dynamoEvent := newEventDynamo(event)
+		key, err := attributevalue.MarshalMap(map[string]any{
+			"PK": dynamoEvent.PK,
+			"SK": dynamoEvent.SK,
+		})
+		require.NoError(t, err)
+
+		out, err := dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
+			TableName: aws.String(tableName),
+			Key:       key,
+		})
+		require.NoError(t, err)
+
+		var savedEvent eventDynamo
+		err = attributevalue.UnmarshalMap(out.Item, &savedEvent)
+		require.NoError(t, err)
+
+		require.Len(t, savedEvent.RegistrationOptions, 1)
+		assert.Equal(t, int64(12345), savedEvent.RegistrationOptions[0].PriceAmount)
+		assert.Equal(t, "GBP", savedEvent.RegistrationOptions[0].PriceCurrency)
 	})
 }
