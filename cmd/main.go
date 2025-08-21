@@ -27,7 +27,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	eventAPI := api.NewAPI(db, logger)
+	eventAPI := api.NewAPI(db, logger, getApiEnvironment())
 
 	serverSettings := getServerSettingsFromEnv()
 	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
@@ -76,6 +76,13 @@ func makeDB(ctx context.Context) (api.DB, error) {
 
 func isLocal() bool {
 	return getEnvOrDefault("AWS_SAM_LOCAL", "false") == "true"
+}
+
+func getApiEnvironment() api.Environment {
+	if isLocal() {
+		return api.LOCAL
+	}
+	return api.PROD
 }
 
 func createLocalDynamoClient(ctx context.Context) (*dynamodb.Client, error) {

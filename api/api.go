@@ -12,8 +12,17 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	middleware "github.com/oapi-codegen/nethttp-middleware"
+	"github.com/rs/cors"
+)
+
+type Environment int
+
+const (
+	LOCAL Environment = iota
+	PROD
 )
 
 type DB interface {
@@ -24,14 +33,16 @@ type DB interface {
 type API struct {
 	db     DB
 	logger *slog.Logger
+	env    Environment
 }
 
 var _ StrictServerInterface = (*API)(nil)
 
-func NewAPI(db DB, logger *slog.Logger) *API {
+func NewAPI(db DB, logger *slog.Logger, env Environment) *API {
 	return &API{
 		db:     db,
 		logger: logger,
+		env:    env,
 	}
 }
 
@@ -49,7 +60,35 @@ func (a *API) ListenAndServe(host string, port string) error {
 
 	HandlerFromMux(strictHandler, r)
 
-	oapiValidationMW := middleware.OapiRequestValidatorWithOptions(swagger, &middleware.Options{
+	h := useMiddlewares(
+		r,
+		a.openapiValidateMiddleware(swagger),
+		a.corsMiddleware(),
+	)
+
+	s := &http.Server{
+		Handler: h,
+		Addr:    net.JoinHostPort(host, port),
+	}
+
+	return s.ListenAndServe()
+}
+
+type middlewareFunc func(next http.Handler) http.Handler
+
+func useMiddlewares(r *http.ServeMux, middlewares ...middlewareFunc) http.Handler {
+	var s http.Handler
+	s = r
+
+	for _, mw := range middlewares {
+		s = mw(s)
+	}
+
+	return s
+}
+
+func (a *API) openapiValidateMiddleware(swagger *openapi3.T) middlewareFunc {
+	return middleware.OapiRequestValidatorWithOptions(swagger, &middleware.Options{
 		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts middleware.ErrorHandlerOpts) {
 			var e Error
 
@@ -82,27 +121,21 @@ func (a *API) ListenAndServe(host string, port string) error {
 			w.Write(jsonBody)
 		},
 	})
-
-	h := useMiddlewares(
-		r,
-		oapiValidationMW,
-	)
-
-	s := &http.Server{
-		Handler: h,
-		Addr:    net.JoinHostPort(host, port),
-	}
-
-	return s.ListenAndServe()
 }
 
-func useMiddlewares(r *http.ServeMux, middlewares ...func(next http.Handler) http.Handler) http.Handler {
-	var s http.Handler
-	s = r
+func (a *API) corsMiddleware() middlewareFunc {
+	var serverCors *cors.Cors
 
-	for _, mw := range middlewares {
-		s = mw(s)
+	switch a.env {
+	case LOCAL:
+		serverCors = cors.AllowAll()
+	case PROD:
+		serverCors = cors.New(cors.Options{
+			AllowedOrigins: []string{"https://icaa.world"},
+			AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+			MaxAge:         300,
+		})
 	}
 
-	return s
+	return serverCors.Handler
 }
