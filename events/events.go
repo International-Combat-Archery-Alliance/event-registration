@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 )
 
@@ -15,12 +16,17 @@ type Event struct {
 	StartTime             time.Time
 	EndTime               time.Time
 	RegistrationCloseTime time.Time
-	RegistrationTypes     []RegistrationType
+	RegistrationOptions   []EventRegistrationOption
 	AllowedTeamSizeRange  Range
 	NumTeams              int
 	NumRosteredPlayers    int
 	NumTotalPlayers       int
 	RulesDocLink          *string
+}
+
+type EventRegistrationOption struct {
+	RegType RegistrationType
+	Price   money.Money
 }
 
 type Range struct {

@@ -30,7 +30,7 @@ type eventDynamo struct {
 	StartTime             time.Time
 	EndTime               time.Time
 	RegistrationCloseTime time.Time
-	RegistrationTypes     []events.RegistrationType
+	RegistrationOptions   []events.EventRegistrationOption
 	AllowedTeamSizeRange  events.Range
 	NumTeams              int
 	NumRosteredPlayers    int
@@ -63,7 +63,7 @@ func newEventDynamo(event events.Event) eventDynamo {
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
-		RegistrationTypes:     event.RegistrationTypes,
+		RegistrationOptions:   event.RegistrationOptions,
 		AllowedTeamSizeRange:  event.AllowedTeamSizeRange,
 		NumTotalPlayers:       event.NumTotalPlayers,
 		NumRosteredPlayers:    event.NumRosteredPlayers,
@@ -81,7 +81,7 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
-		RegistrationTypes:     event.RegistrationTypes,
+		RegistrationOptions:   event.RegistrationOptions,
 		AllowedTeamSizeRange:  event.AllowedTeamSizeRange,
 		NumTeams:              event.NumTeams,
 		NumRosteredPlayers:    event.NumRosteredPlayers,
@@ -181,6 +181,8 @@ func (d *DB) GetEvents(ctx context.Context, limit int32, cursor *string) (events
 		KeyConditionExpression:    expr.KeyCondition(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
+		// Want to sort newest event first
+		ScanIndexForward: aws.Bool(false),
 		// Fetch 1 more than limit to check if there is another page or not
 		Limit:             aws.Int32(limit + 1),
 		ExclusiveStartKey: startKey,

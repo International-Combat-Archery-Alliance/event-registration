@@ -9,6 +9,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/assert"
@@ -74,7 +75,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 	t.Run("registration already exists", func(t *testing.T) {
 		mock := &mockDB{
 			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
-				return events.Event{RegistrationTypes: []events.RegistrationType{events.BY_INDIVIDUAL}, RegistrationCloseTime: time.Now().Add(time.Hour * 1000)}, nil
+				return events.Event{RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: *money.New(10000, "USD")}}, RegistrationCloseTime: time.Now().Add(time.Hour * 1000)}, nil
 			},
 			CreateRegistrationFunc: func(ctx context.Context, reg registration.Registration, event events.Event) error {
 				return &registration.Error{Reason: registration.REASON_REGISTRATION_ALREADY_EXISTS}
@@ -109,7 +110,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 	t.Run("registration is closed", func(t *testing.T) {
 		mock := &mockDB{
 			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
-				return events.Event{RegistrationTypes: []events.RegistrationType{events.BY_INDIVIDUAL}}, nil
+				return events.Event{RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: *money.New(5500, "USD")}}}, nil
 			},
 			CreateRegistrationFunc: func(ctx context.Context, reg registration.Registration, event events.Event) error {
 				return &registration.Error{Reason: registration.REASON_REGISTRATION_IS_CLOSED}

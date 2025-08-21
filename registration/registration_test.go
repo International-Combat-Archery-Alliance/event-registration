@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -73,9 +74,9 @@ func TestAttemptRegistration(t *testing.T) {
 	t.Run("individual registration success", func(t *testing.T) {
 		eventID := uuid.New()
 		event := events.Event{
-			ID:                eventID,
-			Version:           1,
-			RegistrationTypes: []events.RegistrationType{events.BY_INDIVIDUAL},
+			ID:                  eventID,
+			Version:             1,
+			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: *money.New(5000, "USD")}},
 		}
 		eventRepo := &mockEventRepository{
 			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
@@ -101,7 +102,7 @@ func TestAttemptRegistration(t *testing.T) {
 		event := events.Event{
 			ID:                   eventID,
 			Version:              1,
-			RegistrationTypes:    []events.RegistrationType{events.BY_TEAM},
+			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM, Price: *money.New(5000, "USD")}},
 			AllowedTeamSizeRange: events.Range{Min: 1, Max: 5},
 		}
 		eventRepo := &mockEventRepository{
@@ -127,8 +128,8 @@ func TestAttemptRegistration(t *testing.T) {
 	t.Run("individual registration not allowed", func(t *testing.T) {
 		eventID := uuid.New()
 		event := events.Event{
-			ID:                eventID,
-			RegistrationTypes: []events.RegistrationType{events.BY_TEAM},
+			ID:                  eventID,
+			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 		}
 		eventRepo := &mockEventRepository{
 			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
@@ -150,8 +151,8 @@ func TestAttemptRegistration(t *testing.T) {
 	t.Run("team registration not allowed", func(t *testing.T) {
 		eventID := uuid.New()
 		event := events.Event{
-			ID:                eventID,
-			RegistrationTypes: []events.RegistrationType{events.BY_INDIVIDUAL},
+			ID:                  eventID,
+			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}},
 		}
 		eventRepo := &mockEventRepository{
 			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
@@ -174,7 +175,7 @@ func TestAttemptRegistration(t *testing.T) {
 		eventID := uuid.New()
 		event := events.Event{
 			ID:                   eventID,
-			RegistrationTypes:    []events.RegistrationType{events.BY_TEAM},
+			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange: events.Range{Min: 2, Max: 5},
 		}
 		eventRepo := &mockEventRepository{
@@ -239,7 +240,7 @@ func (m *mockRegistration) Type() events.RegistrationType {
 func TestRegisterIndividualAsFreeAgent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		event := &events.Event{
-			RegistrationTypes: []events.RegistrationType{events.BY_INDIVIDUAL},
+			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}},
 		}
 		reg := IndividualRegistration{}
 
@@ -250,7 +251,7 @@ func TestRegisterIndividualAsFreeAgent(t *testing.T) {
 
 	t.Run("not allowed", func(t *testing.T) {
 		event := &events.Event{
-			RegistrationTypes: []events.RegistrationType{events.BY_TEAM},
+			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 		}
 		reg := IndividualRegistration{}
 
@@ -263,7 +264,7 @@ func TestRegisterIndividualAsFreeAgent(t *testing.T) {
 
 	t.Run("registration closed", func(t *testing.T) {
 		event := &events.Event{
-			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}},
 			RegistrationCloseTime: time.Now().Add(-time.Hour),
 		}
 		reg := IndividualRegistration{
@@ -281,7 +282,7 @@ func TestRegisterIndividualAsFreeAgent(t *testing.T) {
 func TestRegisterTeam(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		event := &events.Event{
-			RegistrationTypes:   []events.RegistrationType{events.BY_TEAM},
+			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange: events.Range{Min: 1, Max: 5},
 		}
 		reg := TeamRegistration{
@@ -297,7 +298,7 @@ func TestRegisterTeam(t *testing.T) {
 
 	t.Run("not allowed", func(t *testing.T) {
 		event := &events.Event{
-			RegistrationTypes: []events.RegistrationType{events.BY_INDIVIDUAL},
+			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}},
 		}
 		reg := TeamRegistration{}
 
@@ -310,7 +311,7 @@ func TestRegisterTeam(t *testing.T) {
 
 	t.Run("team size too small", func(t *testing.T) {
 		event := &events.Event{
-			RegistrationTypes:   []events.RegistrationType{events.BY_TEAM},
+			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange: events.Range{Min: 2, Max: 5},
 		}
 		reg := TeamRegistration{
@@ -326,7 +327,7 @@ func TestRegisterTeam(t *testing.T) {
 
 	t.Run("team size too large", func(t *testing.T) {
 		event := &events.Event{
-			RegistrationTypes:   []events.RegistrationType{events.BY_TEAM},
+			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange: events.Range{Min: 1, Max: 1},
 		}
 		reg := TeamRegistration{
@@ -342,7 +343,7 @@ func TestRegisterTeam(t *testing.T) {
 
 	t.Run("registration closed", func(t *testing.T) {
 		event := &events.Event{
-			RegistrationTypes:     []events.RegistrationType{events.BY_TEAM},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange:  events.Range{Min: 1, Max: 5},
 			RegistrationCloseTime: time.Now().Add(-time.Hour),
 		}

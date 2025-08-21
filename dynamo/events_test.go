@@ -55,8 +55,8 @@ func TestCreateEvent(t *testing.T) {
 	t.Run("successfully create an event and verify data", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:        uuid.New(),
-			Name:      "Test Event",
+			ID:   uuid.New(),
+			Name: "Test Event",
 			EventLocation: events.Location{
 				Name: "Test Location",
 				LocAddress: events.Address{
@@ -70,7 +70,7 @@ func TestCreateEvent(t *testing.T) {
 			StartTime:             time.Now().UTC().Truncate(time.Second),
 			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
-			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
@@ -106,7 +106,7 @@ func TestCreateEvent(t *testing.T) {
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
 		assert.WithinDuration(t, event.RegistrationCloseTime, savedEvent.RegistrationCloseTime, time.Second)
-		assert.Equal(t, event.RegistrationTypes, savedEvent.RegistrationTypes)
+		assert.Equal(t, event.RegistrationOptions, savedEvent.RegistrationOptions)
 		assert.Equal(t, event.AllowedTeamSizeRange, savedEvent.AllowedTeamSizeRange)
 		assert.Equal(t, event.NumTeams, savedEvent.NumTeams)
 		assert.Equal(t, event.NumRosteredPlayers, savedEvent.NumRosteredPlayers)
@@ -122,8 +122,8 @@ func TestGetEvent(t *testing.T) {
 	t.Run("successfully get an event", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:        uuid.New(),
-			Name:      "Test Event",
+			ID:   uuid.New(),
+			Name: "Test Event",
 			EventLocation: events.Location{
 				Name: "Test Location",
 				LocAddress: events.Address{
@@ -137,7 +137,7 @@ func TestGetEvent(t *testing.T) {
 			StartTime:             time.Now().UTC().Truncate(time.Second),
 			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
-			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
@@ -156,7 +156,7 @@ func TestGetEvent(t *testing.T) {
 		assert.WithinDuration(t, event.StartTime, actual.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, actual.EndTime, time.Second)
 		assert.WithinDuration(t, event.RegistrationCloseTime, actual.RegistrationCloseTime, time.Second)
-		assert.Equal(t, event.RegistrationTypes, actual.RegistrationTypes)
+		assert.Equal(t, event.RegistrationOptions, actual.RegistrationOptions)
 		assert.Equal(t, event.AllowedTeamSizeRange, actual.AllowedTeamSizeRange)
 		assert.Equal(t, event.NumTeams, actual.NumTeams)
 		assert.Equal(t, event.NumRosteredPlayers, actual.NumRosteredPlayers)
@@ -190,8 +190,8 @@ func TestGetEvents(t *testing.T) {
 	t.Run("successfully get a single event", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:        uuid.New(),
-			Name:      "Test Event",
+			ID:   uuid.New(),
+			Name: "Test Event",
 			EventLocation: events.Location{
 				Name: "Test Location",
 				LocAddress: events.Address{
@@ -205,7 +205,7 @@ func TestGetEvents(t *testing.T) {
 			StartTime:             time.Now().UTC().Truncate(time.Second),
 			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
-			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
@@ -227,8 +227,8 @@ func TestGetEvents(t *testing.T) {
 		resetTable(ctx)
 		for i := range 5 {
 			event := events.Event{
-				ID:        uuid.New(),
-				Name:      fmt.Sprintf("Test Event %d", i),
+				ID:   uuid.New(),
+				Name: fmt.Sprintf("Test Event %d", i),
 				EventLocation: events.Location{
 					Name: fmt.Sprintf("Test Location %d", i),
 					LocAddress: events.Address{
@@ -242,7 +242,7 @@ func TestGetEvents(t *testing.T) {
 				StartTime:             time.Now().Add(time.Duration(i) * time.Hour).UTC().Truncate(time.Second),
 				EndTime:               time.Now().Add(time.Duration(i+1) * time.Hour).UTC().Truncate(time.Second),
 				RegistrationCloseTime: time.Now().Add(time.Duration(i)*time.Hour + 30*time.Minute).UTC().Truncate(time.Second),
-				RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
 				AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 				NumTeams:              10 + i,
 				NumRosteredPlayers:    50 + i,
@@ -266,8 +266,8 @@ func TestGetEvents(t *testing.T) {
 		resetTable(ctx)
 		for i := range 15 {
 			event := events.Event{
-				ID:        uuid.New(),
-				Name:      fmt.Sprintf("Test Event %d", i),
+				ID:   uuid.New(),
+				Name: fmt.Sprintf("Test Event %d", i),
 				EventLocation: events.Location{
 					Name: fmt.Sprintf("Test Location %d", i),
 					LocAddress: events.Address{
@@ -281,7 +281,7 @@ func TestGetEvents(t *testing.T) {
 				StartTime:             time.Now().Add(time.Duration(i) * time.Hour).UTC().Truncate(time.Second),
 				EndTime:               time.Now().Add(time.Duration(i+1) * time.Hour).UTC().Truncate(time.Second),
 				RegistrationCloseTime: time.Now().Add(time.Duration(i)*time.Hour + 30*time.Minute).UTC().Truncate(time.Second),
-				RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
 				AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 				NumTeams:              10 + i,
 				NumRosteredPlayers:    50 + i,
@@ -353,8 +353,8 @@ func TestUpdateEvent(t *testing.T) {
 	t.Run("successfully update an event and verify data", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
-			ID:        uuid.New(),
-			Name:      "Test Event",
+			ID:   uuid.New(),
+			Name: "Test Event",
 			EventLocation: events.Location{
 				Name: "Test Location",
 				LocAddress: events.Address{
@@ -368,7 +368,7 @@ func TestUpdateEvent(t *testing.T) {
 			StartTime:             time.Now().UTC().Truncate(time.Second),
 			EndTime:               time.Now().Add(time.Hour).UTC().Truncate(time.Second),
 			RegistrationCloseTime: time.Now().Add(30 * time.Minute).UTC().Truncate(time.Second),
-			RegistrationTypes:     []events.RegistrationType{events.BY_INDIVIDUAL, events.BY_TEAM},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}, {RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange:  events.Range{Min: 3, Max: 5},
 			NumTeams:              10,
 			NumRosteredPlayers:    50,
@@ -410,7 +410,7 @@ func TestUpdateEvent(t *testing.T) {
 		assert.WithinDuration(t, event.StartTime, savedEvent.StartTime, time.Second)
 		assert.WithinDuration(t, event.EndTime, savedEvent.EndTime, time.Second)
 		assert.WithinDuration(t, event.RegistrationCloseTime, savedEvent.RegistrationCloseTime, time.Second)
-		assert.Equal(t, event.RegistrationTypes, savedEvent.RegistrationTypes)
+		assert.Equal(t, event.RegistrationOptions, savedEvent.RegistrationOptions)
 		assert.Equal(t, event.AllowedTeamSizeRange, savedEvent.AllowedTeamSizeRange)
 		assert.Equal(t, event.NumTeams, savedEvent.NumTeams)
 		assert.Equal(t, event.NumRosteredPlayers, savedEvent.NumRosteredPlayers)
