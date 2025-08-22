@@ -558,7 +558,7 @@ components:
         currency:
           type: string
           format: iso-4217
-          example: USD`
+          example: USD
         amount:
           type: integer
           description: Minor units of money (i.e. 100 == $1 in USD)
