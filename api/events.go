@@ -261,7 +261,7 @@ func apiRegistrationOptionToRegistrationOption(t EventRegistrationOption) (event
 
 	return events.EventRegistrationOption{
 		RegType: regType,
-		Price:   *money.New(int64(t.Price.Amount), t.Price.Currency),
+		Price:   money.New(int64(t.Price.Amount), t.Price.Currency),
 	}, nil
 }
 
@@ -270,6 +270,7 @@ func registrationOptionToApiRegistrationOption(t events.EventRegistrationOption)
 	if err != nil {
 		return EventRegistrationOption{}, err
 	}
+	fmt.Println(t.Price)
 
 	return EventRegistrationOption{
 		RegistrationType: regType,

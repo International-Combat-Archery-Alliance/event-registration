@@ -8,6 +8,7 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
+	"github.com/Rhymond/go-money"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
@@ -30,13 +31,19 @@ type eventDynamo struct {
 	StartTime             time.Time
 	EndTime               time.Time
 	RegistrationCloseTime time.Time
-	RegistrationOptions   []events.EventRegistrationOption
+	RegistrationOptions   []eventRegistrationOptionDynamo
 	AllowedTeamSizeRange  events.Range
 	NumTeams              int
 	NumRosteredPlayers    int
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
+}
+
+type eventRegistrationOptionDynamo struct {
+	RegistrationType events.RegistrationType
+	PriceAmount      int64
+	PriceCurrency    string
 }
 
 const (
@@ -64,13 +71,15 @@ func newEventDynamo(event events.Event) eventDynamo {
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
-		RegistrationOptions:   event.RegistrationOptions,
-		AllowedTeamSizeRange:  event.AllowedTeamSizeRange,
-		NumTotalPlayers:       event.NumTotalPlayers,
-		NumRosteredPlayers:    event.NumRosteredPlayers,
-		NumTeams:              event.NumTeams,
-		RulesDocLink:          event.RulesDocLink,
-		ImageName:             event.ImageName,
+		RegistrationOptions: slices.Map(event.RegistrationOptions, func(o events.EventRegistrationOption) eventRegistrationOptionDynamo {
+			return eventRegOptionToDynamo(o)
+		}),
+		AllowedTeamSizeRange: event.AllowedTeamSizeRange,
+		NumTotalPlayers:      event.NumTotalPlayers,
+		NumRosteredPlayers:   event.NumRosteredPlayers,
+		NumTeams:             event.NumTeams,
+		RulesDocLink:         event.RulesDocLink,
+		ImageName:            event.ImageName,
 	}
 }
 
@@ -83,13 +92,30 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
-		RegistrationOptions:   event.RegistrationOptions,
-		AllowedTeamSizeRange:  event.AllowedTeamSizeRange,
-		NumTeams:              event.NumTeams,
-		NumRosteredPlayers:    event.NumRosteredPlayers,
-		NumTotalPlayers:       event.NumTotalPlayers,
-		RulesDocLink:          event.RulesDocLink,
-		ImageName:             event.ImageName,
+		RegistrationOptions: slices.Map(event.RegistrationOptions, func(o eventRegistrationOptionDynamo) events.EventRegistrationOption {
+			return dynamoEventRegOptionToEventRegOption(o)
+		}),
+		AllowedTeamSizeRange: event.AllowedTeamSizeRange,
+		NumTeams:             event.NumTeams,
+		NumRosteredPlayers:   event.NumRosteredPlayers,
+		NumTotalPlayers:      event.NumTotalPlayers,
+		RulesDocLink:         event.RulesDocLink,
+		ImageName:            event.ImageName,
+	}
+}
+
+func eventRegOptionToDynamo(opt events.EventRegistrationOption) eventRegistrationOptionDynamo {
+	return eventRegistrationOptionDynamo{
+		RegistrationType: opt.RegType,
+		PriceAmount:      opt.Price.Amount(),
+		PriceCurrency:    opt.Price.Currency().Code,
+	}
+}
+
+func dynamoEventRegOptionToEventRegOption(opt eventRegistrationOptionDynamo) events.EventRegistrationOption {
+	return events.EventRegistrationOption{
+		RegType: opt.RegistrationType,
+		Price:   money.New(opt.PriceAmount, opt.PriceCurrency),
 	}
 }
 

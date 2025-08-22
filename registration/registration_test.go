@@ -76,7 +76,7 @@ func TestAttemptRegistration(t *testing.T) {
 		event := events.Event{
 			ID:                  eventID,
 			Version:             1,
-			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: *money.New(5000, "USD")}},
+			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")}},
 		}
 		eventRepo := &mockEventRepository{
 			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
@@ -102,7 +102,7 @@ func TestAttemptRegistration(t *testing.T) {
 		event := events.Event{
 			ID:                   eventID,
 			Version:              1,
-			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM, Price: *money.New(5000, "USD")}},
+			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM, Price: money.New(5000, "USD")}},
 			AllowedTeamSizeRange: events.Range{Min: 1, Max: 5},
 		}
 		eventRepo := &mockEventRepository{

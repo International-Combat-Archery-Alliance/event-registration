@@ -61,7 +61,7 @@ func TestGetEvents(t *testing.T) {
 				StartTime:             now,
 				EndTime:               now.Add(time.Hour),
 				RegistrationCloseTime: now,
-				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: *money.New(5000, "USD")}},
+				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")}},
 				RulesDocLink:          ptr.String("https://example.com/rules"),
 			},
 		}
@@ -144,7 +144,7 @@ func TestGetEventsId(t *testing.T) {
 			StartTime:             now,
 			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
-			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: *money.New(5000, "USD")}},
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")}},
 			RulesDocLink:          ptr.String("https://example.com/rules"),
 		}
 		mock := &mockDB{
