@@ -30,7 +30,7 @@ type API struct {
 	logger *slog.Logger
 	env    Environment
 
-	googleIdVerifier *idtoken.Validator
+	googleIdVerifier googleAuthValidator
 }
 
 var _ StrictServerInterface = (*API)(nil)
@@ -65,6 +65,7 @@ func (a *API) ListenAndServe(host string, port string) error {
 
 	h := useMiddlewares(
 		r,
+		// Executes from the bottom up
 		a.openapiValidateMiddleware(swagger),
 		a.corsMiddleware(),
 		a.loggingMiddleware(),

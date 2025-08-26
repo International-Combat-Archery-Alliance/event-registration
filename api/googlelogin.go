@@ -29,7 +29,7 @@ func (a *API) PostGoogleLogin(ctx context.Context, request PostGoogleLoginReques
 		Name:     googleAuthJWTCookieKey,
 		Value:    request.Body.GoogleJWT,
 		Expires:  time.Unix(jwtPayload.Expires, 0),
-		Domain:   ".icaa.world",
+		Domain:   "icaa.world",
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   a.env == PROD,

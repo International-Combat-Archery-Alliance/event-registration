@@ -11,6 +11,10 @@ const (
 	adminScope = "admin"
 )
 
+type googleAuthValidator interface {
+	Validate(ctx context.Context, idToken string, audience string) (*idtoken.Payload, error)
+}
+
 var (
 	scopeValidators map[string]func(jwt *idtoken.Payload) error = map[string]func(jwt *idtoken.Payload) error{
 		"admin": func(jwt *idtoken.Payload) error {
@@ -47,4 +51,3 @@ func (a *API) validateGoogleOauthToken(ctx context.Context, token string, scopes
 
 	return jwt, nil
 }
-
