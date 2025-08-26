@@ -2,6 +2,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"google.golang.org/api/idtoken"
 )
 
 type Environment int
@@ -27,16 +29,24 @@ type API struct {
 	db     DB
 	logger *slog.Logger
 	env    Environment
+
+	googleIdVerifier *idtoken.Validator
 }
 
 var _ StrictServerInterface = (*API)(nil)
 
-func NewAPI(db DB, logger *slog.Logger, env Environment) *API {
-	return &API{
-		db:     db,
-		logger: logger,
-		env:    env,
+func NewAPI(ctx context.Context, db DB, logger *slog.Logger, env Environment) (*API, error) {
+	verifier, err := idtoken.NewValidator(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create google id verifier: %w", err)
 	}
+
+	return &API{
+		db:               db,
+		logger:           logger,
+		env:              env,
+		googleIdVerifier: verifier,
+	}, nil
 }
 
 func (a *API) ListenAndServe(host string, port string) error {
@@ -55,9 +65,9 @@ func (a *API) ListenAndServe(host string, port string) error {
 
 	h := useMiddlewares(
 		r,
-		a.loggingMiddleware(),
 		a.openapiValidateMiddleware(swagger),
 		a.corsMiddleware(),
+		a.loggingMiddleware(),
 	)
 
 	s := &http.Server{

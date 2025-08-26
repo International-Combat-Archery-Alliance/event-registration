@@ -13,6 +13,7 @@ import (
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var noopLogger = slog.New(slog.DiscardHandler)
@@ -73,7 +74,8 @@ func TestGetEvents(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 
 		req := GetV1EventsRequestObject{
 			Params: GetV1EventsParams{
@@ -81,7 +83,7 @@ func TestGetEvents(t *testing.T) {
 			},
 		}
 
-		resp, err := api.GetV1Events(context.Background(), req)
+		resp, err := api.GetV1Events(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -113,13 +115,14 @@ func TestPostEvents(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 
 		req := PostV1EventsRequestObject{
 			Body: &reqBody,
 		}
 
-		resp, err := api.PostV1Events(context.Background(), req)
+		resp, err := api.PostV1Events(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -153,13 +156,14 @@ func TestGetEventsId(t *testing.T) {
 				return expectedEvent, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 
 		req := GetV1EventsIdRequestObject{
 			Id: id,
 		}
 
-		resp, err := api.GetV1EventsId(context.Background(), req)
+		resp, err := api.GetV1EventsId(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -180,13 +184,14 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 
 		req := GetV1EventsIdRequestObject{
 			Id: id,
 		}
 
-		resp, err := api.GetV1EventsId(context.Background(), req)
+		resp, err := api.GetV1EventsId(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -204,13 +209,14 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 
 		req := GetV1EventsIdRequestObject{
 			Id: id,
 		}
 
-		resp, err := api.GetV1EventsId(context.Background(), req)
+		resp, err := api.GetV1EventsId(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {

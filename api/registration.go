@@ -14,13 +14,15 @@ import (
 )
 
 func (a *API) PostV1EventsEventIdRegister(ctx context.Context, request PostV1EventsEventIdRegisterRequestObject) (PostV1EventsEventIdRegisterResponseObject, error) {
+	logger := getLoggerFromCtx(ctx)
+
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	// request.Body is guaranteed to be non-nil from openapi doc
 	reg, err := apiRegistrationToRegistration(*request.Body, request.EventId)
 	if err != nil {
-		a.logger.Warn("Invalid body for registration", "error", err)
+		logger.Warn("Invalid body for registration", "error", err)
 
 		return PostV1EventsEventIdRegister400JSONResponse{
 			Code:    InvalidBody,
@@ -29,7 +31,7 @@ func (a *API) PostV1EventsEventIdRegister(ctx context.Context, request PostV1Eve
 	}
 	err = registration.AttemptRegistration(ctx, reg, a.db, a.db)
 	if err != nil {
-		a.logger.Error("Error trying to register", "error", err)
+		logger.Error("Error trying to register", "error", err)
 
 		var registrationErr *registration.Error
 
@@ -61,7 +63,7 @@ func (a *API) PostV1EventsEventIdRegister(ctx context.Context, request PostV1Eve
 
 	respReg, err := registrationToApiRegistration(reg)
 	if err != nil {
-		a.logger.Error("Failed to convert registration to api registration", "error", err)
+		logger.Error("Failed to convert registration to api registration", "error", err)
 
 		return PostV1EventsEventIdRegister500JSONResponse{
 			Code:    InternalError,
@@ -73,6 +75,8 @@ func (a *API) PostV1EventsEventIdRegister(ctx context.Context, request PostV1Eve
 }
 
 func (a *API) GetV1EventsEventIdRegistrations(ctx context.Context, request GetV1EventsEventIdRegistrationsRequestObject) (GetV1EventsEventIdRegistrationsResponseObject, error) {
+	logger := getLoggerFromCtx(ctx)
+
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -81,7 +85,7 @@ func (a *API) GetV1EventsEventIdRegistrations(ctx context.Context, request GetV1
 
 	result, err := a.db.GetAllRegistrationsForEvent(ctx, request.EventId, int32(limit), request.Params.Cursor)
 	if err != nil {
-		a.logger.Error("Failed to get registrations for event", "error", err, "eventId", request.EventId)
+		logger.Error("Failed to get registrations for event", "error", err, "eventId", request.EventId)
 
 		var registrationErr *registration.Error
 		if errors.As(err, &registrationErr) {
@@ -103,7 +107,7 @@ func (a *API) GetV1EventsEventIdRegistrations(ctx context.Context, request GetV1
 	for _, v := range result.Data {
 		convReg, err := registrationToApiRegistration(v)
 		if err != nil {
-			a.logger.Error("Failed to convert registration to api registration", "error", err)
+			logger.Error("Failed to convert registration to api registration", "error", err)
 
 			return GetV1EventsEventIdRegistrations500JSONResponse{
 				Code:    InternalError,
