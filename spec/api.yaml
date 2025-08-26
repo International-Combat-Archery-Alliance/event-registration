@@ -8,11 +8,49 @@ servers:
     description: Production server
   - url: http://localhost:3000/
     description: Local dev server
+security:
+  - cookieAuth: []
+  - bearerAuth: []
 paths:
+  /google/login:
+    post:
+      summary: Logs in and returns the auth cookie
+      requestBody:
+        required: true
+        description: The Google JWT to log in with
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - googleJWT
+              properties:
+                googleJWT:
+                  type: string
+      security: []
+      responses:
+        '200':
+          description: >
+            Auth successful.
+            The JWT is returned in a cookie named `GOOGLE_AUTH_JWT`.
+            You need to include this cookie subsequent requests if using cookie based auth.
+          headers:
+            Set-Cookie:
+              schema: 
+                type: string
+                example: GOOGLE_AUTH_JWT=PASSED_IN_JWT; Path=/; HttpOnly
+              description: The google auth token cookie.
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/events:
     get:
       summary: Get all events
       description: Retrieves a list of all events
+      security: []
       parameters:
         - name: cursor
           in: query
@@ -67,6 +105,9 @@ paths:
     post:
       summary: Create a new event
       description: Admin endpoint to create a new event
+      security:
+        - cookieAuth: [admin]
+        - bearerAuth: [admin]
       requestBody:
         description: Event to be created
         required: true
@@ -97,6 +138,7 @@ paths:
     get:
       summary: Get an event
       description: Get one event by id
+      security: []
       parameters:
         - name: id
           in: path
@@ -140,6 +182,7 @@ paths:
     post:
       summary: Sign up for an event
       description: Sign up for an event
+      security: []
       parameters:
         - name: eventId
           in: path
@@ -202,6 +245,9 @@ paths:
     get:
       summary: Get all registrations for an event
       description: Get all registrations for an event
+      security:
+        - cookieAuth: [admin]
+        - bearerAuth: [admin]
       parameters:
         - name: eventId
           in: path
@@ -263,6 +309,15 @@ paths:
                 $ref: '#/components/schemas/Error'
 
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: GOOGLE_AUTH_JWT
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     Event:
       type: object

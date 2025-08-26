@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
@@ -13,6 +14,8 @@ import (
 )
 
 func (a *API) GetV1Events(ctx context.Context, request GetV1EventsRequestObject) (GetV1EventsResponseObject, error) {
+	logger := getLoggerFromCtx(ctx)
+
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -21,7 +24,7 @@ func (a *API) GetV1Events(ctx context.Context, request GetV1EventsRequestObject)
 
 	result, err := a.db.GetEvents(ctx, limit, request.Params.Cursor)
 	if err != nil {
-		a.logger.Error("Failed to get events from the DB", "error", err)
+		logger.Error("Failed to get events from the DB", "error", err)
 
 		var eventErr *events.Error
 		if errors.As(err, &eventErr) {
@@ -43,7 +46,7 @@ func (a *API) GetV1Events(ctx context.Context, request GetV1EventsRequestObject)
 	for _, v := range result.Data {
 		convEvent, err := eventToApiEvent(v)
 		if err != nil {
-			a.logger.Error("Failed to convert event to api event", "error", err)
+			logger.Error("Failed to convert event to api event", "error", err)
 
 			return GetV1Events500JSONResponse{
 				Code:    InternalError,
@@ -61,6 +64,8 @@ func (a *API) GetV1Events(ctx context.Context, request GetV1EventsRequestObject)
 }
 
 func (a *API) PostV1Events(ctx context.Context, request PostV1EventsRequestObject) (PostV1EventsResponseObject, error) {
+	logger := getLoggerFromCtx(ctx)
+
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -75,7 +80,7 @@ func (a *API) PostV1Events(ctx context.Context, request PostV1EventsRequestObjec
 	// request.Body is guaranteed to be non-nil from openapi doc
 	event, err := apiEventToEvent(*request.Body)
 	if err != nil {
-		a.logger.Error("Failed to convert event into core type", "error", err)
+		logger.Error("Failed to convert event into core type", "error", err)
 
 		return PostV1Events400JSONResponse{
 			Code:    InvalidBody,
@@ -85,7 +90,7 @@ func (a *API) PostV1Events(ctx context.Context, request PostV1EventsRequestObjec
 
 	err = a.db.CreateEvent(ctx, event)
 	if err != nil {
-		a.logger.Error("Failed to create an event", "error", err)
+		logger.Error("Failed to create an event", "error", err)
 
 		return PostV1Events500JSONResponse{
 			Code:    InternalError,
@@ -93,16 +98,20 @@ func (a *API) PostV1Events(ctx context.Context, request PostV1EventsRequestObjec
 		}, nil
 	}
 
+	logger.Info("created new event", slog.String("event-id", id.String()))
+
 	return PostV1Events200JSONResponse(*request.Body), nil
 }
 
 func (a *API) GetV1EventsId(ctx context.Context, request GetV1EventsIdRequestObject) (GetV1EventsIdResponseObject, error) {
+	logger := getLoggerFromCtx(ctx)
+
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	event, err := a.db.GetEvent(ctx, request.Id)
 	if err != nil {
-		a.logger.Error("Failed to fetch an event", "error", err)
+		logger.Error("Failed to fetch an event", "error", err)
 
 		var eventErr *events.Error
 		if errors.As(err, &eventErr) {
@@ -123,7 +132,7 @@ func (a *API) GetV1EventsId(ctx context.Context, request GetV1EventsIdRequestObj
 
 	respEvent, err := eventToApiEvent(event)
 	if err != nil {
-		a.logger.Error("Failed to convert event into core type", "error", err)
+		logger.Error("Failed to convert event into core type", "error", err)
 
 		return GetV1EventsId500JSONResponse{
 			Code:    InternalError,
@@ -270,7 +279,6 @@ func registrationOptionToApiRegistrationOption(t events.EventRegistrationOption)
 	if err != nil {
 		return EventRegistrationOption{}, err
 	}
-	fmt.Println(t.Price)
 
 	return EventRegistrationOption{
 		RegistrationType: regType,

@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/google/uuid"
 	middleware "github.com/oapi-codegen/nethttp-middleware"
 	"github.com/rs/cors"
 )
@@ -30,14 +33,19 @@ func useMiddlewares(r *http.ServeMux, middlewares ...middlewareFunc) http.Handle
 func (a *API) loggingMiddleware() middlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestId := uuid.New()
 			start := time.Now()
+
+			requestLogger := a.logger.With(slog.String("request-id", requestId.String()))
+			ctx := ctxWithRequestId(r.Context(), requestId)
+			ctx = ctxWithLogger(ctx, requestLogger)
 
 			loggingRW := newLoggingResponseWriter(w)
 
 			// process the request
-			next.ServeHTTP(loggingRW, r)
+			next.ServeHTTP(loggingRW, r.WithContext(ctx))
 
-			a.logger.InfoContext(r.Context(),
+			requestLogger.InfoContext(r.Context(),
 				"Access log",
 				slog.String("latency", formatDuration(time.Since(start))),
 				slog.Int64("request-content-length", r.ContentLength),
@@ -53,7 +61,48 @@ func (a *API) loggingMiddleware() middlewareFunc {
 
 func (a *API) openapiValidateMiddleware(swagger *openapi3.T) middlewareFunc {
 	return middleware.OapiRequestValidatorWithOptions(swagger, &middleware.Options{
+		Options: openapi3filter.Options{
+			AuthenticationFunc: func(ctx context.Context, ai *openapi3filter.AuthenticationInput) error {
+				logger := getLoggerFromCtx(ctx)
+
+				var token string
+
+				switch ai.SecuritySchemeName {
+				case "cookieAuth":
+					authCookie, err := ai.RequestValidationInput.Request.Cookie(googleAuthJWTCookieKey)
+					if err != nil {
+						return fmt.Errorf("Auth token was not found in cookie %q", googleAuthJWTCookieKey)
+					}
+					token = authCookie.Value
+				case "bearerAuth":
+					authHeader := ai.RequestValidationInput.Request.Header.Get("Authorization")
+					if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+						return fmt.Errorf("Auth token was not found in Authorization header")
+					}
+					token = strings.TrimPrefix(authHeader, "Bearer ")
+				default:
+					return fmt.Errorf("unsupported security scheme")
+				}
+
+				jwt, err := a.validateGoogleOauthToken(ctx, token, ai.Scopes)
+				if err != nil {
+					logger.Error("user attempted to hit an authenticated API without permissions", slog.String("error", err.Error()))
+
+					return fmt.Errorf("failed to validate JWT")
+				}
+
+				loggerWithJwt := logger.With(slog.Any("user-email", jwt.Claims["email"]))
+				ctx = ctxWithJWT(ctx, jwt)
+				ctx = ctxWithLogger(ctx, loggerWithJwt)
+
+				*ai.RequestValidationInput.Request = *ai.RequestValidationInput.Request.WithContext(ctx)
+
+				return nil
+			},
+		},
 		ErrorHandlerWithOpts: func(ctx context.Context, err error, w http.ResponseWriter, r *http.Request, opts middleware.ErrorHandlerOpts) {
+			logger := getLoggerFromCtx(ctx)
+
 			var e Error
 
 			var requestErr *openapi3filter.RequestError
@@ -76,7 +125,7 @@ func (a *API) openapiValidateMiddleware(swagger *openapi3.T) middlewareFunc {
 			}
 			jsonBody, err := json.Marshal(&e)
 			if err != nil {
-				a.logger.Error("failed to marshal input validation error resp", "error", err)
+				logger.Error("failed to marshal input validation error resp", "error", err)
 				jsonBody = []byte("{\"message\": \"input is invalid\", \"code\": \"InputValidationError\"")
 			}
 

@@ -18,7 +18,8 @@ import (
 
 func TestPostEventsEventIdRegister(t *testing.T) {
 	t.Run("invalid body", func(t *testing.T) {
-		api := NewAPI(&mockDB{}, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), &mockDB{}, noopLogger, LOCAL)
+		require.NoError(t, err)
 		reg := Registration{}
 		// Set a field that will cause the discriminator to fail
 		reg.FromIndividualRegistration(IndividualRegistration{})
@@ -29,7 +30,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 			Body:    &reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(context.Background(), req)
+		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -46,7 +47,8 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 		reg := &Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -61,7 +63,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 			Body:    reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(context.Background(), req)
+		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -81,7 +83,8 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return &registration.Error{Reason: registration.REASON_REGISTRATION_ALREADY_EXISTS}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -96,7 +99,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 			Body:    &reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(context.Background(), req)
+		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -116,7 +119,8 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return &registration.Error{Reason: registration.REASON_REGISTRATION_IS_CLOSED}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -131,7 +135,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 			Body:    &reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(context.Background(), req)
+		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -148,7 +152,8 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -163,7 +168,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 			Body:    &reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(context.Background(), req)
+		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -182,7 +187,8 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				return registration.GetAllRegistrationsResponse{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 		req := GetV1EventsEventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetV1EventsEventIdRegistrationsParams{
@@ -190,7 +196,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 			},
 		}
 
-		resp, err := api.GetV1EventsEventIdRegistrations(context.Background(), req)
+		resp, err := api.GetV1EventsEventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -207,7 +213,8 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				return registration.GetAllRegistrationsResponse{}, &registration.Error{Reason: registration.REASON_INVALID_CURSOR}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 		req := GetV1EventsEventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetV1EventsEventIdRegistrationsParams{
@@ -215,7 +222,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 			},
 		}
 
-		resp, err := api.GetV1EventsEventIdRegistrations(context.Background(), req)
+		resp, err := api.GetV1EventsEventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -236,7 +243,8 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 		req := GetV1EventsEventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetV1EventsEventIdRegistrationsParams{
@@ -244,7 +252,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 			},
 		}
 
-		resp, err := api.GetV1EventsEventIdRegistrations(context.Background(), req)
+		resp, err := api.GetV1EventsEventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
@@ -268,7 +276,8 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL)
+		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
+		require.NoError(t, err)
 		req := GetV1EventsEventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetV1EventsEventIdRegistrationsParams{
@@ -276,7 +285,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 			},
 		}
 
-		resp, err := api.GetV1EventsEventIdRegistrations(context.Background(), req)
+		resp, err := api.GetV1EventsEventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {

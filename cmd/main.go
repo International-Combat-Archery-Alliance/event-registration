@@ -27,7 +27,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	eventAPI := api.NewAPI(db, logger, getApiEnvironment())
+	eventAPI, err := api.NewAPI(ctx, db, logger, getApiEnvironment())
+	if err != nil {
+		logger.Error("Error creating api", "error", err)
+		os.Exit(1)
+	}
 
 	serverSettings := getServerSettingsFromEnv()
 	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
