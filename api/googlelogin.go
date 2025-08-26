@@ -30,11 +30,6 @@ func (a *API) PostGoogleLogin(ctx context.Context, request PostGoogleLoginReques
 		domain = ""
 	}
 
-	sameSite := http.SameSiteStrictMode
-	if a.env == LOCAL {
-		sameSite = http.SameSiteLaxMode
-	}
-
 	cookie := &http.Cookie{
 		Name:     googleAuthJWTCookieKey,
 		Value:    request.Body.GoogleJWT,
@@ -43,7 +38,7 @@ func (a *API) PostGoogleLogin(ctx context.Context, request PostGoogleLoginReques
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   a.env == PROD,
-		SameSite: sameSite,
+		SameSite: http.SameSiteStrictMode,
 	}
 
 	return PostGoogleLogin200Response{
