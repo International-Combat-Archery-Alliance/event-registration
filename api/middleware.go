@@ -141,12 +141,34 @@ func (a *API) corsMiddleware() middlewareFunc {
 
 	switch a.env {
 	case LOCAL:
-		serverCors = cors.AllowAll()
+		serverCors = cors.New(cors.Options{
+			AllowedOrigins: []string{"http://localhost:4173", "http://localhost:5173"},
+			AllowedMethods: []string{
+				http.MethodHead,
+				http.MethodGet,
+				http.MethodPost,
+				http.MethodPut,
+				http.MethodPatch,
+				http.MethodDelete,
+			},
+			AllowedHeaders:   []string{"*"},
+			AllowCredentials: true,
+		})
 	case PROD:
 		serverCors = cors.New(cors.Options{
 			AllowedOrigins: []string{"https://icaa.world"},
-			AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-			MaxAge:         300,
+			AllowedMethods: []string{
+				http.MethodHead,
+				http.MethodGet,
+				http.MethodPost,
+				http.MethodPut,
+				http.MethodPatch,
+				http.MethodDelete,
+			},
+			// TODO: revisit this
+			AllowedHeaders:   []string{"*"},
+			MaxAge:           300,
+			AllowCredentials: true,
 		})
 	}
 

@@ -25,15 +25,25 @@ func (a *API) PostGoogleLogin(ctx context.Context, request PostGoogleLoginReques
 
 	logger.Info("successful login", slog.Any("email", jwtPayload.Claims["email"]))
 
+	domain := "icaa.world"
+	if a.env == LOCAL {
+		domain = ""
+	}
+
+	sameSite := http.SameSiteStrictMode
+	if a.env == LOCAL {
+		sameSite = http.SameSiteLaxMode
+	}
+
 	cookie := &http.Cookie{
 		Name:     googleAuthJWTCookieKey,
 		Value:    request.Body.GoogleJWT,
 		Expires:  time.Unix(jwtPayload.Expires, 0),
-		Domain:   "icaa.world",
+		Domain:   domain,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   a.env == PROD,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: sameSite,
 	}
 
 	return PostGoogleLogin200Response{
