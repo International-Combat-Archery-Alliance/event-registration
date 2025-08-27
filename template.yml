@@ -6,8 +6,9 @@ Description: >
 Parameters:
   architecture:
     Description: Architecure to run on
-    Type: string
-    Default: arm64
+    Type: String
+    # TODO: ideally this would be arm, but it's been a struggle to get arm to actually work with SAM
+    Default: x86_64
     AllowedValues:
       - arm64
       - x86_64
@@ -26,22 +27,43 @@ Globals:
         DYNAMO_TABLE_NAME: !FindInMap [attributes, dynamo, tableName]
 
 Resources:
+  EventRegistrationHttp:
+    Type: AWS::Serverless::HttpApi
+  EventsApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: api.icaa.world
+      ApiId: !Ref EventRegistrationHttp
+      Stage: !Ref EventRegistrationHttp.Stage
+      ApiMappingKey: events
   ICAAEventRegistration:
     Type: AWS::Serverless::Function
     Properties:
       PackageType: Image
       Architectures:
         - !Ref architecture
-      MemorySize: 256
+      Policies:
+        - Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
+            Resource: 
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/event-registration"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/event-registration/index/*"
       Events:
         APIEvent:
           Type: HttpApi
+          Properties:
+            ApiId: !Ref EventRegistrationHttp
+            Path: '/{proxy+}'
+            Method: ANY
     Metadata:
       DockerTag: v1
       DockerContext: .
       Dockerfile: Dockerfile
 
-Outputs:
-  ICAAEventRegistrationApi:
-    Description: "API Gateway endpoint URL"
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -181,8 +182,8 @@ var swaggerUI embed.FS
 
 func (a *API) openapiRoutesMiddleware(spec *openapi3.T) middlewareFunc {
 	openapiServer := http.NewServeMux()
-	openapiServer.Handle("/v1/events/swagger-ui/", http.StripPrefix("/v1/events", http.FileServer(http.FS(swaggerUI))))
-	openapiServer.HandleFunc("/v1/events/openapi.json", func(w http.ResponseWriter, r *http.Request) {
+	openapiServer.Handle("/events/swagger-ui/", http.StripPrefix("/events", http.FileServer(http.FS(swaggerUI))))
+	openapiServer.HandleFunc("/events/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(spec)
 	})
@@ -197,6 +198,23 @@ func (a *API) openapiRoutesMiddleware(spec *openapi3.T) middlewareFunc {
 			}
 
 			handler.ServeHTTP(w, r)
+		})
+	}
+}
+
+func (a *API) prodBaseNameHandling() middlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if a.env == PROD {
+				urlWithBasePath, err := url.JoinPath("/events", r.URL.Path)
+				if err != nil {
+					a.logger.Error("url.JoinPath returned an error somehow?", slog.String("error", err.Error()))
+				} else {
+					r.URL.Path = urlWithBasePath
+				}
+			}
+
+			next.ServeHTTP(w, r)
 		})
 	}
 }

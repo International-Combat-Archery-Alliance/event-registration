@@ -46,7 +46,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /v1/events:
+  /events/v1:
     get:
       summary: Get all events
       description: Retrieves a list of all events
@@ -134,7 +134,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /v1/events/{id}:
+  /events/v1/{id}:
     get:
       summary: Get an event
       description: Get one event by id
@@ -178,7 +178,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /v1/events/{eventId}/register:
+  /events/v1/{eventId}/register:
     post:
       summary: Sign up for an event
       description: Sign up for an event
@@ -241,7 +241,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /v1/events/{eventId}/registrations:
+  /events/v1/{eventId}/registrations:
     get:
       summary: Get all registrations for an event
       description: Get all registrations for an event
