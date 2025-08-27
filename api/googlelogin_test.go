@@ -57,7 +57,8 @@ func TestPostGoogleLogin(t *testing.T) {
 		switch r := resp.(type) {
 		case PostGoogleLogin200Response:
 			assert.Contains(t, r.Headers.SetCookie, googleAuthJWTCookieKey+"="+validJWT)
-			assert.Contains(t, r.Headers.SetCookie, "Domain=icaa.world")
+			// For LOCAL env, Domain should not be set
+			assert.NotContains(t, r.Headers.SetCookie, "Domain=")
 			assert.Contains(t, r.Headers.SetCookie, "Path=/")
 			assert.Contains(t, r.Headers.SetCookie, "HttpOnly")
 			assert.Contains(t, r.Headers.SetCookie, "SameSite=Strict")
@@ -103,6 +104,7 @@ func TestPostGoogleLogin(t *testing.T) {
 		switch r := resp.(type) {
 		case PostGoogleLogin200Response:
 			assert.Contains(t, r.Headers.SetCookie, "Secure")
+			assert.Contains(t, r.Headers.SetCookie, "Domain=icaa.world")
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
