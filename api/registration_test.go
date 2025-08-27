@@ -25,16 +25,16 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 		reg.FromIndividualRegistration(IndividualRegistration{})
 		reg.FromTeamRegistration(TeamRegistration{})
 
-		req := PostV1EventsEventIdRegisterRequestObject{
+		req := PostEventsV1EventIdRegisterRequestObject{
 			EventId: uuid.New(),
 			Body:    &reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
+		resp, err := api.PostEventsV1EventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case PostV1EventsEventIdRegister400JSONResponse:
+		case PostEventsV1EventIdRegister400JSONResponse:
 			assert.Equal(t, InvalidBody, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -58,16 +58,16 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 		}
 		require.NoError(t, reg.FromIndividualRegistration(indivReg))
 
-		req := PostV1EventsEventIdRegisterRequestObject{
+		req := PostEventsV1EventIdRegisterRequestObject{
 			EventId: uuid.New(),
 			Body:    reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
+		resp, err := api.PostEventsV1EventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case PostV1EventsEventIdRegister404JSONResponse:
+		case PostEventsV1EventIdRegister404JSONResponse:
 			assert.Equal(t, NotFound, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -94,16 +94,16 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 		}
 		reg.FromIndividualRegistration(indivReg)
 
-		req := PostV1EventsEventIdRegisterRequestObject{
+		req := PostEventsV1EventIdRegisterRequestObject{
 			EventId: uuid.New(),
 			Body:    &reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
+		resp, err := api.PostEventsV1EventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case PostV1EventsEventIdRegister409JSONResponse:
+		case PostEventsV1EventIdRegister409JSONResponse:
 			assert.Equal(t, AlreadyExists, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -130,16 +130,16 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 		}
 		reg.FromIndividualRegistration(indivReg)
 
-		req := PostV1EventsEventIdRegisterRequestObject{
+		req := PostEventsV1EventIdRegisterRequestObject{
 			EventId: uuid.New(),
 			Body:    &reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
+		resp, err := api.PostEventsV1EventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case PostV1EventsEventIdRegister403JSONResponse:
+		case PostEventsV1EventIdRegister403JSONResponse:
 			assert.Equal(t, RegistrationClosed, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -163,16 +163,16 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 		}
 		reg.FromIndividualRegistration(indivReg)
 
-		req := PostV1EventsEventIdRegisterRequestObject{
+		req := PostEventsV1EventIdRegisterRequestObject{
 			EventId: uuid.New(),
 			Body:    &reg,
 		}
 
-		resp, err := api.PostV1EventsEventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
+		resp, err := api.PostEventsV1EventIdRegister(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case PostV1EventsEventIdRegister500JSONResponse:
+		case PostEventsV1EventIdRegister500JSONResponse:
 			assert.Equal(t, InternalError, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -189,18 +189,18 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 		}
 		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
 		require.NoError(t, err)
-		req := GetV1EventsEventIdRegistrationsRequestObject{
+		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
-			Params: GetV1EventsEventIdRegistrationsParams{
+			Params: GetEventsV1EventIdRegistrationsParams{
 				Limit: ptr.Int(10),
 			},
 		}
 
-		resp, err := api.GetV1EventsEventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
+		resp, err := api.GetEventsV1EventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case GetV1EventsEventIdRegistrations500JSONResponse:
+		case GetEventsV1EventIdRegistrations500JSONResponse:
 			assert.Equal(t, InternalError, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -215,18 +215,18 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 		}
 		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
 		require.NoError(t, err)
-		req := GetV1EventsEventIdRegistrationsRequestObject{
+		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
-			Params: GetV1EventsEventIdRegistrationsParams{
+			Params: GetEventsV1EventIdRegistrationsParams{
 				Limit: ptr.Int(10),
 			},
 		}
 
-		resp, err := api.GetV1EventsEventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
+		resp, err := api.GetEventsV1EventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case GetV1EventsEventIdRegistrations400JSONResponse:
+		case GetEventsV1EventIdRegistrations400JSONResponse:
 			assert.Equal(t, InvalidCursor, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -245,18 +245,18 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 		}
 		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
 		require.NoError(t, err)
-		req := GetV1EventsEventIdRegistrationsRequestObject{
+		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
-			Params: GetV1EventsEventIdRegistrationsParams{
+			Params: GetEventsV1EventIdRegistrationsParams{
 				Limit: ptr.Int(10),
 			},
 		}
 
-		resp, err := api.GetV1EventsEventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
+		resp, err := api.GetEventsV1EventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case GetV1EventsEventIdRegistrations500JSONResponse:
+		case GetEventsV1EventIdRegistrations500JSONResponse:
 			assert.Equal(t, InternalError, r.Code)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
@@ -278,18 +278,18 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 		}
 		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
 		require.NoError(t, err)
-		req := GetV1EventsEventIdRegistrationsRequestObject{
+		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
-			Params: GetV1EventsEventIdRegistrationsParams{
+			Params: GetEventsV1EventIdRegistrationsParams{
 				Limit: ptr.Int(10),
 			},
 		}
 
-		resp, err := api.GetV1EventsEventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
+		resp, err := api.GetEventsV1EventIdRegistrations(ctxWithLogger(context.Background(), noopLogger), req)
 		assert.NoError(t, err)
 
 		switch r := resp.(type) {
-		case GetV1EventsEventIdRegistrations200JSONResponse:
+		case GetEventsV1EventIdRegistrations200JSONResponse:
 			assert.Len(t, r.Data, 1)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)

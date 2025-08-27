@@ -68,7 +68,9 @@ func (a *API) ListenAndServe(host string, port string) error {
 		// Executes from the bottom up
 		a.openapiValidateMiddleware(swagger),
 		a.corsMiddleware(),
+		a.openapiRoutesMiddleware(swagger),
 		a.loggingMiddleware(),
+		a.prodBaseNameHandling(),
 	)
 
 	s := &http.Server{

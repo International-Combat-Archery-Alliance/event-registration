@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (a *API) GetV1Events(ctx context.Context, request GetV1EventsRequestObject) (GetV1EventsResponseObject, error) {
+func (a *API) GetEventsV1(ctx context.Context, request GetEventsV1RequestObject) (GetEventsV1ResponseObject, error) {
 	logger := getLoggerFromCtx(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -30,13 +30,13 @@ func (a *API) GetV1Events(ctx context.Context, request GetV1EventsRequestObject)
 		if errors.As(err, &eventErr) {
 			switch eventErr.Reason {
 			case events.REASON_INVALID_CURSOR:
-				return GetV1Events400JSONResponse{
+				return GetEventsV1400JSONResponse{
 					Code:    InvalidCursor,
 					Message: "Passed in cursor is invalid",
 				}, nil
 			}
 		}
-		return GetV1Events500JSONResponse{
+		return GetEventsV1500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to get events",
 		}, nil
@@ -48,7 +48,7 @@ func (a *API) GetV1Events(ctx context.Context, request GetV1EventsRequestObject)
 		if err != nil {
 			logger.Error("Failed to convert event to api event", "error", err)
 
-			return GetV1Events500JSONResponse{
+			return GetEventsV1500JSONResponse{
 				Code:    InternalError,
 				Message: "Failed to get events",
 			}, nil
@@ -56,14 +56,14 @@ func (a *API) GetV1Events(ctx context.Context, request GetV1EventsRequestObject)
 		respEvents = append(respEvents, convEvent)
 	}
 
-	return GetV1Events200JSONResponse{
+	return GetEventsV1200JSONResponse{
 		Data:        respEvents,
 		Cursor:      result.Cursor,
 		HasNextPage: result.HasNextPage,
 	}, nil
 }
 
-func (a *API) PostV1Events(ctx context.Context, request PostV1EventsRequestObject) (PostV1EventsResponseObject, error) {
+func (a *API) PostEventsV1(ctx context.Context, request PostEventsV1RequestObject) (PostEventsV1ResponseObject, error) {
 	logger := getLoggerFromCtx(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -82,7 +82,7 @@ func (a *API) PostV1Events(ctx context.Context, request PostV1EventsRequestObjec
 	if err != nil {
 		logger.Error("Failed to convert event into core type", "error", err)
 
-		return PostV1Events400JSONResponse{
+		return PostEventsV1400JSONResponse{
 			Code:    InvalidBody,
 			Message: "Failed to create the event",
 		}, nil
@@ -92,7 +92,7 @@ func (a *API) PostV1Events(ctx context.Context, request PostV1EventsRequestObjec
 	if err != nil {
 		logger.Error("Failed to create an event", "error", err)
 
-		return PostV1Events500JSONResponse{
+		return PostEventsV1500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to create the event",
 		}, nil
@@ -100,10 +100,10 @@ func (a *API) PostV1Events(ctx context.Context, request PostV1EventsRequestObjec
 
 	logger.Info("created new event", slog.String("event-id", id.String()))
 
-	return PostV1Events200JSONResponse(*request.Body), nil
+	return PostEventsV1200JSONResponse(*request.Body), nil
 }
 
-func (a *API) GetV1EventsId(ctx context.Context, request GetV1EventsIdRequestObject) (GetV1EventsIdResponseObject, error) {
+func (a *API) GetEventsV1Id(ctx context.Context, request GetEventsV1IdRequestObject) (GetEventsV1IdResponseObject, error) {
 	logger := getLoggerFromCtx(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -117,14 +117,14 @@ func (a *API) GetV1EventsId(ctx context.Context, request GetV1EventsIdRequestObj
 		if errors.As(err, &eventErr) {
 			switch eventErr.Reason {
 			case events.REASON_EVENT_DOES_NOT_EXIST:
-				return GetV1EventsId404JSONResponse{
+				return GetEventsV1Id404JSONResponse{
 					Code:    NotFound,
 					Message: "Event does not exist",
 				}, nil
 			}
 		}
 
-		return GetV1EventsId500JSONResponse{
+		return GetEventsV1Id500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to get event",
 		}, nil
@@ -134,12 +134,12 @@ func (a *API) GetV1EventsId(ctx context.Context, request GetV1EventsIdRequestObj
 	if err != nil {
 		logger.Error("Failed to convert event into core type", "error", err)
 
-		return GetV1EventsId500JSONResponse{
+		return GetEventsV1Id500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to get event",
 		}, nil
 	}
-	return GetV1EventsId200JSONResponse{Event: respEvent}, nil
+	return GetEventsV1Id200JSONResponse{Event: respEvent}, nil
 }
 
 func eventToApiEvent(event events.Event) (Event, error) {

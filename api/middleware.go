@@ -2,11 +2,13 @@ package api
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -156,7 +158,7 @@ func (a *API) corsMiddleware() middlewareFunc {
 		})
 	case PROD:
 		serverCors = cors.New(cors.Options{
-			AllowedOrigins: []string{"https://icaa.world"},
+			AllowedOrigins: []string{"https://icaa.world", "https://*-icaa-world.curly-sound-f2cd.workers.dev"},
 			AllowedMethods: []string{
 				http.MethodHead,
 				http.MethodGet,
@@ -173,6 +175,48 @@ func (a *API) corsMiddleware() middlewareFunc {
 	}
 
 	return serverCors.Handler
+}
+
+//go:embed swagger-ui/*
+var swaggerUI embed.FS
+
+func (a *API) openapiRoutesMiddleware(spec *openapi3.T) middlewareFunc {
+	openapiServer := http.NewServeMux()
+	openapiServer.Handle("/events/swagger-ui/", http.StripPrefix("/events", http.FileServer(http.FS(swaggerUI))))
+	openapiServer.HandleFunc("/events/openapi.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(spec)
+	})
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler, matchedPath := openapiServer.Handler(r)
+
+			if matchedPath == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			handler.ServeHTTP(w, r)
+		})
+	}
+}
+
+func (a *API) prodBaseNameHandling() middlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if a.env == PROD {
+				urlWithBasePath, err := url.JoinPath("/events", r.URL.Path)
+				if err != nil {
+					a.logger.Error("url.JoinPath returned an error somehow?", slog.String("error", err.Error()))
+				} else {
+					r.URL.Path = urlWithBasePath
+				}
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // formatDuration formats a duration to one decimal point.
