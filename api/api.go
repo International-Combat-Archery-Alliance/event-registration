@@ -70,6 +70,7 @@ func (a *API) ListenAndServe(host string, port string) error {
 		a.corsMiddleware(),
 		a.openapiRoutesMiddleware(swagger),
 		a.loggingMiddleware(),
+		a.prodBaseNameHandling(),
 	)
 
 	s := &http.Server{

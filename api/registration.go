@@ -13,7 +13,7 @@ import (
 	"github.com/oapi-codegen/runtime/types"
 )
 
-func (a *API) PostV1EventsEventIdRegister(ctx context.Context, request PostV1EventsEventIdRegisterRequestObject) (PostV1EventsEventIdRegisterResponseObject, error) {
+func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEventsV1EventIdRegisterRequestObject) (PostEventsV1EventIdRegisterResponseObject, error) {
 	logger := getLoggerFromCtx(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -24,7 +24,7 @@ func (a *API) PostV1EventsEventIdRegister(ctx context.Context, request PostV1Eve
 	if err != nil {
 		logger.Warn("Invalid body for registration", "error", err)
 
-		return PostV1EventsEventIdRegister400JSONResponse{
+		return PostEventsV1EventIdRegister400JSONResponse{
 			Code:    InvalidBody,
 			Message: "Invalid body",
 		}, nil
@@ -38,24 +38,24 @@ func (a *API) PostV1EventsEventIdRegister(ctx context.Context, request PostV1Eve
 		if errors.As(err, &registrationErr) {
 			switch registrationErr.Reason {
 			case registration.REASON_ASSOCIATED_EVENT_DOES_NOT_EXIST:
-				return PostV1EventsEventIdRegister404JSONResponse{
+				return PostEventsV1EventIdRegister404JSONResponse{
 					Code:    NotFound,
 					Message: "Event to register with was not found",
 				}, nil
 			case registration.REASON_REGISTRATION_IS_CLOSED:
-				return PostV1EventsEventIdRegister403JSONResponse{
+				return PostEventsV1EventIdRegister403JSONResponse{
 					Code:    RegistrationClosed,
 					Message: "Registration has closed for this event",
 				}, nil
 			case registration.REASON_REGISTRATION_ALREADY_EXISTS:
-				return PostV1EventsEventIdRegister409JSONResponse{
+				return PostEventsV1EventIdRegister409JSONResponse{
 					Code:    AlreadyExists,
 					Message: "Registration already exists for this email",
 				}, nil
 			}
 		}
 
-		return PostV1EventsEventIdRegister500JSONResponse{
+		return PostEventsV1EventIdRegister500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to register",
 		}, nil
@@ -65,16 +65,16 @@ func (a *API) PostV1EventsEventIdRegister(ctx context.Context, request PostV1Eve
 	if err != nil {
 		logger.Error("Failed to convert registration to api registration", "error", err)
 
-		return PostV1EventsEventIdRegister500JSONResponse{
+		return PostEventsV1EventIdRegister500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to register",
 		}, nil
 	}
 
-	return PostV1EventsEventIdRegister200JSONResponse{Registration: respReg}, nil
+	return PostEventsV1EventIdRegister200JSONResponse{Registration: respReg}, nil
 }
 
-func (a *API) GetV1EventsEventIdRegistrations(ctx context.Context, request GetV1EventsEventIdRegistrationsRequestObject) (GetV1EventsEventIdRegistrationsResponseObject, error) {
+func (a *API) GetEventsV1EventIdRegistrations(ctx context.Context, request GetEventsV1EventIdRegistrationsRequestObject) (GetEventsV1EventIdRegistrationsResponseObject, error) {
 	logger := getLoggerFromCtx(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -91,13 +91,13 @@ func (a *API) GetV1EventsEventIdRegistrations(ctx context.Context, request GetV1
 		if errors.As(err, &registrationErr) {
 			switch registrationErr.Reason {
 			case registration.REASON_INVALID_CURSOR:
-				return GetV1EventsEventIdRegistrations400JSONResponse{
+				return GetEventsV1EventIdRegistrations400JSONResponse{
 					Code:    InvalidCursor,
 					Message: "Cursor is invalid",
 				}, nil
 			}
 		}
-		return GetV1EventsEventIdRegistrations500JSONResponse{
+		return GetEventsV1EventIdRegistrations500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to get registrations",
 		}, nil
@@ -109,7 +109,7 @@ func (a *API) GetV1EventsEventIdRegistrations(ctx context.Context, request GetV1
 		if err != nil {
 			logger.Error("Failed to convert registration to api registration", "error", err)
 
-			return GetV1EventsEventIdRegistrations500JSONResponse{
+			return GetEventsV1EventIdRegistrations500JSONResponse{
 				Code:    InternalError,
 				Message: "Failed to get registrations",
 			}, nil
@@ -117,7 +117,7 @@ func (a *API) GetV1EventsEventIdRegistrations(ctx context.Context, request GetV1
 		respRegs = append(respRegs, convReg)
 	}
 
-	return GetV1EventsEventIdRegistrations200JSONResponse{
+	return GetEventsV1EventIdRegistrations200JSONResponse{
 		Data:        respRegs,
 		Cursor:      result.Cursor,
 		HasNextPage: result.HasNextPage,

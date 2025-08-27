@@ -179,13 +179,8 @@ type TeamRegistration struct {
 	Version          *int                `json:"version,omitempty"`
 }
 
-// PostGoogleLoginJSONBody defines parameters for PostGoogleLogin.
-type PostGoogleLoginJSONBody struct {
-	GoogleJWT string `json:"googleJWT"`
-}
-
-// GetV1EventsParams defines parameters for GetV1Events.
-type GetV1EventsParams struct {
+// GetEventsV1Params defines parameters for GetEventsV1.
+type GetEventsV1Params struct {
 	// Cursor Cursor of where to start from
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 
@@ -193,8 +188,8 @@ type GetV1EventsParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
-// GetV1EventsEventIdRegistrationsParams defines parameters for GetV1EventsEventIdRegistrations.
-type GetV1EventsEventIdRegistrationsParams struct {
+// GetEventsV1EventIdRegistrationsParams defines parameters for GetEventsV1EventIdRegistrations.
+type GetEventsV1EventIdRegistrationsParams struct {
 	// Cursor Cursor of where to start from
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 
@@ -202,14 +197,19 @@ type GetV1EventsEventIdRegistrationsParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// PostGoogleLoginJSONBody defines parameters for PostGoogleLogin.
+type PostGoogleLoginJSONBody struct {
+	GoogleJWT string `json:"googleJWT"`
+}
+
+// PostEventsV1JSONRequestBody defines body for PostEventsV1 for application/json ContentType.
+type PostEventsV1JSONRequestBody = Event
+
+// PostEventsV1EventIdRegisterJSONRequestBody defines body for PostEventsV1EventIdRegister for application/json ContentType.
+type PostEventsV1EventIdRegisterJSONRequestBody = Registration
+
 // PostGoogleLoginJSONRequestBody defines body for PostGoogleLogin for application/json ContentType.
 type PostGoogleLoginJSONRequestBody PostGoogleLoginJSONBody
-
-// PostV1EventsJSONRequestBody defines body for PostV1Events for application/json ContentType.
-type PostV1EventsJSONRequestBody = Event
-
-// PostV1EventsEventIdRegisterJSONRequestBody defines body for PostV1EventsEventIdRegister for application/json ContentType.
-type PostV1EventsEventIdRegisterJSONRequestBody = Registration
 
 // AsIndividualRegistration returns the union data inside the Registration as a IndividualRegistration
 func (t Registration) AsIndividualRegistration() (IndividualRegistration, error) {
@@ -302,24 +302,24 @@ func (t *Registration) UnmarshalJSON(b []byte) error {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Get all events
+	// (GET /events/v1)
+	GetEventsV1(w http.ResponseWriter, r *http.Request, params GetEventsV1Params)
+	// Create a new event
+	// (POST /events/v1)
+	PostEventsV1(w http.ResponseWriter, r *http.Request)
+	// Sign up for an event
+	// (POST /events/v1/{eventId}/register)
+	PostEventsV1EventIdRegister(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID)
+	// Get all registrations for an event
+	// (GET /events/v1/{eventId}/registrations)
+	GetEventsV1EventIdRegistrations(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, params GetEventsV1EventIdRegistrationsParams)
+	// Get an event
+	// (GET /events/v1/{id})
+	GetEventsV1Id(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Logs in and returns the auth cookie
 	// (POST /google/login)
 	PostGoogleLogin(w http.ResponseWriter, r *http.Request)
-	// Get all events
-	// (GET /v1/events)
-	GetV1Events(w http.ResponseWriter, r *http.Request, params GetV1EventsParams)
-	// Create a new event
-	// (POST /v1/events)
-	PostV1Events(w http.ResponseWriter, r *http.Request)
-	// Sign up for an event
-	// (POST /v1/events/{eventId}/register)
-	PostV1EventsEventIdRegister(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID)
-	// Get all registrations for an event
-	// (GET /v1/events/{eventId}/registrations)
-	GetV1EventsEventIdRegistrations(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, params GetV1EventsEventIdRegistrationsParams)
-	// Get an event
-	// (GET /v1/events/{id})
-	GetV1EventsId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -331,27 +331,13 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// PostGoogleLogin operation middleware
-func (siw *ServerInterfaceWrapper) PostGoogleLogin(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostGoogleLogin(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetV1Events operation middleware
-func (siw *ServerInterfaceWrapper) GetV1Events(w http.ResponseWriter, r *http.Request) {
+// GetEventsV1 operation middleware
+func (siw *ServerInterfaceWrapper) GetEventsV1(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetV1EventsParams
+	var params GetEventsV1Params
 
 	// ------------- Optional query parameter "cursor" -------------
 
@@ -370,7 +356,7 @@ func (siw *ServerInterfaceWrapper) GetV1Events(w http.ResponseWriter, r *http.Re
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV1Events(w, r, params)
+		siw.Handler.GetEventsV1(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -380,8 +366,8 @@ func (siw *ServerInterfaceWrapper) GetV1Events(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
-// PostV1Events operation middleware
-func (siw *ServerInterfaceWrapper) PostV1Events(w http.ResponseWriter, r *http.Request) {
+// PostEventsV1 operation middleware
+func (siw *ServerInterfaceWrapper) PostEventsV1(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
@@ -392,7 +378,7 @@ func (siw *ServerInterfaceWrapper) PostV1Events(w http.ResponseWriter, r *http.R
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostV1Events(w, r)
+		siw.Handler.PostEventsV1(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -402,8 +388,8 @@ func (siw *ServerInterfaceWrapper) PostV1Events(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// PostV1EventsEventIdRegister operation middleware
-func (siw *ServerInterfaceWrapper) PostV1EventsEventIdRegister(w http.ResponseWriter, r *http.Request) {
+// PostEventsV1EventIdRegister operation middleware
+func (siw *ServerInterfaceWrapper) PostEventsV1EventIdRegister(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -417,7 +403,7 @@ func (siw *ServerInterfaceWrapper) PostV1EventsEventIdRegister(w http.ResponseWr
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostV1EventsEventIdRegister(w, r, eventId)
+		siw.Handler.PostEventsV1EventIdRegister(w, r, eventId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -427,8 +413,8 @@ func (siw *ServerInterfaceWrapper) PostV1EventsEventIdRegister(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
-// GetV1EventsEventIdRegistrations operation middleware
-func (siw *ServerInterfaceWrapper) GetV1EventsEventIdRegistrations(w http.ResponseWriter, r *http.Request) {
+// GetEventsV1EventIdRegistrations operation middleware
+func (siw *ServerInterfaceWrapper) GetEventsV1EventIdRegistrations(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -450,7 +436,7 @@ func (siw *ServerInterfaceWrapper) GetV1EventsEventIdRegistrations(w http.Respon
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetV1EventsEventIdRegistrationsParams
+	var params GetEventsV1EventIdRegistrationsParams
 
 	// ------------- Optional query parameter "cursor" -------------
 
@@ -469,7 +455,7 @@ func (siw *ServerInterfaceWrapper) GetV1EventsEventIdRegistrations(w http.Respon
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV1EventsEventIdRegistrations(w, r, eventId, params)
+		siw.Handler.GetEventsV1EventIdRegistrations(w, r, eventId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -479,8 +465,8 @@ func (siw *ServerInterfaceWrapper) GetV1EventsEventIdRegistrations(w http.Respon
 	handler.ServeHTTP(w, r)
 }
 
-// GetV1EventsId operation middleware
-func (siw *ServerInterfaceWrapper) GetV1EventsId(w http.ResponseWriter, r *http.Request) {
+// GetEventsV1Id operation middleware
+func (siw *ServerInterfaceWrapper) GetEventsV1Id(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -494,7 +480,21 @@ func (siw *ServerInterfaceWrapper) GetV1EventsId(w http.ResponseWriter, r *http.
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV1EventsId(w, r, id)
+		siw.Handler.GetEventsV1Id(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostGoogleLogin operation middleware
+func (siw *ServerInterfaceWrapper) PostGoogleLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostGoogleLogin(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -624,14 +624,239 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc("GET "+options.BaseURL+"/events/v1", wrapper.GetEventsV1)
+	m.HandleFunc("POST "+options.BaseURL+"/events/v1", wrapper.PostEventsV1)
+	m.HandleFunc("POST "+options.BaseURL+"/events/v1/{eventId}/register", wrapper.PostEventsV1EventIdRegister)
+	m.HandleFunc("GET "+options.BaseURL+"/events/v1/{eventId}/registrations", wrapper.GetEventsV1EventIdRegistrations)
+	m.HandleFunc("GET "+options.BaseURL+"/events/v1/{id}", wrapper.GetEventsV1Id)
 	m.HandleFunc("POST "+options.BaseURL+"/google/login", wrapper.PostGoogleLogin)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/events", wrapper.GetV1Events)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/events", wrapper.PostV1Events)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/events/{eventId}/register", wrapper.PostV1EventsEventIdRegister)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/events/{eventId}/registrations", wrapper.GetV1EventsEventIdRegistrations)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/events/{id}", wrapper.GetV1EventsId)
 
 	return m
+}
+
+type GetEventsV1RequestObject struct {
+	Params GetEventsV1Params
+}
+
+type GetEventsV1ResponseObject interface {
+	VisitGetEventsV1Response(w http.ResponseWriter) error
+}
+
+type GetEventsV1200JSONResponse struct {
+	Cursor      *string `json:"cursor,omitempty"`
+	Data        []Event `json:"data"`
+	HasNextPage bool    `json:"hasNextPage"`
+}
+
+func (response GetEventsV1200JSONResponse) VisitGetEventsV1Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1400JSONResponse Error
+
+func (response GetEventsV1400JSONResponse) VisitGetEventsV1Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1500JSONResponse Error
+
+func (response GetEventsV1500JSONResponse) VisitGetEventsV1Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1RequestObject struct {
+	Body *PostEventsV1JSONRequestBody
+}
+
+type PostEventsV1ResponseObject interface {
+	VisitPostEventsV1Response(w http.ResponseWriter) error
+}
+
+type PostEventsV1200JSONResponse Event
+
+func (response PostEventsV1200JSONResponse) VisitPostEventsV1Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1400JSONResponse Error
+
+func (response PostEventsV1400JSONResponse) VisitPostEventsV1Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1500JSONResponse Error
+
+func (response PostEventsV1500JSONResponse) VisitPostEventsV1Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdRegisterRequestObject struct {
+	EventId openapi_types.UUID `json:"eventId"`
+	Body    *PostEventsV1EventIdRegisterJSONRequestBody
+}
+
+type PostEventsV1EventIdRegisterResponseObject interface {
+	VisitPostEventsV1EventIdRegisterResponse(w http.ResponseWriter) error
+}
+
+type PostEventsV1EventIdRegister200JSONResponse struct {
+	Registration Registration `json:"registration"`
+}
+
+func (response PostEventsV1EventIdRegister200JSONResponse) VisitPostEventsV1EventIdRegisterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdRegister400JSONResponse Error
+
+func (response PostEventsV1EventIdRegister400JSONResponse) VisitPostEventsV1EventIdRegisterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdRegister403JSONResponse Error
+
+func (response PostEventsV1EventIdRegister403JSONResponse) VisitPostEventsV1EventIdRegisterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdRegister404JSONResponse Error
+
+func (response PostEventsV1EventIdRegister404JSONResponse) VisitPostEventsV1EventIdRegisterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdRegister409JSONResponse Error
+
+func (response PostEventsV1EventIdRegister409JSONResponse) VisitPostEventsV1EventIdRegisterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdRegister500JSONResponse Error
+
+func (response PostEventsV1EventIdRegister500JSONResponse) VisitPostEventsV1EventIdRegisterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdRegistrationsRequestObject struct {
+	EventId openapi_types.UUID `json:"eventId"`
+	Params  GetEventsV1EventIdRegistrationsParams
+}
+
+type GetEventsV1EventIdRegistrationsResponseObject interface {
+	VisitGetEventsV1EventIdRegistrationsResponse(w http.ResponseWriter) error
+}
+
+type GetEventsV1EventIdRegistrations200JSONResponse struct {
+	Cursor      *string        `json:"cursor,omitempty"`
+	Data        []Registration `json:"data"`
+	HasNextPage bool           `json:"hasNextPage"`
+}
+
+func (response GetEventsV1EventIdRegistrations200JSONResponse) VisitGetEventsV1EventIdRegistrationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdRegistrations400JSONResponse Error
+
+func (response GetEventsV1EventIdRegistrations400JSONResponse) VisitGetEventsV1EventIdRegistrationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdRegistrations500JSONResponse Error
+
+func (response GetEventsV1EventIdRegistrations500JSONResponse) VisitGetEventsV1EventIdRegistrationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1IdRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetEventsV1IdResponseObject interface {
+	VisitGetEventsV1IdResponse(w http.ResponseWriter) error
+}
+
+type GetEventsV1Id200JSONResponse struct {
+	Event Event `json:"event"`
+}
+
+func (response GetEventsV1Id200JSONResponse) VisitGetEventsV1IdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1Id400JSONResponse Error
+
+func (response GetEventsV1Id400JSONResponse) VisitGetEventsV1IdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1Id404JSONResponse Error
+
+func (response GetEventsV1Id404JSONResponse) VisitGetEventsV1IdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1Id500JSONResponse Error
+
+func (response GetEventsV1Id500JSONResponse) VisitGetEventsV1IdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type PostGoogleLoginRequestObject struct {
@@ -665,251 +890,26 @@ func (response PostGoogleLogin401JSONResponse) VisitPostGoogleLoginResponse(w ht
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetV1EventsRequestObject struct {
-	Params GetV1EventsParams
-}
-
-type GetV1EventsResponseObject interface {
-	VisitGetV1EventsResponse(w http.ResponseWriter) error
-}
-
-type GetV1Events200JSONResponse struct {
-	Cursor      *string `json:"cursor,omitempty"`
-	Data        []Event `json:"data"`
-	HasNextPage bool    `json:"hasNextPage"`
-}
-
-func (response GetV1Events200JSONResponse) VisitGetV1EventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetV1Events400JSONResponse Error
-
-func (response GetV1Events400JSONResponse) VisitGetV1EventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetV1Events500JSONResponse Error
-
-func (response GetV1Events500JSONResponse) VisitGetV1EventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PostV1EventsRequestObject struct {
-	Body *PostV1EventsJSONRequestBody
-}
-
-type PostV1EventsResponseObject interface {
-	VisitPostV1EventsResponse(w http.ResponseWriter) error
-}
-
-type PostV1Events200JSONResponse Event
-
-func (response PostV1Events200JSONResponse) VisitPostV1EventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PostV1Events400JSONResponse Error
-
-func (response PostV1Events400JSONResponse) VisitPostV1EventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PostV1Events500JSONResponse Error
-
-func (response PostV1Events500JSONResponse) VisitPostV1EventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PostV1EventsEventIdRegisterRequestObject struct {
-	EventId openapi_types.UUID `json:"eventId"`
-	Body    *PostV1EventsEventIdRegisterJSONRequestBody
-}
-
-type PostV1EventsEventIdRegisterResponseObject interface {
-	VisitPostV1EventsEventIdRegisterResponse(w http.ResponseWriter) error
-}
-
-type PostV1EventsEventIdRegister200JSONResponse struct {
-	Registration Registration `json:"registration"`
-}
-
-func (response PostV1EventsEventIdRegister200JSONResponse) VisitPostV1EventsEventIdRegisterResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PostV1EventsEventIdRegister400JSONResponse Error
-
-func (response PostV1EventsEventIdRegister400JSONResponse) VisitPostV1EventsEventIdRegisterResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PostV1EventsEventIdRegister403JSONResponse Error
-
-func (response PostV1EventsEventIdRegister403JSONResponse) VisitPostV1EventsEventIdRegisterResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(403)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PostV1EventsEventIdRegister404JSONResponse Error
-
-func (response PostV1EventsEventIdRegister404JSONResponse) VisitPostV1EventsEventIdRegisterResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PostV1EventsEventIdRegister409JSONResponse Error
-
-func (response PostV1EventsEventIdRegister409JSONResponse) VisitPostV1EventsEventIdRegisterResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(409)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PostV1EventsEventIdRegister500JSONResponse Error
-
-func (response PostV1EventsEventIdRegister500JSONResponse) VisitPostV1EventsEventIdRegisterResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetV1EventsEventIdRegistrationsRequestObject struct {
-	EventId openapi_types.UUID `json:"eventId"`
-	Params  GetV1EventsEventIdRegistrationsParams
-}
-
-type GetV1EventsEventIdRegistrationsResponseObject interface {
-	VisitGetV1EventsEventIdRegistrationsResponse(w http.ResponseWriter) error
-}
-
-type GetV1EventsEventIdRegistrations200JSONResponse struct {
-	Cursor      *string        `json:"cursor,omitempty"`
-	Data        []Registration `json:"data"`
-	HasNextPage bool           `json:"hasNextPage"`
-}
-
-func (response GetV1EventsEventIdRegistrations200JSONResponse) VisitGetV1EventsEventIdRegistrationsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetV1EventsEventIdRegistrations400JSONResponse Error
-
-func (response GetV1EventsEventIdRegistrations400JSONResponse) VisitGetV1EventsEventIdRegistrationsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetV1EventsEventIdRegistrations500JSONResponse Error
-
-func (response GetV1EventsEventIdRegistrations500JSONResponse) VisitGetV1EventsEventIdRegistrationsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetV1EventsIdRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
-}
-
-type GetV1EventsIdResponseObject interface {
-	VisitGetV1EventsIdResponse(w http.ResponseWriter) error
-}
-
-type GetV1EventsId200JSONResponse struct {
-	Event Event `json:"event"`
-}
-
-func (response GetV1EventsId200JSONResponse) VisitGetV1EventsIdResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetV1EventsId400JSONResponse Error
-
-func (response GetV1EventsId400JSONResponse) VisitGetV1EventsIdResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetV1EventsId404JSONResponse Error
-
-func (response GetV1EventsId404JSONResponse) VisitGetV1EventsIdResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetV1EventsId500JSONResponse Error
-
-func (response GetV1EventsId500JSONResponse) VisitGetV1EventsIdResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Get all events
+	// (GET /events/v1)
+	GetEventsV1(ctx context.Context, request GetEventsV1RequestObject) (GetEventsV1ResponseObject, error)
+	// Create a new event
+	// (POST /events/v1)
+	PostEventsV1(ctx context.Context, request PostEventsV1RequestObject) (PostEventsV1ResponseObject, error)
+	// Sign up for an event
+	// (POST /events/v1/{eventId}/register)
+	PostEventsV1EventIdRegister(ctx context.Context, request PostEventsV1EventIdRegisterRequestObject) (PostEventsV1EventIdRegisterResponseObject, error)
+	// Get all registrations for an event
+	// (GET /events/v1/{eventId}/registrations)
+	GetEventsV1EventIdRegistrations(ctx context.Context, request GetEventsV1EventIdRegistrationsRequestObject) (GetEventsV1EventIdRegistrationsResponseObject, error)
+	// Get an event
+	// (GET /events/v1/{id})
+	GetEventsV1Id(ctx context.Context, request GetEventsV1IdRequestObject) (GetEventsV1IdResponseObject, error)
 	// Logs in and returns the auth cookie
 	// (POST /google/login)
 	PostGoogleLogin(ctx context.Context, request PostGoogleLoginRequestObject) (PostGoogleLoginResponseObject, error)
-	// Get all events
-	// (GET /v1/events)
-	GetV1Events(ctx context.Context, request GetV1EventsRequestObject) (GetV1EventsResponseObject, error)
-	// Create a new event
-	// (POST /v1/events)
-	PostV1Events(ctx context.Context, request PostV1EventsRequestObject) (PostV1EventsResponseObject, error)
-	// Sign up for an event
-	// (POST /v1/events/{eventId}/register)
-	PostV1EventsEventIdRegister(ctx context.Context, request PostV1EventsEventIdRegisterRequestObject) (PostV1EventsEventIdRegisterResponseObject, error)
-	// Get all registrations for an event
-	// (GET /v1/events/{eventId}/registrations)
-	GetV1EventsEventIdRegistrations(ctx context.Context, request GetV1EventsEventIdRegistrationsRequestObject) (GetV1EventsEventIdRegistrationsResponseObject, error)
-	// Get an event
-	// (GET /v1/events/{id})
-	GetV1EventsId(ctx context.Context, request GetV1EventsIdRequestObject) (GetV1EventsIdResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -939,6 +939,149 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetEventsV1 operation middleware
+func (sh *strictHandler) GetEventsV1(w http.ResponseWriter, r *http.Request, params GetEventsV1Params) {
+	var request GetEventsV1RequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEventsV1(ctx, request.(GetEventsV1RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEventsV1")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEventsV1ResponseObject); ok {
+		if err := validResponse.VisitGetEventsV1Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostEventsV1 operation middleware
+func (sh *strictHandler) PostEventsV1(w http.ResponseWriter, r *http.Request) {
+	var request PostEventsV1RequestObject
+
+	var body PostEventsV1JSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostEventsV1(ctx, request.(PostEventsV1RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostEventsV1")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostEventsV1ResponseObject); ok {
+		if err := validResponse.VisitPostEventsV1Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostEventsV1EventIdRegister operation middleware
+func (sh *strictHandler) PostEventsV1EventIdRegister(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID) {
+	var request PostEventsV1EventIdRegisterRequestObject
+
+	request.EventId = eventId
+
+	var body PostEventsV1EventIdRegisterJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostEventsV1EventIdRegister(ctx, request.(PostEventsV1EventIdRegisterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostEventsV1EventIdRegister")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostEventsV1EventIdRegisterResponseObject); ok {
+		if err := validResponse.VisitPostEventsV1EventIdRegisterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEventsV1EventIdRegistrations operation middleware
+func (sh *strictHandler) GetEventsV1EventIdRegistrations(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, params GetEventsV1EventIdRegistrationsParams) {
+	var request GetEventsV1EventIdRegistrationsRequestObject
+
+	request.EventId = eventId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEventsV1EventIdRegistrations(ctx, request.(GetEventsV1EventIdRegistrationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEventsV1EventIdRegistrations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEventsV1EventIdRegistrationsResponseObject); ok {
+		if err := validResponse.VisitGetEventsV1EventIdRegistrationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEventsV1Id operation middleware
+func (sh *strictHandler) GetEventsV1Id(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetEventsV1IdRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEventsV1Id(ctx, request.(GetEventsV1IdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEventsV1Id")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEventsV1IdResponseObject); ok {
+		if err := validResponse.VisitGetEventsV1IdResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // PostGoogleLogin operation middleware
@@ -972,196 +1115,53 @@ func (sh *strictHandler) PostGoogleLogin(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// GetV1Events operation middleware
-func (sh *strictHandler) GetV1Events(w http.ResponseWriter, r *http.Request, params GetV1EventsParams) {
-	var request GetV1EventsRequestObject
-
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetV1Events(ctx, request.(GetV1EventsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetV1Events")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetV1EventsResponseObject); ok {
-		if err := validResponse.VisitGetV1EventsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// PostV1Events operation middleware
-func (sh *strictHandler) PostV1Events(w http.ResponseWriter, r *http.Request) {
-	var request PostV1EventsRequestObject
-
-	var body PostV1EventsJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PostV1Events(ctx, request.(PostV1EventsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PostV1Events")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PostV1EventsResponseObject); ok {
-		if err := validResponse.VisitPostV1EventsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// PostV1EventsEventIdRegister operation middleware
-func (sh *strictHandler) PostV1EventsEventIdRegister(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID) {
-	var request PostV1EventsEventIdRegisterRequestObject
-
-	request.EventId = eventId
-
-	var body PostV1EventsEventIdRegisterJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PostV1EventsEventIdRegister(ctx, request.(PostV1EventsEventIdRegisterRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PostV1EventsEventIdRegister")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PostV1EventsEventIdRegisterResponseObject); ok {
-		if err := validResponse.VisitPostV1EventsEventIdRegisterResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetV1EventsEventIdRegistrations operation middleware
-func (sh *strictHandler) GetV1EventsEventIdRegistrations(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, params GetV1EventsEventIdRegistrationsParams) {
-	var request GetV1EventsEventIdRegistrationsRequestObject
-
-	request.EventId = eventId
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetV1EventsEventIdRegistrations(ctx, request.(GetV1EventsEventIdRegistrationsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetV1EventsEventIdRegistrations")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetV1EventsEventIdRegistrationsResponseObject); ok {
-		if err := validResponse.VisitGetV1EventsEventIdRegistrationsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetV1EventsId operation middleware
-func (sh *strictHandler) GetV1EventsId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request GetV1EventsIdRequestObject
-
-	request.Id = id
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetV1EventsId(ctx, request.(GetV1EventsIdRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetV1EventsId")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetV1EventsIdResponseObject); ok {
-		if err := validResponse.VisitGetV1EventsIdResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
