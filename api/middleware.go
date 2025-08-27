@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -173,6 +174,31 @@ func (a *API) corsMiddleware() middlewareFunc {
 	}
 
 	return serverCors.Handler
+}
+
+//go:embed swagger-ui/*
+var swaggerUI embed.FS
+
+func (a *API) openapiRoutesMiddleware(spec *openapi3.T) middlewareFunc {
+	openapiServer := http.NewServeMux()
+	openapiServer.Handle("/v1/events/swagger-ui/", http.StripPrefix("/v1/events", http.FileServer(http.FS(swaggerUI))))
+	openapiServer.HandleFunc("/v1/events/openapi.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(spec)
+	})
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler, matchedPath := openapiServer.Handler(r)
+
+			if matchedPath == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			handler.ServeHTTP(w, r)
+		})
+	}
 }
 
 // formatDuration formats a duration to one decimal point.
