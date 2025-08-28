@@ -9,43 +9,9 @@ servers:
   - url: http://localhost:3000/
     description: Local dev server
 security:
-  - cookieAuth: []
-  - bearerAuth: []
+  - googleCookieAuth: []
+  - googleBearerAuth: []
 paths:
-  /google/login:
-    post:
-      summary: Logs in and returns the auth cookie
-      requestBody:
-        required: true
-        description: The Google JWT to log in with
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - googleJWT
-              properties:
-                googleJWT:
-                  type: string
-      security: []
-      responses:
-        '200':
-          description: >
-            Auth successful.
-            The JWT is returned in a cookie named `GOOGLE_AUTH_JWT`.
-            You need to include this cookie subsequent requests if using cookie based auth.
-          headers:
-            Set-Cookie:
-              schema: 
-                type: string
-                example: GOOGLE_AUTH_JWT=PASSED_IN_JWT; Path=/; HttpOnly
-              description: The google auth token cookie.
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
   /events/v1:
     get:
       summary: Get all events
@@ -106,8 +72,8 @@ paths:
       summary: Create a new event
       description: Admin endpoint to create a new event
       security:
-        - cookieAuth: [admin]
-        - bearerAuth: [admin]
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
       requestBody:
         description: Event to be created
         required: true
@@ -246,8 +212,8 @@ paths:
       summary: Get all registrations for an event
       description: Get all registrations for an event
       security:
-        - cookieAuth: [admin]
-        - bearerAuth: [admin]
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
       parameters:
         - name: eventId
           in: path
@@ -310,11 +276,11 @@ paths:
 
 components:
   securitySchemes:
-    cookieAuth:
+    googleCookieAuth:
       type: apiKey
       in: cookie
       name: GOOGLE_AUTH_JWT
-    bearerAuth:
+    googleBearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT

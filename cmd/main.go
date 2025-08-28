@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/International-Combat-Archery-Alliance/auth/google"
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
 	"github.com/International-Combat-Archery-Alliance/event-registration/dynamo"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -27,11 +28,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	eventAPI, err := api.NewAPI(ctx, db, logger, getApiEnvironment())
+	googleAuthValidator, err := google.NewValidator(ctx)
 	if err != nil {
-		logger.Error("Error creating api", "error", err)
+		logger.Error("failed to create google auth validator", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+
+	eventAPI := api.NewAPI(db, logger, getApiEnvironment(), googleAuthValidator)
 
 	serverSettings := getServerSettingsFromEnv()
 	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
