@@ -8,9 +8,10 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/International-Combat-Archery-Alliance/auth"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
-	"google.golang.org/api/idtoken"
+	"github.com/International-Combat-Archery-Alliance/middleware"
 )
 
 type Environment int
@@ -30,23 +31,18 @@ type API struct {
 	logger *slog.Logger
 	env    Environment
 
-	googleIdVerifier googleAuthValidator
+	authValidator auth.Validator
 }
 
 var _ StrictServerInterface = (*API)(nil)
 
-func NewAPI(ctx context.Context, db DB, logger *slog.Logger, env Environment) (*API, error) {
-	verifier, err := idtoken.NewValidator(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create google id verifier: %w", err)
-	}
-
+func NewAPI(db DB, logger *slog.Logger, env Environment, authValidator auth.Validator) *API {
 	return &API{
-		db:               db,
-		logger:           logger,
-		env:              env,
-		googleIdVerifier: verifier,
-	}, nil
+		db:            db,
+		logger:        logger,
+		env:           env,
+		authValidator: authValidator,
+	}
 }
 
 func (a *API) ListenAndServe(host string, port string) error {
@@ -63,15 +59,21 @@ func (a *API) ListenAndServe(host string, port string) error {
 
 	HandlerFromMux(strictHandler, r)
 
-	h := useMiddlewares(
-		r,
+	swaggerUIMiddleware, err := middleware.HostSwaggerUI("/events", swagger)
+	if err != nil {
+		return fmt.Errorf("failed to create swagger ui middleware: %w", err)
+	}
+
+	middlewares := []middleware.MiddlewareFunc{
 		// Executes from the bottom up
 		a.openapiValidateMiddleware(swagger),
 		a.corsMiddleware(),
-		a.openapiRoutesMiddleware(swagger),
-		a.loggingMiddleware(),
-		a.prodBaseNameHandling(),
-	)
+		swaggerUIMiddleware,
+		middleware.AccessLogging(a.logger),
+		middleware.BaseNamePrefix(a.logger, "/events"),
+	}
+
+	h := middleware.UseMiddlewares(r, middlewares...)
 
 	s := &http.Server{
 		Handler: h,
@@ -79,4 +81,13 @@ func (a *API) ListenAndServe(host string, port string) error {
 	}
 
 	return s.ListenAndServe()
+}
+
+func (a *API) getLoggerOrBaseLogger(ctx context.Context) *slog.Logger {
+	logger, ok := middleware.GetLoggerFromCtx(ctx)
+	if !ok {
+		a.logger.Error("tried to get logger and it wasn't in the context")
+		return a.logger
+	}
+	return logger
 }

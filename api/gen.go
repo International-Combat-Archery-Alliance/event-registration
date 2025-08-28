@@ -197,19 +197,11 @@ type GetEventsV1EventIdRegistrationsParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
-// PostGoogleLoginJSONBody defines parameters for PostGoogleLogin.
-type PostGoogleLoginJSONBody struct {
-	GoogleJWT string `json:"googleJWT"`
-}
-
 // PostEventsV1JSONRequestBody defines body for PostEventsV1 for application/json ContentType.
 type PostEventsV1JSONRequestBody = Event
 
 // PostEventsV1EventIdRegisterJSONRequestBody defines body for PostEventsV1EventIdRegister for application/json ContentType.
 type PostEventsV1EventIdRegisterJSONRequestBody = Registration
-
-// PostGoogleLoginJSONRequestBody defines body for PostGoogleLogin for application/json ContentType.
-type PostGoogleLoginJSONRequestBody PostGoogleLoginJSONBody
 
 // AsIndividualRegistration returns the union data inside the Registration as a IndividualRegistration
 func (t Registration) AsIndividualRegistration() (IndividualRegistration, error) {
@@ -317,9 +309,6 @@ type ServerInterface interface {
 	// Get an event
 	// (GET /events/v1/{id})
 	GetEventsV1Id(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-	// Logs in and returns the auth cookie
-	// (POST /google/login)
-	PostGoogleLogin(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -490,20 +479,6 @@ func (siw *ServerInterfaceWrapper) GetEventsV1Id(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// PostGoogleLogin operation middleware
-func (siw *ServerInterfaceWrapper) PostGoogleLogin(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostGoogleLogin(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -629,7 +604,6 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/{eventId}/register", wrapper.PostEventsV1EventIdRegister)
 	m.HandleFunc("GET "+options.BaseURL+"/events/v1/{eventId}/registrations", wrapper.GetEventsV1EventIdRegistrations)
 	m.HandleFunc("GET "+options.BaseURL+"/events/v1/{id}", wrapper.GetEventsV1Id)
-	m.HandleFunc("POST "+options.BaseURL+"/google/login", wrapper.PostGoogleLogin)
 
 	return m
 }
@@ -859,37 +833,6 @@ func (response GetEventsV1Id500JSONResponse) VisitGetEventsV1IdResponse(w http.R
 	return json.NewEncoder(w).Encode(response)
 }
 
-type PostGoogleLoginRequestObject struct {
-	Body *PostGoogleLoginJSONRequestBody
-}
-
-type PostGoogleLoginResponseObject interface {
-	VisitPostGoogleLoginResponse(w http.ResponseWriter) error
-}
-
-type PostGoogleLogin200ResponseHeaders struct {
-	SetCookie string
-}
-
-type PostGoogleLogin200Response struct {
-	Headers PostGoogleLogin200ResponseHeaders
-}
-
-func (response PostGoogleLogin200Response) VisitPostGoogleLoginResponse(w http.ResponseWriter) error {
-	w.Header().Set("Set-Cookie", fmt.Sprint(response.Headers.SetCookie))
-	w.WriteHeader(200)
-	return nil
-}
-
-type PostGoogleLogin401JSONResponse Error
-
-func (response PostGoogleLogin401JSONResponse) VisitPostGoogleLoginResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Get all events
@@ -907,9 +850,6 @@ type StrictServerInterface interface {
 	// Get an event
 	// (GET /events/v1/{id})
 	GetEventsV1Id(ctx context.Context, request GetEventsV1IdRequestObject) (GetEventsV1IdResponseObject, error)
-	// Logs in and returns the auth cookie
-	// (POST /google/login)
-	PostGoogleLogin(ctx context.Context, request PostGoogleLoginRequestObject) (PostGoogleLoginResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -1084,84 +1024,49 @@ func (sh *strictHandler) GetEventsV1Id(w http.ResponseWriter, r *http.Request, i
 	}
 }
 
-// PostGoogleLogin operation middleware
-func (sh *strictHandler) PostGoogleLogin(w http.ResponseWriter, r *http.Request) {
-	var request PostGoogleLoginRequestObject
-
-	var body PostGoogleLoginJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PostGoogleLogin(ctx, request.(PostGoogleLoginRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PostGoogleLogin")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PostGoogleLoginResponseObject); ok {
-		if err := validResponse.VisitPostGoogleLoginResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+xae2/bOBL/KgRv/7gDFFt24tvGiwDnOGnqXpoEcdJi2wu6jDi22UqklqScuIW/+4Gk",
-	"ZOvlR5qmj7sNFltLIuc9v5mh9BkHIooFB64V7n7GKphAROzPHqUSlP0ZSxGD1AzsVcD0zPxLQQWSxZoJ",
-	"jru4z/QMCYm0uOPYw3BPojgE3MU9PkvvReT+FPhYT3C343s4Yjy73PWwnsVmtdKS8TGeezgQCdeyjlP6",
-	"IM/kethby6BdwyAWSpOwLyhUeVzYZygwD/N89v12yy9yam9WRWmia5gMzW1js1iKKeNBkVX/4RopLQF0",
-	"HSNzH5HUo3kurfYuekUYR0NdUqvT2aDX3MMS/kyYBIq77zLmnouPTOmCmZdOvVlQE7cfINBG+mMphawJ",
-	"t9RBv0gY4S7+W3MZsc00XJt2q2Ux93AESpGx3ZOPQpRwuI8h0EARmPVIBEEiJdAG3qRbGgcZ5ZXSZ8EE",
-	"PInMvgHXIDkJnWoePmUR0+eJPh8dioRT44oBn5KQ0X4ilV1yJvRz8wx7+DiK9exQ0NlyWXrVCyUQOju+",
-	"Z0obIpcwZkpLYvzdD4UCarfEiX5tdtn7mQy9RE/c75uaEDqeAtdVJ5AwFHdAr4BEQ/YJLgkfb3SKWzT3",
-	"MHB6xaKSQ9p+u7PjP9tp7V+1213f7/p+w/f9t9jDIyEjonEXU6JhR5utNZIyWiTop387Nf/L/vLEk4QZ",
-	"KxlDnvNwhrtaJlDHJyJjOCNRTQL30IiFgDiJAOkJ0QisQxDjSE8AXQ8QUQq0QlqgRAEiyt4PxVg0Cll4",
-	"K5QWfEeLRBpiXDc+xONy+vs1woUiIE6Y9b44zdbNPcxJ2ReDfq+H+kmMjFMeCgPGhKXoW+PtX6/au93O",
-	"frez/zBv53mcW/vbuGQaIrURHUxMX1YIWKxgfOBItBZMiZRkZnkmIagjEZwy/rGozkTrWHWbTSoC1RgL",
-	"MQ6hEYjIXCfGfU3aJFSNRmSkzH90RJtTBnfbeFSxMb+OTWnYqNcwt9RVGanXJlrrWXfvn93ObqP1rLO9",
-	"6acgVRpiC6qtlYnDuIYxyAqE2mTLSKVBmIvfvPhLxFgVW/Xx4NXDVNGmtdi9IkAqMBhLFmzEvVeCw6wc",
-	"s1eW5wbALK8v27BC0EslqlXqPgbJgAdwClMI82XpTEyZ7TZsfYqAMleqe3RKeADU0MuhQ3FRJT4GnLIp",
-	"owkJ8wpUjQcRYWExNj8QDg0q4F/pLZNE+bh0WwpZ0/I391tg/Dn4RvUBFnbeiEMlj8w9PBER9NN+utIy",
-	"e6jS1m6j/bcqjDEpcXLrVuy7FSIEYkE3DskM5ICPxCaLXSxXLvIJJNCefhzGbdTt8an7tXCzJudLUJpF",
-	"e8lA3iJ7FkFWMH0hclNv1uHIaa7FKDWFywlxnW2yQbK29UhDHfVFFCXczJB9MHjz0LAvWS0tL5mEdXo5",
-	"mK4qFZkRpdrrvWJcSGREVEiMUGR2o7+zBjRQy/fRwQH6pWUav+vh0T/yvV0rV+UXPvawnTx4UEr86+FR",
-	"PmSZEjt77davm+eTjJqXyV+n8UUh74pqj5hU+qzinpeEw9oxtFXXlJI6UkfioZRKSi5FzLGo03MxnRRV",
-	"jMh9QSLX2LLI1MRWnY8iVknexQZ/Y+Ka3VbfehlLpZIyE2wR40S7ITgicWys0P2MD2fLErsqyVYUYQ8f",
-	"zkw3tGqbeVbYYODZWW3mXFgFoLmHBYfzEe6+W5/4K2Sae+u3VWW6KRksQ+SsnykYaKFyoYkpLanE7LDY",
-	"dhcjhyfRpXDA6nJIFQPJXx8YniFgRCpua221TWgS1jLtbBGNxUpTAMhMIq9OuyrruhiuOKp6dkNiTRg/",
-	"rnZ+6ZOfufH7P+7dtp+9ix3c+nH752rvNJCoWuWuJoCes/FEMz5GrwQfC6FAPTwQvnvzuFCv0D8WEnoZ",
-	"DSvbx7mHFQSJZHo2NLZ0sHALRILsJUb57Op55siXb67MyG5Xm9izT5eQPdE6dq8HxEcGGQ1TqdNb2eFC",
-	"F5+cn5+cHr/vXV+9eO+oZiEXs3+bEd2Ix9J2qHSyx1HvYoBGQqKIcDI23rSmUohwihQbc3Mrie0S98Qe",
-	"IzO9PFGzxwqoVI8XjsWtht/wbTWNgZOY4S7etbeMNfXEWqrpSDenLXM1rjvcvwQtGUxBIYJCprTpTkkY",
-	"pkJhS95xN8CIT0BbudTrlmUkSQTaZvS7yosWeyZt6N1NQALSAtlDGjSSFq2t0f9MwL6LSW0eZOfYLnWK",
-	"yfF7ez95u/tyQl+8UoMX4ZQOD6Pb3dfJ2/6hT06ux2/fPP9ET17PBiev+du7g4O6vrfSl5N75HpeI2jq",
-	"Iy3QCHQwWSFkyCKmCzJSGJEk1K4oFys0uXc1tlDla/rF+Y3JIRULrlyUt33fvb/gOj1TJ3EcMjdNNT8o",
-	"l91LGUql0xnyK9vPMzhJHnZyasGuhNUTos7gXl+U37PUl40SKlkRijRqkMPIWjptz8I7y7e5h/ceaOSN",
-	"b5HqOB8SiowCoLRl2vkWTK/5R24mYwVyCtK9smoUEBV33914WCVRROTMpXY+89NXnDXgRiPGEXAaC8a1",
-	"SZZAAtGACOJw57ZXcONCqDxwpOaw76O+milctFVN4YBUC3QLqagU50PKRN38kdn3RYKZap8K5Mz2V0ya",
-	"MpKvze8wMeGGbwx05wv/8kEhiPvVUDT0l4Ww+TntWebNrGWx6Fkb6masy6o04VuE9rGjfZlR3lAiB0cG",
-	"j/QEFqRtvTH1e1lu8j1WPmTri+QXtvzlQnnzNDlaHMyrEZJ//sQZW6yXsjSIPkCJ1T3zVnUpDwL5zd8F",
-	"CxzP3afneSZssRF3QI2fs1RMld57egFcUWAKcaHRSCS8IAe6Y3riZNl/elmGIgLBwUhD3KcZdkQAarAn",
-	"4RQk0hOmkDvW+HE7iFq43AC/LtjVyvkk60oKq9cDcm5GKeBxxuqnBWXvyUesVnt3r/PwuanonP/R8amz",
-	"t9tuPXomKh+X/1ijUcGRf3Wjj+1GtwCvMjwyOl+LhaZO2OXodoYsSqwEPwtPj4c69j1az6+WyZB9kbjN",
-	"hFbMJrd12x4OssOO75Ix37BnWjRMP/xhRiHH3Hd2zVCM3XvZbOKrDnMnduWpXfjlY1AxDB33l2+uzMX6",
-	"F9XLpduGnhMYvXxzZWpvKMaIcdfBbjk0lcpBoidIJUEASo2SsIEMD0OcKSRBJ9J0powjghw22i9YKfqj",
-	"dGD+RwP9LhLEwbX4jAdhQsF1sulGldwqY16us2BWiI1QohgfZ2tuiQKKSKInjf8Yf0yA0PQV0hD0Tt+d",
-	"2leUMDI7S9q9SIuPwFOajRXdT0mBg4vecHh89H5wZq5+QxdETw6av6EXWsf2LUoVu+Y2FVvfIiOMVkKy",
-	"T0DXZ8KpGNtPigmnqffcZ8TWKuk7j/n6qlctd67O2WysqysXUtAksEO8W4Q9nMgw9+kriVmDBYQ07oQM",
-	"aRNXO8xTEZAQUZjWkeg2m6F5PhFKd3d932/i+c38vwEAAP//yaWFm48yAAA=",
+	"H4sIAAAAAAAC/+xae2/bOBL/KgRv/7gDFFu249uNgALnuGnqXpoEcdLFtQgWjDi22UqklqSceAt/9wNJ",
+	"ydbLj2yaPu42WGwjkZz3/GaGymccijgRHLhWOPiMVTiDmNhfB5RKUPbXRIoEpGZgn0KmF+ZfCiqULNFM",
+	"cBzgIdMLJCTS4p5jD8MDiZMIcIAHfJG9i8nDGfCpnuGg73s4Zjx/7HlYLxKzW2nJ+BQvPRyKlGvZxClb",
+	"KDK5GQ+2Mug2MEiE0iQaCgp1Hpd2DYVmscjnyO92/DKn7m5VlCa6gcnYvDY2S6SYMx6WWQ0fr5HSEkA3",
+	"MTLvEck8WuTS6fbQW8I4GuuKWv3+Dr2WHpbwe8okUBx8yJl7Lj5ypUtmXjv1dkVN3H2EUBvpT6QUsiHc",
+	"Mgf9JGGCA/y39jpi21m4tu1Ry2Lp4RiUIlN7phiFKOXwkECogSIw+5EIw1RKoC28S7csDnLKG6XPgwl4",
+	"GptzI65BchI51Tx8xmKmL1J9MTkWKafGFSM+JxGjw1Qqu+Vc6FdmDXv4JE704ljQxXpb9jSIJBC6OHlg",
+	"ShsiVzBlSkti/D2MhAJqjySpfmdO2fe5DINUz9zvtw0hdDIHrutOIFEk7oFeA4nH7A+4Iny60ylu09LD",
+	"wOk1iysO6frd/oH/y0Hn6LrbDXw/8P2W7/vvsYcnQsZE4wBTouFAm6MNkjJaJuhnPwcN/8t/isTTlBkr",
+	"GUNe8GiBAy1TaOITkymck7ghgQdowiJAnMSA9IxoBNYhiHGkZ4BuRogoBVohLVCqABFl30diKlqlLLwT",
+	"Sgt+oEUqDTGuWx+TaTX9/QbhIhESJ8x2X5zl+5Ye5qTqi9FwMEDDNEHGKY+FAWPCSvRt8fbP191e0D8K",
+	"+keP83aRx4W1v41LpiFWO9HBxPRVjYDFCsZHjkRnxZRISRaWZxqBeinCM8Y/ldWZaZ2ooN2mIlStqRDT",
+	"CFqhiM1zatzXpm1C1WRCJsr8Rye0PWdwv49HFZvym8SUhp16jQtbXZWRemuidX4JDv8Z9Hutzi/9/U0/",
+	"B6myEFtR7WxMHMY1TEHWINQmW04qC8JC/BbFXyPGpthqjgevGabKNm3E7g0BUoPBRLJwJ+69FRwW1Zi9",
+	"tjx3AGZ1f9WGNYJeJlGjUg8JSAY8hDOYQ1QsS+dizmy3YetTDJS5Uj2gc8JDoIZeAR3Km2rxMeKUzRlN",
+	"SVRUoG48iAmLyrH5kXBoUQH/yl6ZJCrGpTtSypqOv7vfAuPP0VeqD7Cy804cqnhk6eGZiGGY9dO1ltlD",
+	"tbZ2H+2/VmFMSIWT27fh3J0QERALuklEFiBHfCJ2WexyvXOVTyCBDvTTMG6nbk9P3S+Fmw05X4HSPNor",
+	"BvJW2bMKspLpS5GbebMJR84KLUalKVxPiNtskw+Sja1HFupoKOI45WaGHILBm8eGfcVqWXnJJWzSy8F0",
+	"XanYjCj1Xu8t40IiI6JCYoJicxr9nbWghTq+j168QD91TON3M375j2Jv1ylU+ZWPPWwnDx5WEv9m/LIY",
+	"skyJg8Nu5+fd80lOzcvlb9L4spR3ZbUnTCp9XnPPG8Jh6xjaaWpKSROpl+KxlCpKrkUssGjSczWdlFWM",
+	"yUNJItfYstjUxE6Tj2JWS97VAX9n4prTVt9mGSulkjITbDHjRLshOCZJYqwQfMbHi3WJ3ZRkG4qwh48X",
+	"phvadMyslQ4YeHZWWzgX1gFo6WHB4WKCgw/bE3+DTEtv+7G6TLcVg+WInPczJQOtVC41MZUttZgdl9vu",
+	"cuTwNL4SDlhdDqlyIPnbA8MzBIxI5WOdvY4JTaJGpv09orFcaUoAmUvkNWlXZ90UwzVH1e9uSKIJ4yf1",
+	"zi9b+ZEbv//j3m3/2bvcwW0ft3+s9k4DietV7noG6BWbzjTjU/RW8KkQCtTjA+GbN48r9Ur9Yymh19Gw",
+	"sX1celhBmEqmF2NjSwcLd0AkyEFqlM+fXuWOfPPrtRnZ7W4Te3Z1DdkzrRP3eUB8YpDTMJU6e5VfLgT4",
+	"9OLi9Ozkt8HN9evfHNU85BL2bzOiG/FY1g5VbvY4GlyO0ERIFBNOpsab1lQKEU6RYlNuXqWJ3eJW7DUy",
+	"0+sbNXutgCr1eOVY3Gn5Ld9W0wQ4SRgOcM++MtbUM2uptiPdnnfM07Tpcv8KtGQwB4UIipjSpjslUZQJ",
+	"hS15x90AIz4FbeVS7zqWkSQxaJvRH2ofWuydtKF3PwMJSAtkL2nQRFq0tkb/PQX7LSazeZjfY7vUKSfH",
+	"f7pH6fvemxl9/VaNXkdzOj6O73rv0vfDY5+c3kzf//rqD3r6bjE6fcff37940dT31vpy8oBcz2sEzXyk",
+	"BZqADmcbhIxYzHRJRgoTkkbaFeVyhSYPrsaWqnxDv7i8NTmkEsGVi/Ku77vvF1xnd+okSSLmpqn2R+Wy",
+	"ey1DpXQ6Q35h+3kGJ8njbk4t2FWwekbUOTzoy+p3luayUUElK0KZRgNyGFkrt+15eOf5tvTw4SONvPMr",
+	"UhPnY0KRUQCUtkz7X4PpDf/EzWSsQM5Buk9WrRKi4uDDrYdVGsdELlxqFzM/+8TZAG40ZhwBp4lgXJtk",
+	"CSUQDYggDvfueA03LoUqAkdmDvs96ouZwkVb3RQOSLVAd5CJSnExpEzULZ+YfX9KMFPtM4Gc2f6KSVNG",
+	"irX5AyYm3PCtge5i4V8vlIJ4WA9FQ39dCNufs55l2c5bFouejaFuxrq8ShO+R2ifONpXOeUdJXL00uCR",
+	"nsGKtK03pn6vy02xxyqGbHOR/JMtf7VQ3j5PjpYH83qEFNefOWPL9VJWBtFHKLG5Z96rLhVBoHj4m2CB",
+	"49l7fp7nwhYbcQ/U+DlPxUzpw+cXwBUFphAXGk1EyktyoHumZ06Wo+eXZSxiEByMNMT9aYYdEYAa7Ek5",
+	"BYn0jCnkrjW+3w6iES53wK8LdrVxPsm7ktLu7YBcmFFKeJyz+mFB2Xv2EavT7R32Hz83lZ3zPzo+9Q97",
+	"3c6TZ6Lqdfn3NRqVHPlXN/rUbnQP8KrCI6PLrVho6oTdju4WyKLERvCz8PR0qGPfovX8YpkM+V8k7jOh",
+	"lbPJHd23h4P8suObZMxX7JlWDdN3f5mxzrGtSV3PZpfGlllT2lxKQdPQzihuE/ZwKqPCX/aRhLVYSEjr",
+	"XsiItnG9gJ6JkESIwryJRNBuR2Z9JpQOer7vt/HydvnfAAAA//+h+RgNbi8AAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

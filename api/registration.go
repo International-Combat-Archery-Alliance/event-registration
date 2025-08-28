@@ -14,7 +14,7 @@ import (
 )
 
 func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEventsV1EventIdRegisterRequestObject) (PostEventsV1EventIdRegisterResponseObject, error) {
-	logger := getLoggerFromCtx(ctx)
+	logger := a.getLoggerOrBaseLogger(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
@@ -75,7 +75,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 }
 
 func (a *API) GetEventsV1EventIdRegistrations(ctx context.Context, request GetEventsV1EventIdRegistrationsRequestObject) (GetEventsV1EventIdRegistrationsResponseObject, error) {
-	logger := getLoggerFromCtx(ctx)
+	logger := a.getLoggerOrBaseLogger(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
