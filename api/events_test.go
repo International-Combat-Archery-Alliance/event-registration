@@ -7,16 +7,34 @@ import (
 	"testing"
 	"time"
 
+	"github.com/International-Combat-Archery-Alliance/auth"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var noopLogger = slog.New(slog.DiscardHandler)
+
+type mockAuthValidator struct{}
+
+type mockAuthToken struct{}
+
+func (m *mockAuthToken) ExpiresAt() time.Time  { return time.Now().Add(time.Hour) }
+func (m *mockAuthToken) ProfilePicURL() string { return "" }
+func (m *mockAuthToken) IsAdmin() bool         { return false }
+func (m *mockAuthToken) UserEmail() string     { return "test@example.com" }
+
+func (m *mockAuthValidator) Validate(ctx context.Context, token string, clientID string) (auth.AuthToken, error) {
+	return &mockAuthToken{}, nil
+}
+
+func ctxWithLogger(ctx context.Context, logger *slog.Logger) context.Context {
+	return middleware.CtxWithLogger(ctx, logger)
+}
 
 type mockDB struct {
 	GetEventsFunc                   func(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error)
@@ -74,8 +92,7 @@ func TestGetEvents(t *testing.T) {
 				}, nil
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 
 		req := GetEventsV1RequestObject{
 			Params: GetEventsV1Params{
@@ -115,8 +132,7 @@ func TestPostEvents(t *testing.T) {
 				return nil
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -156,8 +172,7 @@ func TestGetEventsId(t *testing.T) {
 				return expectedEvent, nil
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -184,8 +199,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -209,8 +223,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,

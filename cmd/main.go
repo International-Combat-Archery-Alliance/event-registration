@@ -34,7 +34,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	eventAPI := api.NewAPI( db, logger, getApiEnvironment() googleAuthValidator)
+	eventAPI := api.NewAPI(db, logger, getApiEnvironment(), googleAuthValidator)
 
 	serverSettings := getServerSettingsFromEnv()
 	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)

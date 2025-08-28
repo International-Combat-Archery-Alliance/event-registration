@@ -18,8 +18,7 @@ import (
 
 func TestPostEventsEventIdRegister(t *testing.T) {
 	t.Run("invalid body", func(t *testing.T) {
-		api, err := NewAPI(context.Background(), &mockDB{}, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(&mockDB{}, noopLogger, LOCAL, &mockAuthValidator{})
 		reg := Registration{}
 		// Set a field that will cause the discriminator to fail
 		reg.FromIndividualRegistration(IndividualRegistration{})
@@ -47,8 +46,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 		reg := &Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -83,8 +81,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return &registration.Error{Reason: registration.REASON_REGISTRATION_ALREADY_EXISTS}
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -119,8 +116,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return &registration.Error{Reason: registration.REASON_REGISTRATION_IS_CLOSED}
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -152,8 +148,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -187,8 +182,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				return registration.GetAllRegistrationsResponse{}, errors.New("some error")
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetEventsV1EventIdRegistrationsParams{
@@ -213,8 +207,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				return registration.GetAllRegistrationsResponse{}, &registration.Error{Reason: registration.REASON_INVALID_CURSOR}
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetEventsV1EventIdRegistrationsParams{
@@ -243,8 +236,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				}, nil
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetEventsV1EventIdRegistrationsParams{
@@ -276,8 +268,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				}, nil
 			},
 		}
-		api, err := NewAPI(context.Background(), mock, noopLogger, LOCAL)
-		require.NoError(t, err)
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
 		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetEventsV1EventIdRegistrationsParams{
