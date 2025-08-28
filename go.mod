@@ -8,6 +8,8 @@ tool (
 )
 
 require (
+	github.com/International-Combat-Archery-Alliance/auth v0.2.0
+	github.com/International-Combat-Archery-Alliance/middleware v0.1.3
 	github.com/Rhymond/go-money v1.0.15
 	github.com/aws/aws-sdk-go-v2 v1.38.1
 	github.com/aws/aws-sdk-go-v2/config v1.31.3
@@ -23,7 +25,6 @@ require (
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.11.0
 	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.38.0
-	google.golang.org/api v0.248.0
 )
 
 require github.com/testcontainers/testcontainers-go v0.38.0 // indirect
@@ -34,8 +35,6 @@ require (
 	cloud.google.com/go/compute/metadata v0.8.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/International-Combat-Archery-Alliance/auth v0.2.0 // indirect
-	github.com/International-Combat-Archery-Alliance/middleware v0.1.3 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.4 // indirect
@@ -120,6 +119,7 @@ require (
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
+	google.golang.org/api v0.248.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
 	google.golang.org/grpc v1.74.2 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect

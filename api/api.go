@@ -70,7 +70,10 @@ func (a *API) ListenAndServe(host string, port string) error {
 		a.corsMiddleware(),
 		swaggerUIMiddleware,
 		middleware.AccessLogging(a.logger),
-		middleware.BaseNamePrefix(a.logger, "/events"),
+	}
+
+	if a.env == PROD {
+		middlewares = append(middlewares, middleware.BaseNamePrefix(a.logger, "/events"))
 	}
 
 	h := middleware.UseMiddlewares(r, middlewares...)
