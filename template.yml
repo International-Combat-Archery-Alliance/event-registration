@@ -42,6 +42,8 @@ Resources:
       PackageType: Image
       Architectures:
         - !Ref architecture
+      LoggingConfig:
+        LogRetentionInDays: 30
       Policies:
         - Statement:
           - Effect: Allow
