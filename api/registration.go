@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
@@ -18,6 +19,24 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
+
+	validatedData, err := a.captchaValidator.Validate(ctx, request.Params.CfTurnstileResponse, "")
+	if err != nil {
+		logger.Warn("Invalid captcha", slog.String("error", err.Error()))
+
+		return PostEventsV1EventIdRegister400JSONResponse{
+			Code:    CaptchaInvalid,
+			Message: "Invalid captcha",
+		}, nil
+	}
+	if a.env == PROD && validatedData.Hostname() != "icaa.world" {
+		logger.Warn("Invalid captcha hostname", slog.String("givenHostname", validatedData.Hostname()))
+
+		return PostEventsV1EventIdRegister400JSONResponse{
+			Code:    CaptchaInvalid,
+			Message: "Invalid hostname, must come from icaa.world",
+		}, nil
+	}
 
 	// request.Body is guaranteed to be non-nil from openapi doc
 	reg, err := apiRegistrationToRegistration(*request.Body, request.EventId)

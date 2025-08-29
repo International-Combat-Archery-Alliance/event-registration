@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/International-Combat-Archery-Alliance/auth"
+	"github.com/International-Combat-Archery-Alliance/captcha"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
@@ -31,17 +32,25 @@ type API struct {
 	logger *slog.Logger
 	env    Environment
 
-	authValidator auth.Validator
+	authValidator    auth.Validator
+	captchaValidator captcha.Validator
 }
 
 var _ StrictServerInterface = (*API)(nil)
 
-func NewAPI(db DB, logger *slog.Logger, env Environment, authValidator auth.Validator) *API {
+func NewAPI(
+	db DB,
+	logger *slog.Logger,
+	env Environment,
+	authValidator auth.Validator,
+	captchaValidator captcha.Validator,
+) *API {
 	return &API{
-		db:            db,
-		logger:        logger,
-		env:           env,
-		authValidator: authValidator,
+		db:               db,
+		logger:           logger,
+		env:              env,
+		authValidator:    authValidator,
+		captchaValidator: captchaValidator,
 	}
 }
 
