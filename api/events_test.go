@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/auth"
+	"github.com/International-Combat-Archery-Alliance/captcha"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
@@ -30,6 +31,23 @@ func (m *mockAuthToken) UserEmail() string     { return "test@example.com" }
 
 func (m *mockAuthValidator) Validate(ctx context.Context, token string, clientID string) (auth.AuthToken, error) {
 	return &mockAuthToken{}, nil
+}
+
+type mockCaptchaValidator struct {
+	ValidateFunc func(ctx context.Context, token string, remoteIP string) (captcha.ValidatedData, error)
+}
+
+type mockCaptchaValidatedData struct{}
+
+func (m *mockCaptchaValidatedData) Hostname() string       { return "icaa.world" }
+func (m *mockCaptchaValidatedData) Action() string         { return "" }
+func (m *mockCaptchaValidatedData) ChallengeTS() time.Time { return time.Now() }
+
+func (m *mockCaptchaValidator) Validate(ctx context.Context, token string, remoteIP string) (captcha.ValidatedData, error) {
+	if m.ValidateFunc != nil {
+		return m.ValidateFunc(ctx, token, remoteIP)
+	}
+	return &mockCaptchaValidatedData{}, nil
 }
 
 func ctxWithLogger(ctx context.Context, logger *slog.Logger) context.Context {
@@ -92,7 +110,7 @@ func TestGetEvents(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
 
 		req := GetEventsV1RequestObject{
 			Params: GetEventsV1Params{
@@ -132,7 +150,7 @@ func TestPostEvents(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -172,7 +190,7 @@ func TestGetEventsId(t *testing.T) {
 				return expectedEvent, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -199,7 +217,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -223,7 +241,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
