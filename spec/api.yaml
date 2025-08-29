@@ -158,6 +158,13 @@ paths:
             type: string
             format: uuid
             example: 00000000-0000-0000-0000-000000000000
+        - name: cf-turnstile-response
+          in: header
+          description: Cloudflare turnstile CAPTCHA
+          required: true
+          schema:
+            type: string
+            example: XXXX.DUMMY.TOKEN.XXXX 
       requestBody:
         description: Registration to be created
         required: true
@@ -620,6 +627,7 @@ components:
         - RegistrationClosed
         - InputValidationError
         - AuthError
+        - CaptchaInvalid
     Error:
       type: object
       required:

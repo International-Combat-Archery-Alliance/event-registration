@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/auth/google"
+	"github.com/International-Combat-Archery-Alliance/captcha/cfturnstile"
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
 	"github.com/International-Combat-Archery-Alliance/event-registration/dynamo"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,7 +36,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	eventAPI := api.NewAPI(db, logger, getApiEnvironment(), googleAuthValidator)
+	cfTurnstileValidator := cfturnstile.NewValidator(http.DefaultClient, "1x0000000000000000000000000000000AA")
+
+	eventAPI := api.NewAPI(db, logger, getApiEnvironment(), googleAuthValidator, cfTurnstileValidator)
 
 	serverSettings := getServerSettingsFromEnv()
 	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
