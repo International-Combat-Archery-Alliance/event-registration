@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
 
 func main() {
@@ -36,9 +37,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfTurnstileValidator := cfturnstile.NewValidator(http.DefaultClient, "1x0000000000000000000000000000000AA")
+	env := getApiEnvironment()
 
-	eventAPI := api.NewAPI(db, logger, getApiEnvironment(), googleAuthValidator, cfTurnstileValidator)
+	cfSecretKey, err := getTurnstileSecretKey(ctx, env)
+	if err != nil {
+		logger.Error("failed to get turnstile secret key", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	cfTurnstileValidator := cfturnstile.NewValidator(http.DefaultClient, cfSecretKey)
+
+	eventAPI := api.NewAPI(db, logger, env, googleAuthValidator, cfTurnstileValidator)
 
 	serverSettings := getServerSettingsFromEnv()
 	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
@@ -121,4 +129,36 @@ func createProdDynamoClient(ctx context.Context) (*dynamodb.Client, error) {
 		return nil, err
 	}
 	return dynamodb.NewFromConfig(cfg), nil
+}
+
+func getSecretFromAWS(ctx context.Context, secretName string) (string, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return "", fmt.Errorf("unable to load SDK config: %w", err)
+	}
+
+	client := secretsmanager.NewFromConfig(cfg)
+
+	result, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+		SecretId: aws.String(secretName),
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret %s: %w", secretName, err)
+	}
+
+	return *result.SecretString, nil
+}
+
+func getTurnstileSecretKey(ctx context.Context, env api.Environment) (string, error) {
+	if env == api.LOCAL {
+		// This is the test key to always have success
+		return "1x0000000000000000000000000000000AA", nil
+	}
+
+	secret, err := getSecretFromAWS(ctx, "cfTurnstileSecretKey")
+	if err != nil {
+		return "", fmt.Errorf("failed to get turnstile key from aws: %w", err)
+	}
+
+	return secret, nil
 }
