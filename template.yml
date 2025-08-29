@@ -42,8 +42,6 @@ Resources:
       PackageType: Image
       Architectures:
         - !Ref architecture
-      LoggingConfig:
-        LogRetentionInDays: 30
       Policies:
         - Statement:
           - Effect: Allow
@@ -73,4 +71,9 @@ Resources:
       DockerTag: v1
       DockerContext: .
       Dockerfile: Dockerfile
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ICAAEventRegistration}
+      RetentionInDays: 30 
 
