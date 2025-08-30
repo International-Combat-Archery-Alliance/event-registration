@@ -47,3 +47,34 @@ type Repository interface {
 	CreateEvent(ctx context.Context, event Event) error
 	UpdateEvent(ctx context.Context, event Event) error
 }
+
+func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event) (Event, error) {
+	existingEvent, err := repo.GetEvent(ctx, id)
+	if err != nil {
+		return Event{}, err
+	}
+
+	updatedEvent := Event{
+		ID:                    id,
+		Version:               existingEvent.Version + 1,
+		Name:                  event.Name,
+		StartTime:             event.StartTime,
+		EndTime:               event.EndTime,
+		EventLocation:         event.EventLocation,
+		RegistrationCloseTime: event.RegistrationCloseTime,
+		RegistrationOptions:   event.RegistrationOptions,
+		AllowedTeamSizeRange:  event.AllowedTeamSizeRange,
+		NumTeams:              existingEvent.NumTeams,
+		NumRosteredPlayers:    existingEvent.NumRosteredPlayers,
+		NumTotalPlayers:       existingEvent.NumTotalPlayers,
+		RulesDocLink:          event.RulesDocLink,
+		ImageName:             event.ImageName,
+	}
+
+	err = repo.UpdateEvent(ctx, updatedEvent)
+	if err != nil {
+		return Event{}, err
+	}
+
+	return updatedEvent, nil
+}
