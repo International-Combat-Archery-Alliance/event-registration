@@ -536,9 +536,9 @@ func (siw *ServerInterfaceWrapper) PatchEventsV1Id(w http.ResponseWriter, r *htt
 
 	ctx := r.Context()
 
-	ctx = context.WithValue(ctx, GoogleCookieAuthScopes, []string{})
+	ctx = context.WithValue(ctx, GoogleCookieAuthScopes, []string{"admin"})
 
-	ctx = context.WithValue(ctx, GoogleBearerAuthScopes, []string{})
+	ctx = context.WithValue(ctx, GoogleBearerAuthScopes, []string{"admin"})
 
 	r = r.WithContext(ctx)
 
@@ -1227,8 +1227,8 @@ var swaggerSpec = []string{
 	"sgxFBIKDkYa4H5vYuQaoAcmEU5BIT5hC7l7m2217anF9Q51wwa5WDlVZK1XYvb5y5AarQuHIWH1H1eOx",
 	"58JWe3ev8/Bhr+ic73Tm6+zttltfPMiV7/u/rXmu4MgfLfRjttBbAFkZKhmdr8VFUzPsdnQ7QxYxVgKh",
 	"haovhz32zIj3uFkN2c8rtxkxi5nljm7bz0F2W/NVsucZ+6dF8/TN38bwpVNiYopTJaOuY2pnXL42py7M",
-	"4e8hq77SrVFirfzU49yzZXqqzo+M/zoZv8jxUvI6Mpvq+KoC7iq35VaX0xdS0CSwVxRuE/ZwIsPcL5NJ",
-	"zBosIKRxJ2RIm7jaP5+IgISIwrSORLfZDM36RCjd3fV9v4nnN/P/BwAA//+5nnQcPzQAAA==",
+	"4e8hq77SrVFirfzU49yzZXqqzo+M/34KdQkHnESbOK1i4Whbwevg4UIKmgT2tsNtwh5OZJj7kTOJWYMF",
+	"hDTuhAxpE1db8RMRkBBRmNaR6DaboVmfCKW7u77vN/H8Zv7/AAAA///zb6XbijQAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

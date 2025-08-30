@@ -147,6 +147,9 @@ paths:
     patch:
       summary: Update an event
       description: Update an event by id
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
       parameters:
         - name: id
           in: path
