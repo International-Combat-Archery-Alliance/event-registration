@@ -258,3 +258,204 @@ func TestGetEventsId(t *testing.T) {
 		}
 	})
 }
+
+func TestPatchEventsV1Id(t *testing.T) {
+	t.Run("successful update", func(t *testing.T) {
+		eventID := uuid.New()
+		now := time.Now()
+
+		existingEvent := events.Event{
+			ID:                 eventID,
+			Version:            1,
+			Name:               "Original Event",
+			NumTeams:           5,
+			NumRosteredPlayers: 25,
+			NumTotalPlayers:    30,
+		}
+
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				assert.Equal(t, eventID, id)
+				return existingEvent, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event events.Event) error {
+				assert.Equal(t, eventID, event.ID)
+				assert.Equal(t, "Updated Event Name", event.Name)
+				return nil
+			},
+		}
+
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+
+		reqBody := Event{
+			Name:                  "Updated Event Name",
+			StartTime:             now,
+			EndTime:               now.Add(2 * time.Hour),
+			RegistrationCloseTime: now.Add(-time.Hour),
+			Location: Location{
+				Name: "New Venue",
+				Address: Address{
+					Street:     "456 New St",
+					City:       "New City",
+					State:      "NS",
+					PostalCode: "54321",
+					Country:    "USA",
+				},
+			},
+			RegistrationOptions: []EventRegistrationOption{
+				{RegistrationType: ByTeam, Price: Money{Amount: 10000, Currency: "USD"}},
+			},
+			AllowedTeamSizeRange: Range{Min: 2, Max: 6},
+			RulesDocLink:         ptr.String("https://example.com/new-rules"),
+			ImageName:            ptr.String("new-image.jpg"),
+		}
+
+		req := PatchEventsV1IdRequestObject{
+			Id:   eventID,
+			Body: &reqBody,
+		}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PatchEventsV1Id200JSONResponse:
+			assert.Equal(t, reqBody.Name, r.Event.Name)
+			assert.Equal(t, reqBody.StartTime, r.Event.StartTime)
+			assert.Equal(t, reqBody.EndTime, r.Event.EndTime)
+			assert.Equal(t, reqBody.RegistrationCloseTime, r.Event.RegistrationCloseTime)
+			assert.Equal(t, reqBody.Location, r.Event.Location)
+			assert.Equal(t, reqBody.RegistrationOptions, r.Event.RegistrationOptions)
+			assert.Equal(t, reqBody.AllowedTeamSizeRange, r.Event.AllowedTeamSizeRange)
+			assert.Equal(t, reqBody.RulesDocLink, r.Event.RulesDocLink)
+			assert.Equal(t, reqBody.ImageName, r.Event.ImageName)
+			assert.Equal(t, existingEvent.NumTotalPlayers, r.Event.SignUpStats.NumTotalPlayers)
+			assert.Equal(t, existingEvent.NumRosteredPlayers, r.Event.SignUpStats.NumRosteredPlayers)
+			assert.Equal(t, existingEvent.NumTeams, r.Event.SignUpStats.NumTeams)
+			// Version should be incremented
+			assert.Equal(t, 2, *r.Event.Version)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		eventID := uuid.New()
+		mock := &mockDB{}
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+
+		// Create invalid request body with invalid registration type
+		reqBody := Event{
+			Name: "Test Event",
+			RegistrationOptions: []EventRegistrationOption{
+				{RegistrationType: RegistrationType("INVALID"), Price: Money{Amount: 5000, Currency: "USD"}},
+			},
+			SignUpStats: &SignUpStats{
+				NumTeams:           0,
+				NumRosteredPlayers: 0,
+				NumTotalPlayers:    0,
+			},
+		}
+
+		req := PatchEventsV1IdRequestObject{
+			Id:   eventID,
+			Body: &reqBody,
+		}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PatchEventsV1Id400JSONResponse:
+			assert.Equal(t, InvalidBody, r.Code)
+			assert.Equal(t, "Invalid event body", r.Message)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("event not found", func(t *testing.T) {
+		eventID := uuid.New()
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
+			},
+		}
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+
+		reqBody := Event{
+			Name: "Test Event",
+			RegistrationOptions: []EventRegistrationOption{
+				{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}},
+			},
+			SignUpStats: &SignUpStats{
+				NumTeams:           0,
+				NumRosteredPlayers: 0,
+				NumTotalPlayers:    0,
+			},
+		}
+
+		req := PatchEventsV1IdRequestObject{
+			Id:   eventID,
+			Body: &reqBody,
+		}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PatchEventsV1Id404JSONResponse:
+			assert.Equal(t, NotFound, r.Code)
+			assert.Equal(t, "Event not found", r.Message)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("update event error", func(t *testing.T) {
+		eventID := uuid.New()
+		existingEvent := events.Event{
+			ID:      eventID,
+			Version: 1,
+			Name:    "Original Event",
+		}
+
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return existingEvent, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event events.Event) error {
+				return errors.New("database connection failed")
+			},
+		}
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+
+		reqBody := Event{
+			Name: "Updated Event",
+			RegistrationOptions: []EventRegistrationOption{
+				{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}},
+			},
+			SignUpStats: &SignUpStats{
+				NumTeams:           0,
+				NumRosteredPlayers: 0,
+				NumTotalPlayers:    0,
+			},
+		}
+
+		req := PatchEventsV1IdRequestObject{
+			Id:   eventID,
+			Body: &reqBody,
+		}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PatchEventsV1Id500JSONResponse:
+			assert.Equal(t, InternalError, r.Code)
+			assert.Equal(t, "Updating event failed", r.Message)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+}

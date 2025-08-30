@@ -148,6 +148,7 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 	// Need these for apiEventToEvent to work, they don't get used anyway though
 	request.Body.Id = &request.Id
 	request.Body.Version = ptr.Int(1)
+	request.Body.SignUpStats = &SignUpStats{}
 
 	event, err := apiEventToEvent(*request.Body)
 	if err != nil {
