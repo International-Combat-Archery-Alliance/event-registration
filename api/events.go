@@ -142,6 +142,57 @@ func (a *API) GetEventsV1Id(ctx context.Context, request GetEventsV1IdRequestObj
 	return GetEventsV1Id200JSONResponse{Event: respEvent}, nil
 }
 
+func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdRequestObject) (PatchEventsV1IdResponseObject, error) {
+	logger := a.getLoggerOrBaseLogger(ctx)
+
+	// Need these for apiEventToEvent to work, they don't get used anyway though
+	request.Body.Id = &request.Id
+	request.Body.Version = ptr.Int(1)
+	request.Body.SignUpStats = &SignUpStats{}
+
+	event, err := apiEventToEvent(*request.Body)
+	if err != nil {
+		return PatchEventsV1Id400JSONResponse{
+			Code:    InvalidBody,
+			Message: "Invalid event body",
+		}, nil
+	}
+	updatedEvent, err := events.UpdateEvent(ctx, a.db, request.Id, event)
+	if err != nil {
+		logger.Error("failed to update event", slog.String("error", err.Error()))
+
+		var eventErr *events.Error
+		if errors.As(err, &eventErr) {
+			switch eventErr.Reason {
+			case events.REASON_EVENT_DOES_NOT_EXIST:
+				return PatchEventsV1Id404JSONResponse{
+					Code:    NotFound,
+					Message: "Event not found",
+				}, nil
+			}
+		}
+
+		return PatchEventsV1Id500JSONResponse{
+			Code:    InternalError,
+			Message: "Updating event failed",
+		}, nil
+	}
+
+	apiUpdatedEvent, err := eventToApiEvent(updatedEvent)
+	if err != nil {
+		logger.Error("error when converting updating event back to api event", slog.String("error", err.Error()))
+
+		return PatchEventsV1Id500JSONResponse{
+			Code:    NotFound,
+			Message: "Updating event failed",
+		}, nil
+	}
+
+	return PatchEventsV1Id200JSONResponse{
+		Event: apiUpdatedEvent,
+	}, nil
+}
+
 func eventToApiEvent(event events.Event) (Event, error) {
 	regOptions := []EventRegistrationOption{}
 	for _, t := range event.RegistrationOptions {
