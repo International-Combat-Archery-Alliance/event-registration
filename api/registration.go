@@ -48,7 +48,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 			Message: "Invalid body",
 		}, nil
 	}
-	err = registration.AttemptRegistration(ctx, reg, a.db, a.db)
+	signedUpReg, event, err := registration.AttemptRegistration(ctx, reg, a.db, a.db)
 	if err != nil {
 		logger.Error("Error trying to register", "error", err)
 
@@ -80,7 +80,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 		}, nil
 	}
 
-	respReg, err := registrationToApiRegistration(reg)
+	respReg, err := registrationToApiRegistration(signedUpReg)
 	if err != nil {
 		logger.Error("Failed to convert registration to api registration", "error", err)
 
@@ -88,6 +88,15 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 			Code:    InternalError,
 			Message: "Failed to register",
 		}, nil
+	}
+
+	err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, "ICAA <info@icaa.world>", signedUpReg, event)
+	if err != nil {
+		logger.Error("failed to send email to signed up player", slog.String("error", err.Error()), slog.String("email", reg.GetEmail()))
+
+		// TODO: Is there other error handling we should do here?
+		// I don't want to send a failed status code to the user
+		// because they did actually sign up succesfully still...
 	}
 
 	return PostEventsV1EventIdRegister200JSONResponse{Registration: respReg}, nil

@@ -10,6 +10,7 @@ tool (
 require (
 	github.com/International-Combat-Archery-Alliance/auth v0.2.0
 	github.com/International-Combat-Archery-Alliance/captcha v0.1.0
+	github.com/International-Combat-Archery-Alliance/email v0.2.0
 	github.com/International-Combat-Archery-Alliance/middleware v0.1.3
 	github.com/Rhymond/go-money v1.0.15
 	github.com/aws/aws-sdk-go-v2 v1.38.3
@@ -29,7 +30,10 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.38.0
 )
 
-require github.com/testcontainers/testcontainers-go v0.38.0 // indirect
+require (
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.6 // indirect
+	github.com/testcontainers/testcontainers-go v0.38.0 // indirect
+)
 
 require (
 	cloud.google.com/go/auth v0.16.5 // indirect
@@ -47,6 +51,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.11.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.53.1
 	github.com/aws/aws-sdk-go-v2/service/sso v1.28.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.34.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.0 // indirect

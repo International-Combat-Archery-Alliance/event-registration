@@ -46,7 +46,7 @@ func TestAttemptRegistration(t *testing.T) {
 			EventID: uuid.New(),
 		}
 
-		err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
+		_, _, err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
 		assert.Error(t, err)
 		var registrationErr *Error
 		assert.True(t, errors.As(err, &registrationErr))
@@ -64,7 +64,7 @@ func TestAttemptRegistration(t *testing.T) {
 			EventID: uuid.New(),
 		}
 
-		err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
+		_, _, err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
 		assert.Error(t, err)
 		var registrationErr *Error
 		assert.True(t, errors.As(err, &registrationErr))
@@ -93,7 +93,7 @@ func TestAttemptRegistration(t *testing.T) {
 			EventID: eventID,
 		}
 
-		err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
+		_, _, err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
 		assert.NoError(t, err)
 	})
 
@@ -121,7 +121,7 @@ func TestAttemptRegistration(t *testing.T) {
 			Players: []PlayerInfo{{}},
 		}
 
-		err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
+		_, _, err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
 		assert.NoError(t, err)
 	})
 
@@ -141,7 +141,7 @@ func TestAttemptRegistration(t *testing.T) {
 			EventID: eventID,
 		}
 
-		err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
+		_, _, err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
 		assert.Error(t, err)
 		var registrationErr *Error
 		assert.True(t, errors.As(err, &registrationErr))
@@ -164,7 +164,7 @@ func TestAttemptRegistration(t *testing.T) {
 			EventID: eventID,
 		}
 
-		err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
+		_, _, err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
 		assert.Error(t, err)
 		var registrationErr *Error
 		assert.True(t, errors.As(err, &registrationErr))
@@ -189,7 +189,7 @@ func TestAttemptRegistration(t *testing.T) {
 			Players: []PlayerInfo{{}},
 		}
 
-		err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
+		_, _, err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
 		assert.Error(t, err)
 		var registrationErr *Error
 		assert.True(t, errors.As(err, &registrationErr))
@@ -211,12 +211,15 @@ func TestAttemptRegistration(t *testing.T) {
 			GetEventIDFunc: func() uuid.UUID {
 				return eventID
 			},
+			GetEmailFunc: func() string {
+				return "test@example.com"
+			},
 			TypeFunc: func() events.RegistrationType {
 				return 99
 			},
 		}
 
-		err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
+		_, _, err := AttemptRegistration(context.Background(), registrationRequest, eventRepo, registrationRepo)
 		assert.Error(t, err)
 		var registrationErr *Error
 		assert.True(t, errors.As(err, &registrationErr))
@@ -226,11 +229,16 @@ func TestAttemptRegistration(t *testing.T) {
 
 type mockRegistration struct {
 	GetEventIDFunc func() uuid.UUID
+	GetEmailFunc   func() string
 	TypeFunc       func() events.RegistrationType
 }
 
 func (m *mockRegistration) GetEventID() uuid.UUID {
 	return m.GetEventIDFunc()
+}
+
+func (m *mockRegistration) GetEmail() string {
+	return m.GetEmailFunc()
 }
 
 func (m *mockRegistration) Type() events.RegistrationType {

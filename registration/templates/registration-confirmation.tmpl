@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Confirmation - {{.Event.Name}}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #ff5722;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: center;
+        }
+        .header h1 {
+            color: #0a1c4a;
+            margin: 0;
+        }
+        .header-text {
+            margin-left: 25px;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .section h2 {
+            color: #0a1c4a;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .info-grid {
+            display: table;
+            width: 100%;
+            margin-top: 12px;
+        }
+        .info-row {
+            display: table-row;
+        }
+        .info-label {
+            display: table-cell;
+            font-weight: bold;
+            padding: 8px 15px 8px 0;
+            vertical-align: top;
+            width: 30%;
+        }
+        .info-value {
+            display: table-cell;
+            padding: 8px 0;
+            vertical-align: top;
+        }
+        .player-list {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .player {
+            padding: 5px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .player:last-child {
+            border-bottom: none;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        .logo {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://icaa.world/images/logos/ICAA%20Logo%20transparent.png" style="width: 100px; object-fit: contain;" />
+            <div class="header-text">
+                <h1>Registration Confirmed!</h1>
+                <p>Thank you for registering for an ICAA event</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Event Details</h2>
+
+            <div>
+                {{if .Event.ImageName}}
+                <div class="logo">
+                    <img src="https://icaa.world/images/logos/{{.Event.ImageName}}" style="width: 200px; object-fit: contain;" />
+                </div>
+                {{end}}
+
+                <div class="info-grid">
+                    <div class="info-row">
+                        <div class="info-label">Event Name:</div>
+                        <div class="info-value">{{.Event.Name}}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Date:</div>
+                        <div class="info-value">{{.Event.StartTime.Format "January 2, 2006"}}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Time:</div>
+                        <div class="info-value">{{.Event.StartTime.Format "3:04 PM"}} - {{.Event.EndTime.Format "3:04 PM"}}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Location:</div>
+                        <div class="info-value">
+                            {{.Event.EventLocation.Name}}<br>
+                            {{.Event.EventLocation.LocAddress.Street}}<br>
+                            {{.Event.EventLocation.LocAddress.City}}, {{.Event.EventLocation.LocAddress.State}} {{.Event.EventLocation.LocAddress.PostalCode}}
+                            {{if .Event.EventLocation.LocAddress.Country}}<br>{{.Event.EventLocation.LocAddress.Country}}{{end}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Registration Details</h2>
+            <div class="info-grid">
+                <div class="info-row">
+                    <div class="info-label">Registration Type:</div>
+                    <div class="info-value">
+                        {{if eq .Registration.Type 0}}Individual Registration{{else}}Team Registration{{end}}
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Home City:</div>
+                    <div class="info-value">{{.Registration.HomeCity}}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Contact Email:</div>
+                    <div class="info-value">{{.Registration.GetEmail}}</div>
+                </div>
+            </div>
+
+            {{if eq .Registration.Type 0}}
+            <!-- Individual Registration Details -->
+            <div class="info-grid">
+                <div class="info-row">
+                    <div class="info-label">Player Name:</div>
+                    <div class="info-value">{{.Registration.PlayerInfo.FirstName}} {{.Registration.PlayerInfo.LastName}}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Experience Level:</div>
+                    <div class="info-value">{{.Registration.Experience}}</div>
+                </div>
+            </div>
+            {{else}}
+            <!-- Team Registration Details -->
+            <div class="info-grid">
+                <div class="info-row">
+                    <div class="info-label">Team Name:</div>
+                    <div class="info-value">{{.Registration.TeamName}}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Team Size:</div>
+                    <div class="info-value">{{len .Registration.Players}} players</div>
+                </div>
+            </div>
+
+            <h3>Team Roster</h3>
+            <div class="player-list">
+                {{range $index, $player := .Registration.Players}}
+                <div class="player">
+                    <strong>{{add $index 1}}.</strong>{{if eq $index 0}} <strong>[Captain]</strong>{{end}} {{$player.FirstName}} {{$player.LastName}}
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+
+        {{if .Event.RulesDocLink}}
+        <div class="section">
+            <h2>Important Information</h2>
+            <p>Please review the event rules and guidelines:</p>
+            <ul>
+                <li><a href="{{.Event.RulesDocLink}}">Event Rules Document</a></li>
+                <li><a href="https://docs.google.com/document/d/e/2PACX-1vTVdQN1TKuKVl7-kmhAAf8ZbHB90Sn3jhUUJovUBioi-H6lcqvkhKiMahgwYipgv0hBEl93ixTMQtFt/pub">Official ICAA Rules</a></li>
+            </ul>
+        </div>
+        {{end}}
+
+        <div class="section">
+            <h2>What's Next?</h2>
+            <ul>
+                <li>Mark your calendar for {{.Event.StartTime.Format "January 2, 2006"}}</li>
+                <li>Prepare your equipment and review the rules</li>
+                <li>We'll send additional event information closer to the date</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>Questions? Either reply to this email or contact the ICAA at <a href="mailto:info@icaa.world">info@icaa.world</a>.</p>
+            <p>We look forward to seeing you at the event!</p>
+        </div>
+    </div>
+</body>
+</html>
