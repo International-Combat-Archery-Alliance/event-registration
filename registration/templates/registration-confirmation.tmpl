@@ -26,7 +26,6 @@
             padding-bottom: 20px;
             margin-bottom: 30px;
             display: flex;
-            gap: 12px;
             justify-content: center;
         }
         .header h1 {
@@ -37,6 +36,7 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
+            margin-left: 12px;
         }
         .section {
             margin-bottom: 25px;
@@ -46,13 +46,10 @@
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
         }
-        .event-info {
-            display: flex;
-            gap: 24px;
-        }
         .info-grid {
             display: table;
             width: 100%;
+            margin-top: 12px;
         }
         .info-row {
             display: table-row;
@@ -62,7 +59,7 @@
             font-weight: bold;
             padding: 8px 15px 8px 0;
             vertical-align: top;
-            width: 40%;
+            width: 30%;
         }
         .info-value {
             display: table-cell;
@@ -99,8 +96,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <img src="https://icaa.world/images/logos/ICAA Logo transparent.png" style="width: 100px;" />
-            <div>
+            <img src="https://icaa.world/images/logos/ICAA%20Logo%20transparent.png" style="width: 100px; object-fit: contain;" />
+            <div class="header-text">
                 <h1>Registration Confirmed!</h1>
                 <p>Thank you for registering for an ICAA event</p>
             </div>
@@ -109,7 +106,6 @@
         <div class="section">
             <h2>Event Details</h2>
 
-            <div class="event-info">
                 {{if .Event.ImageName}}
                 <div class="logo">
                     <img src="https://icaa.world/images/logos/{{.Event.ImageName}}" style="width: 200px; object-fit: contain;" />
@@ -139,7 +135,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
         </div>
 
         <div class="section">
