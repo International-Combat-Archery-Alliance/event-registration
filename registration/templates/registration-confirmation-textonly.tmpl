@@ -19,7 +19,6 @@ REGISTRATION DETAILS
 ====================
 
 Registration Type:    {{if eq .Registration.Type 0}}Individual Registration{{else}}Team Registration{{end}}
-Registered At:        {{.Registration.RegisteredAt.Format "January 2, 2006 at 3:04 PM"}}
 Home City:           {{.Registration.HomeCity}}
 Contact Email:       {{.Registration.GetEmail}}
 

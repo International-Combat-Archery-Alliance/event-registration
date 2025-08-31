@@ -33,10 +33,7 @@
             margin: 0;
         }
         .header-text {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            margin-left: 12px;
+            margin-left: 25px;
         }
         .section {
             margin-bottom: 25px;
@@ -106,6 +103,7 @@
         <div class="section">
             <h2>Event Details</h2>
 
+            <div>
                 {{if .Event.ImageName}}
                 <div class="logo">
                     <img src="https://icaa.world/images/logos/{{.Event.ImageName}}" style="width: 200px; object-fit: contain;" />
@@ -135,6 +133,7 @@
                         </div>
                     </div>
                 </div>
+            </div>
         </div>
 
         <div class="section">
@@ -145,10 +144,6 @@
                     <div class="info-value">
                         {{if eq .Registration.Type 0}}Individual Registration{{else}}Team Registration{{end}}
                     </div>
-                </div>
-                <div class="info-row">
-                    <div class="info-label">Registered At:</div>
-                    <div class="info-value">{{.Registration.RegisteredAt.Format "January 2, 2006 at 3:04 PM"}}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">Home City:</div>

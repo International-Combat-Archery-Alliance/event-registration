@@ -90,7 +90,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 		}, nil
 	}
 
-	err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, "info@icaa.world", signedUpReg, event)
+	err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, "ICAA <info@icaa.world>", signedUpReg, event)
 	if err != nil {
 		logger.Error("failed to send email to signed up player", slog.String("error", err.Error()), slog.String("email", reg.GetEmail()))
 
