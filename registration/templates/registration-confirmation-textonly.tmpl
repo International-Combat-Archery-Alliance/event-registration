@@ -1,0 +1,62 @@
+===============================================================================
+                    ICAA - INTERNATIONAL COMBAT ARCHERY ALLIANCE
+                           REGISTRATION CONFIRMED!
+                    Thank you for registering for an ICAA event
+===============================================================================
+
+EVENT DETAILS
+=============
+
+Event Name:    {{.Event.Name}}
+Date:          {{.Event.StartTime.Format "January 2, 2006"}}
+Time:          {{.Event.StartTime.Format "3:04 PM"}} - {{.Event.EndTime.Format "3:04 PM"}}
+Location:      {{.Event.EventLocation.Name}}
+               {{.Event.EventLocation.LocAddress.Street}}
+               {{.Event.EventLocation.LocAddress.City}}, {{.Event.EventLocation.LocAddress.State}} {{.Event.EventLocation.LocAddress.PostalCode}}
+               {{if .Event.EventLocation.LocAddress.Country}}{{.Event.EventLocation.LocAddress.Country}}{{end}}
+
+REGISTRATION DETAILS
+====================
+
+Registration Type:    {{if eq .Registration.Type 0}}Individual Registration{{else}}Team Registration{{end}}
+Registered At:        {{.Registration.RegisteredAt.Format "January 2, 2006 at 3:04 PM"}}
+Home City:           {{.Registration.HomeCity}}
+Contact Email:       {{.Registration.GetEmail}}
+
+{{if eq .Registration.Type 0}}
+Player Name:         {{.Registration.PlayerInfo.FirstName}} {{.Registration.PlayerInfo.LastName}}
+Experience Level:    {{.Registration.Experience}}
+{{else}}
+Team Name:           {{.Registration.TeamName}}
+Team Size:           {{len .Registration.Players}} players
+
+TEAM ROSTER
+-----------
+{{range $index, $player := .Registration.Players}}
+{{add $index 1}}.{{if eq $index 0}} [CAPTAIN]{{end}} {{$player.FirstName}} {{$player.LastName}}
+{{end}}
+{{end}}
+
+{{if .Event.RulesDocLink}}
+IMPORTANT INFORMATION
+=====================
+
+Please review the event rules and guidelines:
+• Event Rules Document: {{.Event.RulesDocLink}}
+• Official ICAA Rules: https://docs.google.com/document/d/e/2PACX-1vTVdQN1TKuKVl7-kmhAAf8ZbHB90Sn3jhUUJovUBioi-H6lcqvkhKiMahgwYipgv0hBEl93ixTMQtFt/pub
+
+{{end}}
+WHAT'S NEXT?
+============
+
+• Mark your calendar for {{.Event.StartTime.Format "January 2, 2006"}}
+• Prepare your equipment and review the rules
+• We'll send additional event information closer to the date
+
+===============================================================================
+
+Questions? Either reply to this email or contact the ICAA at info@icaa.world.
+
+We look forward to seeing you at the event!
+
+===============================================================================

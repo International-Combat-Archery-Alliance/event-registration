@@ -46,7 +46,13 @@ func main() {
 	}
 	cfTurnstileValidator := cfturnstile.NewValidator(http.DefaultClient, cfSecretKey)
 
-	eventAPI := api.NewAPI(db, logger, env, googleAuthValidator, cfTurnstileValidator)
+	emailSender, err := createEmailSender(ctx, logger, env)
+	if err != nil {
+		logger.Error("failed to create email sender", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	eventAPI := api.NewAPI(db, logger, env, googleAuthValidator, cfTurnstileValidator, emailSender)
 
 	serverSettings := getServerSettingsFromEnv()
 	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)

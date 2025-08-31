@@ -10,6 +10,7 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/auth"
 	"github.com/International-Combat-Archery-Alliance/captcha"
+	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
@@ -34,6 +35,7 @@ type API struct {
 
 	authValidator    auth.Validator
 	captchaValidator captcha.Validator
+	emailSender      email.Sender
 }
 
 var _ StrictServerInterface = (*API)(nil)
@@ -44,6 +46,7 @@ func NewAPI(
 	env Environment,
 	authValidator auth.Validator,
 	captchaValidator captcha.Validator,
+	emailSender email.Sender,
 ) *API {
 	return &API{
 		db:               db,
@@ -51,6 +54,7 @@ func NewAPI(
 		env:              env,
 		authValidator:    authValidator,
 		captchaValidator: captchaValidator,
+		emailSender:      emailSender,
 	}
 }
 

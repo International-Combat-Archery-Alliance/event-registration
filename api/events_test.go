@@ -9,6 +9,7 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/auth"
 	"github.com/International-Combat-Archery-Alliance/captcha"
+	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
@@ -48,6 +49,12 @@ func (m *mockCaptchaValidator) Validate(ctx context.Context, token string, remot
 		return m.ValidateFunc(ctx, token, remoteIP)
 	}
 	return &mockCaptchaValidatedData{}, nil
+}
+
+type mockEmailSender struct{}
+
+func (m *mockEmailSender) SendEmail(ctx context.Context, e email.Email) error {
+	return nil
 }
 
 func ctxWithLogger(ctx context.Context, logger *slog.Logger) context.Context {
@@ -110,7 +117,7 @@ func TestGetEvents(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
 
 		req := GetEventsV1RequestObject{
 			Params: GetEventsV1Params{
@@ -150,7 +157,7 @@ func TestPostEvents(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -190,7 +197,7 @@ func TestGetEventsId(t *testing.T) {
 				return expectedEvent, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -217,7 +224,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -241,7 +248,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -285,7 +292,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
 
 		reqBody := Event{
 			Name:                  "Updated Event Name",
@@ -342,7 +349,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 	t.Run("invalid request body", func(t *testing.T) {
 		eventID := uuid.New()
 		mock := &mockDB{}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
 
 		// Create invalid request body with invalid registration type
 		reqBody := Event{
@@ -381,7 +388,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
 
 		reqBody := Event{
 			Name: "Test Event",
@@ -428,7 +435,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 				return errors.New("database connection failed")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
 
 		reqBody := Event{
 			Name: "Updated Event",
