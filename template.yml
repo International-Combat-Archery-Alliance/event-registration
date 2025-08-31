@@ -60,6 +60,11 @@ Resources:
               - ssm:GetParameter
             Resource: 
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cfTurnstileSecretKey"
+          - Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+            Resource: "*"
       Events:
         APIEvent:
           Type: HttpApi
