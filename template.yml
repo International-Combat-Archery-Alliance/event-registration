@@ -57,9 +57,9 @@ Resources:
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/event-registration/index/*"
           - Effect: Allow
             Action:
-              - secretsmanager:GetSecretValue
+              - ssm:GetParameter
             Resource: 
-              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:cfTurnstileSecretKey*"
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cfTurnstileSecretKey"
       Events:
         APIEvent:
           Type: HttpApi

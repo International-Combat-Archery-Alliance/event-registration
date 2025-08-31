@@ -16,7 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 )
 
 func main() {
@@ -131,22 +131,23 @@ func createProdDynamoClient(ctx context.Context) (*dynamodb.Client, error) {
 	return dynamodb.NewFromConfig(cfg), nil
 }
 
-func getSecretFromAWS(ctx context.Context, secretName string) (string, error) {
+func getParameterFromAWS(ctx context.Context, parameterName string) (string, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return "", fmt.Errorf("unable to load SDK config: %w", err)
 	}
 
-	client := secretsmanager.NewFromConfig(cfg)
+	client := ssm.NewFromConfig(cfg)
 
-	result, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(secretName),
+	result, err := client.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           aws.String(parameterName),
+		WithDecryption: aws.Bool(true),
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to get secret %s: %w", secretName, err)
+		return "", fmt.Errorf("failed to get parameter %s: %w", parameterName, err)
 	}
 
-	return *result.SecretString, nil
+	return *result.Parameter.Value, nil
 }
 
 func getTurnstileSecretKey(ctx context.Context, env api.Environment) (string, error) {
@@ -155,10 +156,10 @@ func getTurnstileSecretKey(ctx context.Context, env api.Environment) (string, er
 		return "1x0000000000000000000000000000000AA", nil
 	}
 
-	secret, err := getSecretFromAWS(ctx, "cfTurnstileSecretKey")
+	parameter, err := getParameterFromAWS(ctx, "/cfTurnstileSecretKey")
 	if err != nil {
 		return "", fmt.Errorf("failed to get turnstile key from aws: %w", err)
 	}
 
-	return secret, nil
+	return parameter, nil
 }
