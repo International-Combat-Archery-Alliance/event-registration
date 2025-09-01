@@ -169,3 +169,12 @@ func getTurnstileSecretKey(ctx context.Context, env api.Environment) (string, er
 
 	return parameter, nil
 }
+
+func getGoogleServiceAccountJSON(ctx context.Context) ([]byte, error) {
+	parameter, err := getParameterFromAWS(ctx, "/googleServiceAccount")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get google service account from aws: %w", err)
+	}
+
+	return []byte(parameter), nil
+}
