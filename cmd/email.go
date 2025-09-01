@@ -7,6 +7,7 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/email/awsses"
+	"github.com/International-Combat-Archery-Alliance/email/gmail"
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
@@ -26,7 +27,7 @@ func (el *EmailLogger) SendEmail(ctx context.Context, e email.Email) error {
 	return nil
 }
 
-func createProdEmailSender(ctx context.Context) (*awsses.AWSSESSender, error) {
+func createProdAWSEmailSender(ctx context.Context) (*awsses.AWSSESSender, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get aws config: %w", err)
@@ -38,10 +39,19 @@ func createProdEmailSender(ctx context.Context) (*awsses.AWSSESSender, error) {
 	return sender, nil
 }
 
+func createProdGmailEmailSender(ctx context.Context) (*gmail.GmailSender, error) {
+	creds, err := getGoogleServiceAccountJSON(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return gmail.NewGmailSender(ctx, creds, "andrew.mellen@icaa.world")
+}
+
 func createEmailSender(ctx context.Context, logger *slog.Logger, env api.Environment) (email.Sender, error) {
 	if env == api.LOCAL {
 		return &EmailLogger{logger: logger}, nil
 	}
 
-	return createProdEmailSender(ctx)
+	return createProdGmailEmailSender(ctx)
 }

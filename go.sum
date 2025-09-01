@@ -14,8 +14,8 @@ github.com/International-Combat-Archery-Alliance/auth v0.2.0 h1:POMQNgpjfagAaXFp
 github.com/International-Combat-Archery-Alliance/auth v0.2.0/go.mod h1:ST1Eo++OlUwQck4VgIGgDHd7rgAvHokyu/R18YsKUu8=
 github.com/International-Combat-Archery-Alliance/captcha v0.1.0 h1:QAXrGpm8XulV2biJZSMPLhHBi17E0/XtR/1sktKGnk4=
 github.com/International-Combat-Archery-Alliance/captcha v0.1.0/go.mod h1:a7DP91/hhCXZLiFdRdgNkz6+qpGwY6dflL9dBEqEN1M=
-github.com/International-Combat-Archery-Alliance/email v0.2.0 h1:8RJ9wHpbidj6nUcKWDlQ9eVG6Mc882mA/5DBd5/WJew=
-github.com/International-Combat-Archery-Alliance/email v0.2.0/go.mod h1:rPhnc2gzUsFP4w/xD65beNCLDyCGjhJH95u6lpuccK4=
+github.com/International-Combat-Archery-Alliance/email v0.3.0 h1:ujoGCEDuWEZJXiowyqWgQBVgkebtdhY5E4s6RW23xXY=
+github.com/International-Combat-Archery-Alliance/email v0.3.0/go.mod h1:ifXveqJSE9HcX8rHFt27xuHDduwlbtxkk1p7CDHnjBg=
 github.com/International-Combat-Archery-Alliance/middleware v0.1.3 h1:juzfVNRzcIa/OSBcQtkKeJbsVK5bh4QATu2LmW9OQdw=
 github.com/International-Combat-Archery-Alliance/middleware v0.1.3/go.mod h1:csjAv9ghHwQqpsfkDrpmPLz55USVBlphOnoXGBDirJ8=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

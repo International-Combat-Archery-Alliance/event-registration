@@ -10,7 +10,7 @@ tool (
 require (
 	github.com/International-Combat-Archery-Alliance/auth v0.2.0
 	github.com/International-Combat-Archery-Alliance/captcha v0.1.0
-	github.com/International-Combat-Archery-Alliance/email v0.2.0
+	github.com/International-Combat-Archery-Alliance/email v0.3.0
 	github.com/International-Combat-Archery-Alliance/middleware v0.1.3
 	github.com/Rhymond/go-money v1.0.15
 	github.com/aws/aws-sdk-go-v2 v1.38.3
