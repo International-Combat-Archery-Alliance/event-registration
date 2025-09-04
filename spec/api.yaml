@@ -375,6 +375,10 @@ components:
           example: ICAA Cup 2025
         location:
           $ref: '#/components/schemas/Location'
+        timeZone:
+          type: string
+          description: Time zone of the event. Defaults to UTC if not set.
+          example: America/New_York
         startTime:
           type: string
           format: date-time

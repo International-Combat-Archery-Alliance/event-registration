@@ -28,6 +28,7 @@ type eventDynamo struct {
 	Version               int
 	Name                  string
 	EventLocation         events.Location
+	TimeZone              *string
 	StartTime             time.Time
 	EndTime               time.Time
 	RegistrationCloseTime time.Time
@@ -59,39 +60,61 @@ func eventSK(id uuid.UUID) string {
 }
 
 func newEventDynamo(event events.Event) eventDynamo {
+	var timeZoneStr *string
+	if event.TimeZone != nil {
+		tzStr := event.TimeZone.String()
+		timeZoneStr = &tzStr
+	}
+
 	return eventDynamo{
-		PK:                    eventPK(event.ID),
-		SK:                    eventSK(event.ID),
-		GSI1PK:                eventEntityName,
-		GSI1SK:                fmt.Sprintf("%s#%s#%s", eventEntityName, event.StartTime, event.ID),
-		ID:                    event.ID.String(),
-		Version:               event.Version,
-		Name:                  event.Name,
-		EventLocation:         event.EventLocation,
-		StartTime:             event.StartTime,
-		EndTime:               event.EndTime,
-		RegistrationCloseTime: event.RegistrationCloseTime,
+		PK:            eventPK(event.ID),
+		SK:            eventSK(event.ID),
+		GSI1PK:        eventEntityName,
+		GSI1SK:        fmt.Sprintf("%s#%s#%s", eventEntityName, event.StartTime, event.ID),
+		ID:            event.ID.String(),
+		Version:       event.Version,
+		Name:          event.Name,
+		EventLocation: event.EventLocation,
+		TimeZone:      timeZoneStr,
+		// Store timestamps in the db as UTC
+		StartTime:             event.StartTime.UTC(),
+		EndTime:               event.EndTime.UTC(),
+		RegistrationCloseTime: event.RegistrationCloseTime.UTC(),
 		RegistrationOptions: slices.Map(event.RegistrationOptions, func(o events.EventRegistrationOption) eventRegistrationOptionDynamo {
 			return eventRegOptionToDynamo(o)
 		}),
 		AllowedTeamSizeRange: event.AllowedTeamSizeRange,
-		NumTotalPlayers:      event.NumTotalPlayers,
-		NumRosteredPlayers:   event.NumRosteredPlayers,
 		NumTeams:             event.NumTeams,
+		NumRosteredPlayers:   event.NumRosteredPlayers,
+		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
 	}
 }
 
 func eventFromEventDynamo(event eventDynamo) events.Event {
+	var timeZone *time.Location
+	if event.TimeZone != nil {
+		var err error
+		timeZone, err = time.LoadLocation(*event.TimeZone)
+		if err != nil {
+			// Fallback to UTC if timezone is invalid
+			timeZone = time.UTC
+		}
+	} else {
+		timeZone = time.UTC
+	}
+
 	return events.Event{
-		ID:                    uuid.MustParse(event.ID),
-		Version:               event.Version,
-		Name:                  event.Name,
-		EventLocation:         event.EventLocation,
-		StartTime:             event.StartTime,
-		EndTime:               event.EndTime,
-		RegistrationCloseTime: event.RegistrationCloseTime,
+		ID:            uuid.MustParse(event.ID),
+		Version:       event.Version,
+		Name:          event.Name,
+		EventLocation: event.EventLocation,
+		TimeZone:      timeZone,
+		// All timestamps set in the timezone
+		StartTime:             event.StartTime.In(timeZone),
+		EndTime:               event.EndTime.In(timeZone),
+		RegistrationCloseTime: event.RegistrationCloseTime.In(timeZone),
 		RegistrationOptions: slices.Map(event.RegistrationOptions, func(o eventRegistrationOptionDynamo) events.EventRegistrationOption {
 			return dynamoEventRegOptionToEventRegOption(o)
 		}),

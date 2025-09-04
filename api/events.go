@@ -152,6 +152,7 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 
 	event, err := apiEventToEvent(*request.Body)
 	if err != nil {
+		logger.Error("Invalid event body", slog.String("error", err.Error()))
 		return PatchEventsV1Id400JSONResponse{
 			Code:    InvalidBody,
 			Message: "Invalid event body",
@@ -208,6 +209,7 @@ func eventToApiEvent(event events.Event) (Event, error) {
 		Version:               &event.Version,
 		Name:                  event.Name,
 		Location:              locationToApiLocation(event.EventLocation),
+		TimeZone:              ptr.String(event.TimeZone.String()),
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
@@ -236,11 +238,21 @@ func apiEventToEvent(event Event) (events.Event, error) {
 		regOptions = append(regOptions, convT)
 	}
 
+	timezone := time.UTC
+	if event.TimeZone != nil {
+		var err error
+		timezone, err = time.LoadLocation(*event.TimeZone)
+		if err != nil {
+			return events.Event{}, fmt.Errorf("invalid timezone %q: %w", *event.TimeZone, err)
+		}
+	}
+
 	return events.Event{
 		ID:                    *event.Id,
 		Version:               *event.Version,
 		Name:                  event.Name,
 		EventLocation:         apiLocationToLocation(event.Location),
+		TimeZone:              timezone,
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
 		RegistrationCloseTime: event.RegistrationCloseTime,
