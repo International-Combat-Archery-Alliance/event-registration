@@ -152,6 +152,7 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 
 	event, err := apiEventToEvent(*request.Body)
 	if err != nil {
+		logger.Error("Invalid event body", slog.String("error", err.Error()))
 		return PatchEventsV1Id400JSONResponse{
 			Code:    InvalidBody,
 			Message: "Invalid event body",

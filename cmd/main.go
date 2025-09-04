@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	_ "time/tzdata" // Embeds timezone data
 
 	"github.com/International-Combat-Archery-Alliance/auth/google"
 	"github.com/International-Combat-Archery-Alliance/captcha/cfturnstile"
