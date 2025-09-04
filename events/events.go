@@ -13,6 +13,7 @@ type Event struct {
 	Version               int
 	Name                  string
 	EventLocation         Location
+	TimeZone              *time.Location
 	StartTime             time.Time
 	EndTime               time.Time
 	RegistrationCloseTime time.Time
@@ -60,6 +61,7 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		Name:                  event.Name,
 		StartTime:             event.StartTime,
 		EndTime:               event.EndTime,
+		TimeZone:              event.TimeZone,
 		EventLocation:         event.EventLocation,
 		RegistrationCloseTime: event.RegistrationCloseTime,
 		RegistrationOptions:   event.RegistrationOptions,
