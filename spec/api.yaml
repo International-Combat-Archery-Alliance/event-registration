@@ -377,7 +377,7 @@ components:
           $ref: '#/components/schemas/Location'
         timeZone:
           type: string
-          Description: Time zone of the event. Defaults to UTC if not set.
+          description: Time zone of the event. Defaults to UTC if not set.
           example: America/New_York
         startTime:
           type: string

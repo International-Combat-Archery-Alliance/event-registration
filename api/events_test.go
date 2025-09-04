@@ -98,10 +98,12 @@ func TestGetEvents(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		id := uuid.New()
 		now := time.Now()
+		tz, _ := time.LoadLocation("America/New_York")
 		expectedEvents := []events.Event{
 			{
 				ID:                    id,
 				Name:                  "Test Event",
+				TimeZone:              tz,
 				StartTime:             now,
 				EndTime:               now.Add(time.Hour),
 				RegistrationCloseTime: now,
@@ -133,6 +135,7 @@ func TestGetEvents(t *testing.T) {
 			assert.Equal(t, len(expectedEvents), len(r.Data))
 			assert.Equal(t, &expectedEvents[0].ID, r.Data[0].Id)
 			assert.Equal(t, expectedEvents[0].Name, r.Data[0].Name)
+			assert.Equal(t, ptr.String("America/New_York"), r.Data[0].TimeZone)
 			assert.Equal(t, []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}}, r.Data[0].RegistrationOptions)
 			assert.Equal(t, expectedEvents[0].RulesDocLink, r.Data[0].RulesDocLink)
 		default:
@@ -146,6 +149,7 @@ func TestPostEvents(t *testing.T) {
 		now := time.Now()
 		reqBody := PostEventsV1JSONRequestBody{
 			Name:                  "Test Event",
+			TimeZone:              ptr.String("America/New_York"),
 			StartTime:             now,
 			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
@@ -170,6 +174,7 @@ func TestPostEvents(t *testing.T) {
 		case PostEventsV1200JSONResponse:
 			assert.NotNil(t, r.Id)
 			assert.Equal(t, reqBody.Name, r.Name)
+			assert.Equal(t, reqBody.TimeZone, r.TimeZone)
 			assert.Equal(t, reqBody.RegistrationOptions, r.RegistrationOptions)
 			assert.Equal(t, reqBody.RulesDocLink, r.RulesDocLink)
 		default:
@@ -182,9 +187,11 @@ func TestGetEventsId(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		id := uuid.New()
 		now := time.Now()
+		tz, _ := time.LoadLocation("Europe/London")
 		expectedEvent := events.Event{
 			ID:                    id,
 			Name:                  "Test Event",
+			TimeZone:              tz,
 			StartTime:             now,
 			EndTime:               now.Add(time.Hour),
 			RegistrationCloseTime: now,
@@ -210,6 +217,7 @@ func TestGetEventsId(t *testing.T) {
 		case GetEventsV1Id200JSONResponse:
 			assert.Equal(t, &expectedEvent.ID, r.Event.Id)
 			assert.Equal(t, expectedEvent.Name, r.Event.Name)
+			assert.Equal(t, ptr.String("Europe/London"), r.Event.TimeZone)
 			assert.Equal(t, []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}}, r.Event.RegistrationOptions)
 			assert.Equal(t, expectedEvent.RulesDocLink, r.Event.RulesDocLink)
 		default:
@@ -296,6 +304,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 
 		reqBody := Event{
 			Name:                  "Updated Event Name",
+			TimeZone:              ptr.String("America/Los_Angeles"),
 			StartTime:             now,
 			EndTime:               now.Add(2 * time.Hour),
 			RegistrationCloseTime: now.Add(-time.Hour),
@@ -328,6 +337,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 		switch r := resp.(type) {
 		case PatchEventsV1Id200JSONResponse:
 			assert.Equal(t, reqBody.Name, r.Event.Name)
+			assert.Equal(t, reqBody.TimeZone, r.Event.TimeZone)
 			assert.Equal(t, reqBody.StartTime, r.Event.StartTime)
 			assert.Equal(t, reqBody.EndTime, r.Event.EndTime)
 			assert.Equal(t, reqBody.RegistrationCloseTime, r.Event.RegistrationCloseTime)
@@ -461,6 +471,208 @@ func TestPatchEventsV1Id(t *testing.T) {
 		case PatchEventsV1Id500JSONResponse:
 			assert.Equal(t, InternalError, r.Code)
 			assert.Equal(t, "Updating event failed", r.Message)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+}
+
+func TestTimeZoneHandling(t *testing.T) {
+	t.Run("create event with valid timezone", func(t *testing.T) {
+		now := time.Now()
+		reqBody := PostEventsV1JSONRequestBody{
+			Name:                  "Timezone Test Event",
+			TimeZone:              ptr.String("America/New_York"),
+			StartTime:             now,
+			EndTime:               now.Add(time.Hour),
+			RegistrationCloseTime: now,
+			RegistrationOptions:   []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}},
+		}
+		mock := &mockDB{
+			CreateEventFunc: func(ctx context.Context, event events.Event) error {
+				assert.Equal(t, "America/New_York", event.TimeZone.String())
+				return nil
+			},
+		}
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+
+		req := PostEventsV1RequestObject{
+			Body: &reqBody,
+		}
+
+		resp, err := api.PostEventsV1(ctxWithLogger(context.Background(), noopLogger), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PostEventsV1200JSONResponse:
+			assert.Equal(t, ptr.String("America/New_York"), r.TimeZone)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("create event with invalid timezone", func(t *testing.T) {
+		now := time.Now()
+		reqBody := PostEventsV1JSONRequestBody{
+			Name:                  "Invalid Timezone Event",
+			TimeZone:              ptr.String("Invalid/Timezone"),
+			StartTime:             now,
+			EndTime:               now.Add(time.Hour),
+			RegistrationCloseTime: now,
+			RegistrationOptions:   []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}},
+		}
+		mock := &mockDB{}
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+
+		req := PostEventsV1RequestObject{
+			Body: &reqBody,
+		}
+
+		resp, err := api.PostEventsV1(ctxWithLogger(context.Background(), noopLogger), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PostEventsV1400JSONResponse:
+			assert.Equal(t, InvalidBody, r.Code)
+			assert.Equal(t, "Failed to create the event", r.Message)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("create event without timezone defaults to UTC", func(t *testing.T) {
+		now := time.Now()
+		reqBody := PostEventsV1JSONRequestBody{
+			Name:                  "No Timezone Event",
+			StartTime:             now,
+			EndTime:               now.Add(time.Hour),
+			RegistrationCloseTime: now,
+			RegistrationOptions:   []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}},
+		}
+		mock := &mockDB{
+			CreateEventFunc: func(ctx context.Context, event events.Event) error {
+				assert.Equal(t, time.UTC, event.TimeZone)
+				return nil
+			},
+		}
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+
+		req := PostEventsV1RequestObject{
+			Body: &reqBody,
+		}
+
+		resp, err := api.PostEventsV1(ctxWithLogger(context.Background(), noopLogger), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PostEventsV1200JSONResponse:
+			assert.Nil(t, r.TimeZone)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("update event timezone", func(t *testing.T) {
+		eventID := uuid.New()
+		now := time.Now()
+		existingEvent := events.Event{
+			ID:       eventID,
+			Version:  1,
+			Name:     "Original Event",
+			TimeZone: time.UTC,
+		}
+
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				assert.Equal(t, eventID, id)
+				return existingEvent, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event events.Event) error {
+				assert.Equal(t, eventID, event.ID)
+				assert.Equal(t, "Pacific/Auckland", event.TimeZone.String())
+				return nil
+			},
+		}
+
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+
+		reqBody := Event{
+			Name:                  "Updated Event",
+			TimeZone:              ptr.String("Pacific/Auckland"),
+			StartTime:             now,
+			EndTime:               now.Add(2 * time.Hour),
+			RegistrationCloseTime: now.Add(-time.Hour),
+			RegistrationOptions: []EventRegistrationOption{
+				{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}},
+			},
+			SignUpStats: &SignUpStats{
+				NumTeams:           0,
+				NumRosteredPlayers: 0,
+				NumTotalPlayers:    0,
+			},
+		}
+
+		req := PatchEventsV1IdRequestObject{
+			Id:   eventID,
+			Body: &reqBody,
+		}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PatchEventsV1Id200JSONResponse:
+			assert.Equal(t, ptr.String("Pacific/Auckland"), r.Event.TimeZone)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("update event with invalid timezone", func(t *testing.T) {
+		eventID := uuid.New()
+		now := time.Now()
+		existingEvent := events.Event{
+			ID:      eventID,
+			Version: 1,
+			Name:    "Original Event",
+		}
+
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return existingEvent, nil
+			},
+		}
+
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+
+		reqBody := Event{
+			Name:                  "Updated Event",
+			TimeZone:              ptr.String("Not/A/Real/Timezone"),
+			StartTime:             now,
+			EndTime:               now.Add(2 * time.Hour),
+			RegistrationCloseTime: now.Add(-time.Hour),
+			RegistrationOptions: []EventRegistrationOption{
+				{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}},
+			},
+			SignUpStats: &SignUpStats{
+				NumTeams:           0,
+				NumRosteredPlayers: 0,
+				NumTotalPlayers:    0,
+			},
+		}
+
+		req := PatchEventsV1IdRequestObject{
+			Id:   eventID,
+			Body: &reqBody,
+		}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), req)
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PatchEventsV1Id400JSONResponse:
+			assert.Equal(t, InvalidBody, r.Code)
+			assert.Equal(t, "Invalid event body", r.Message)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}

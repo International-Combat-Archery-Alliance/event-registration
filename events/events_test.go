@@ -54,17 +54,21 @@ func TestUpdateEvent(t *testing.T) {
 	imageName := "test-image.jpg"
 
 	t.Run("successful update", func(t *testing.T) {
+		tz, _ := time.LoadLocation("America/Denver")
 		existingEvent := Event{
 			ID:                 eventID,
 			Version:            1,
 			Name:               "Original Event",
+			TimeZone:           tz,
 			NumTeams:           5,
 			NumRosteredPlayers: 25,
 			NumTotalPlayers:    30,
 		}
 
+		updatedTz, _ := time.LoadLocation("Europe/Berlin")
 		updatedEventData := Event{
 			Name:                  "Updated Event Name",
+			TimeZone:              updatedTz,
 			EventLocation:         location,
 			StartTime:             startTime,
 			EndTime:               endTime,
@@ -86,6 +90,7 @@ func TestUpdateEvent(t *testing.T) {
 				assert.Equal(t, eventID, event.ID)
 				assert.Equal(t, 2, event.Version)
 				assert.Equal(t, "Updated Event Name", event.Name)
+				assert.Equal(t, "Europe/Berlin", event.TimeZone.String())
 				assert.Equal(t, location, event.EventLocation)
 				assert.Equal(t, startTime, event.StartTime)
 				assert.Equal(t, endTime, event.EndTime)
@@ -109,6 +114,7 @@ func TestUpdateEvent(t *testing.T) {
 		assert.Equal(t, eventID, result.ID)
 		assert.Equal(t, 2, result.Version)
 		assert.Equal(t, "Updated Event Name", result.Name)
+		assert.Equal(t, "Europe/Berlin", result.TimeZone.String())
 		assert.Equal(t, 5, result.NumTeams)
 		assert.Equal(t, 25, result.NumRosteredPlayers)
 		assert.Equal(t, 30, result.NumTotalPlayers)
@@ -239,5 +245,105 @@ func TestUpdateEvent(t *testing.T) {
 		assert.Equal(t, 10, capturedEvent.NumTeams)
 		assert.Equal(t, 50, capturedEvent.NumRosteredPlayers)
 		assert.Equal(t, 60, capturedEvent.NumTotalPlayers)
+	})
+}
+
+func TestUpdateEventTimeZone(t *testing.T) {
+	eventID := uuid.New()
+
+	t.Run("timezone is updated correctly", func(t *testing.T) {
+		originalTz, _ := time.LoadLocation("America/New_York")
+		existingEvent := Event{
+			ID:       eventID,
+			Version:  1,
+			Name:     "Original Event",
+			TimeZone: originalTz,
+		}
+
+		newTz, _ := time.LoadLocation("Pacific/Auckland")
+		updatedEventData := Event{
+			Name:     "Updated Event",
+			TimeZone: newTz,
+		}
+
+		repo := &mockRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (Event, error) {
+				assert.Equal(t, eventID, id)
+				return existingEvent, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event Event) error {
+				assert.Equal(t, eventID, event.ID)
+				assert.Equal(t, 2, event.Version)
+				assert.Equal(t, "Pacific/Auckland", event.TimeZone.String())
+				return nil
+			},
+		}
+
+		result, err := UpdateEvent(context.Background(), repo, eventID, updatedEventData)
+
+		assert.NoError(t, err)
+		assert.Equal(t, eventID, result.ID)
+		assert.Equal(t, 2, result.Version)
+		assert.Equal(t, "Pacific/Auckland", result.TimeZone.String())
+	})
+
+	t.Run("nil timezone passed through as nil", func(t *testing.T) {
+		existingEvent := Event{
+			ID:       eventID,
+			Version:  1,
+			Name:     "Original Event",
+			TimeZone: time.UTC,
+		}
+
+		updatedEventData := Event{
+			Name:     "Updated Event",
+			TimeZone: nil, // Explicitly nil timezone
+		}
+
+		repo := &mockRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (Event, error) {
+				return existingEvent, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event Event) error {
+				assert.Nil(t, event.TimeZone)
+				return nil
+			},
+		}
+
+		result, err := UpdateEvent(context.Background(), repo, eventID, updatedEventData)
+
+		assert.NoError(t, err)
+		assert.Nil(t, result.TimeZone)
+	})
+
+	t.Run("explicit timezone update", func(t *testing.T) {
+		originalTz, _ := time.LoadLocation("Europe/London")
+		existingEvent := Event{
+			ID:       eventID,
+			Version:  1,
+			Name:     "Original Event",
+			TimeZone: originalTz,
+		}
+
+		newTz, _ := time.LoadLocation("Asia/Tokyo")
+		updatedEventData := Event{
+			Name:     "Updated Event Name",
+			TimeZone: newTz, // Explicit timezone change
+		}
+
+		repo := &mockRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (Event, error) {
+				return existingEvent, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event Event) error {
+				assert.Equal(t, "Asia/Tokyo", event.TimeZone.String())
+				return nil
+			},
+		}
+
+		result, err := UpdateEvent(context.Background(), repo, eventID, updatedEventData)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "Asia/Tokyo", result.TimeZone.String())
 	})
 }

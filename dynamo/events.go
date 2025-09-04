@@ -28,7 +28,7 @@ type eventDynamo struct {
 	Version               int
 	Name                  string
 	EventLocation         events.Location
-	TimeZone              *time.Location
+	TimeZone              *string
 	StartTime             time.Time
 	EndTime               time.Time
 	RegistrationCloseTime time.Time
@@ -60,9 +60,10 @@ func eventSK(id uuid.UUID) string {
 }
 
 func newEventDynamo(event events.Event) eventDynamo {
-	timeZone := event.TimeZone
-	if timeZone == nil {
-		timeZone = time.UTC
+	var timeZoneStr *string
+	if event.TimeZone != nil {
+		tzStr := event.TimeZone.String()
+		timeZoneStr = &tzStr
 	}
 
 	return eventDynamo{
@@ -74,7 +75,7 @@ func newEventDynamo(event events.Event) eventDynamo {
 		Version:       event.Version,
 		Name:          event.Name,
 		EventLocation: event.EventLocation,
-		TimeZone:      timeZone,
+		TimeZone:      timeZoneStr,
 		// Store timestamps in the db as UTC
 		StartTime:             event.StartTime.UTC(),
 		EndTime:               event.EndTime.UTC(),
@@ -83,17 +84,24 @@ func newEventDynamo(event events.Event) eventDynamo {
 			return eventRegOptionToDynamo(o)
 		}),
 		AllowedTeamSizeRange: event.AllowedTeamSizeRange,
-		NumTotalPlayers:      event.NumTotalPlayers,
-		NumRosteredPlayers:   event.NumRosteredPlayers,
 		NumTeams:             event.NumTeams,
+		NumRosteredPlayers:   event.NumRosteredPlayers,
+		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
 	}
 }
 
 func eventFromEventDynamo(event eventDynamo) events.Event {
-	timeZone := event.TimeZone
-	if timeZone == nil {
+	var timeZone *time.Location
+	if event.TimeZone != nil {
+		var err error
+		timeZone, err = time.LoadLocation(*event.TimeZone)
+		if err != nil {
+			// Fallback to UTC if timezone is invalid
+			timeZone = time.UTC
+		}
+	} else {
 		timeZone = time.UTC
 	}
 
