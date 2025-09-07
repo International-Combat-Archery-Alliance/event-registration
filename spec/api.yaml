@@ -200,7 +200,8 @@ paths:
   /events/v1/{eventId}/register:
     post:
       summary: Sign up for an event
-      description: Sign up for an event
+      description: Deprecated in favor of the payment sign up flow, will be removed in the future.
+      deprecated: true
       security: []
       parameters:
         - name: eventId
@@ -327,6 +328,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error' 
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Sign up for an event
+      description: Starts an event sign up flow
+      security: []
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+        - name: cf-turnstile-response
+          in: header
+          description: Cloudflare turnstile CAPTCHA
+          required: true
+          schema:
+            type: string
+            example: XXXX.DUMMY.TOKEN.XXXX 
+      requestBody:
+        description: Registration to be created
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Registration'
+      responses:
+        '200':
+          description: The created registration with payment info.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - info
+                properties:
+                  info:
+                    $ref: '#/components/schemas/RegistrationPaymentInfo'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not allowed to register.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event is not found to register with
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Someone is already signed up under this email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Unknown server error.
           content:
@@ -658,6 +728,16 @@ components:
           $ref: '#/components/schemas/RegistrationType'
         price:
           $ref: '#/components/schemas/Money'
+    RegistrationPaymentInfo:
+      type: object
+      required:
+        - clientSecret
+        - registration
+      properties:
+        clientSecret:
+          type: string
+        registration:
+          $ref: '#/components/schemas/Registration'
     RegistrationType:
       type: string
       enum:

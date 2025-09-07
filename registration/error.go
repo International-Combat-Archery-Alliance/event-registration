@@ -22,6 +22,9 @@ const (
 	REASON_NOT_ALLOWED_TO_SIGN_UP_AS_TYPE  ErrorReason = "NOT_ALLOWED_TO_SIGN_UP_AS_TYPE"
 	REASON_REGISTRATION_IS_CLOSED          ErrorReason = "REGISTRATION_IS_CLOSED"
 	REASON_TIMEOUT                         ErrorReason = "TIMEOUT"
+	REASON_FAILED_TO_CREATE_CHECKOUT       ErrorReason = "FAILED_TO_CREATE_CHECKOUT"
+	REASON_PAYMENT_MISSING_METADATA        ErrorReason = "PAYMENT_MISSING_METADATA"
+	REASON_INVALID_PAYMENT_METADATA        ErrorReason = "INVALID_PAYMENT_METADATA"
 )
 
 type Error struct {
@@ -92,4 +95,16 @@ func NewRegistrationIsClosedError(closedAt time.Time) *Error {
 
 func NewTimeoutError(message string) *Error {
 	return newRegistrationError(REASON_TIMEOUT, message, nil)
+}
+
+func NewFailedToCreateCheckoutError(message string, cause error) *Error {
+	return newRegistrationError(REASON_FAILED_TO_CREATE_CHECKOUT, message, cause)
+}
+
+func NewPaymentMissingMetadataError(key string) *Error {
+	return newRegistrationError(REASON_PAYMENT_MISSING_METADATA, fmt.Sprintf("Missing key %q from payment metadata", key), nil)
+}
+
+func NewInvalidPaymentMetadata(message string, cause error) *Error {
+	return newRegistrationError(REASON_INVALID_PAYMENT_METADATA, message, cause)
 }

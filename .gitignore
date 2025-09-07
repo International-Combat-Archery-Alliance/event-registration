@@ -34,3 +34,4 @@ go.work.sum
 .aws-sam*
 
 email.html
+env.json
