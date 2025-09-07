@@ -365,3 +365,343 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		a.Len(returnedIDs, 3) // All three should be found across both pages
 	})
 }
+
+func TestGetRegistration(t *testing.T) {
+	ctx := context.Background()
+	a := assert.New(t)
+
+	t.Run("successfully get individual registration", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Test City",
+			Paid:       true,
+			Email:      "test@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "John", LastName: "Doe"},
+			Experience: registration.ADVANCED,
+		}
+
+		event2 := events.Event{ID: eventID, Version: 2}
+		require.NoError(t, db.CreateRegistration(ctx, &reg, event2))
+
+		retrieved, err := db.GetRegistration(ctx, eventID, "test@example.com")
+		a.NoError(err)
+		a.Equal(reg, *retrieved.(*registration.IndividualRegistration))
+	})
+
+	t.Run("successfully get team registration", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.TeamRegistration{
+			ID:           uuid.New(),
+			EventID:      eventID,
+			Version:      1,
+			HomeCity:     "Team City",
+			Paid:         false,
+			TeamName:     "Test Team",
+			CaptainEmail: "captain@example.com",
+			Players:      []registration.PlayerInfo{{FirstName: "Jane", LastName: "Smith"}},
+		}
+
+		event2 := events.Event{ID: eventID, Version: 2}
+		require.NoError(t, db.CreateRegistration(ctx, &reg, event2))
+
+		retrieved, err := db.GetRegistration(ctx, eventID, "captain@example.com")
+		a.NoError(err)
+		a.Equal(reg, *retrieved.(*registration.TeamRegistration))
+	})
+
+	t.Run("registration does not exist", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		_, err := db.GetRegistration(ctx, eventID, "nonexistent@example.com")
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_REGISTRATION_DOES_NOT_EXIST, regError.Reason)
+	})
+}
+
+func TestCreateRegistrationWithPayment(t *testing.T) {
+	ctx := context.Background()
+	a := assert.New(t)
+
+	t.Run("successfully create individual registration with payment intent", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Payment City",
+			Paid:       false, // Should be false initially
+			Email:      "payment@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Payment", LastName: "User"},
+			Experience: registration.NOVICE,
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "stripe_session_123",
+			Email:            "payment@example.com",
+		}
+
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event2)
+		a.NoError(err)
+
+		// Verify registration was created
+		retrieved, err := db.GetRegistration(ctx, eventID, "payment@example.com")
+		a.NoError(err)
+		a.Equal(reg, *retrieved.(*registration.IndividualRegistration))
+		a.False(retrieved.(*registration.IndividualRegistration).Paid) // Should still be unpaid
+	})
+
+	t.Run("successfully create team registration with payment intent", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.TeamRegistration{
+			ID:           uuid.New(),
+			EventID:      eventID,
+			Version:      1,
+			HomeCity:     "Payment Team City",
+			Paid:         false, // Should be false initially
+			TeamName:     "Payment Team",
+			CaptainEmail: "team-payment@example.com",
+			Players:      []registration.PlayerInfo{{FirstName: "Team", LastName: "Player"}},
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "stripe_session_456",
+			Email:            "team-payment@example.com",
+		}
+
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event2)
+		a.NoError(err)
+
+		// Verify registration was created
+		retrieved, err := db.GetRegistration(ctx, eventID, "team-payment@example.com")
+		a.NoError(err)
+		a.Equal(reg, *retrieved.(*registration.TeamRegistration))
+		a.False(retrieved.(*registration.TeamRegistration).Paid) // Should still be unpaid
+	})
+
+	t.Run("fail when registration already exists", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Duplicate City",
+			Paid:       false,
+			Email:      "duplicate@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Duplicate", LastName: "User"},
+			Experience: registration.NOVICE,
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "stripe_session_789",
+			Email:            "duplicate@example.com",
+		}
+
+		// First registration should succeed
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event2)
+		a.NoError(err)
+
+		// Second registration should fail
+		reg.ID = uuid.New()   // Different ID but same email
+		regIntent.Version = 1 // Reset version
+		event3 := events.Event{ID: eventID, Version: 3}
+		err = db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event3)
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_REGISTRATION_ALREADY_EXISTS, regError.Reason)
+	})
+}
+
+func TestUpdateRegistrationToPaid(t *testing.T) {
+	ctx := context.Background()
+	a := assert.New(t)
+
+	t.Run("successfully update individual registration to paid", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Update City",
+			Paid:       false, // Start unpaid
+			Email:      "update@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Update", LastName: "User"},
+			Experience: registration.INTERMEDIATE,
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "stripe_session_update",
+			Email:            "update@example.com",
+		}
+
+		// Create registration with payment intent
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event2)
+		a.NoError(err)
+
+		// Update to paid
+		reg.Paid = true
+		reg.Version = 2
+		err = db.UpdateRegistrationToPaid(ctx, &reg)
+		a.NoError(err)
+
+		// Verify registration is now paid
+		retrieved, err := db.GetRegistration(ctx, eventID, "update@example.com")
+		a.NoError(err)
+		a.True(retrieved.(*registration.IndividualRegistration).Paid)
+		a.Equal(2, retrieved.(*registration.IndividualRegistration).Version)
+	})
+
+	t.Run("successfully update team registration to paid", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.TeamRegistration{
+			ID:           uuid.New(),
+			EventID:      eventID,
+			Version:      1,
+			HomeCity:     "Update Team City",
+			Paid:         false, // Start unpaid
+			TeamName:     "Update Team",
+			CaptainEmail: "team-update@example.com",
+			Players:      []registration.PlayerInfo{{FirstName: "Team", LastName: "Update"}},
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "stripe_session_team_update",
+			Email:            "team-update@example.com",
+		}
+
+		// Create registration with payment intent
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event2)
+		a.NoError(err)
+
+		// Update to paid
+		reg.Paid = true
+		reg.Version = 2
+		err = db.UpdateRegistrationToPaid(ctx, &reg)
+		a.NoError(err)
+
+		// Verify registration is now paid
+		retrieved, err := db.GetRegistration(ctx, eventID, "team-update@example.com")
+		a.NoError(err)
+		a.True(retrieved.(*registration.TeamRegistration).Paid)
+		a.Equal(2, retrieved.(*registration.TeamRegistration).Version)
+	})
+
+	t.Run("fail when registration does not exist", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Nonexistent City",
+			Paid:       true,
+			Email:      "nonexistent@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Nonexistent", LastName: "User"},
+			Experience: registration.NOVICE,
+		}
+
+		err := db.UpdateRegistrationToPaid(ctx, &reg)
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_FAILED_TO_WRITE, regError.Reason)
+	})
+
+	t.Run("fail when version conflict occurs", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Version City",
+			Paid:       false,
+			Email:      "version@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Version", LastName: "User"},
+			Experience: registration.ADVANCED,
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "stripe_session_version",
+			Email:            "version@example.com",
+		}
+
+		// Create registration with payment intent
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event2)
+		a.NoError(err)
+
+		// Try to update with wrong version (should be 2, but we're using 3 to simulate stale data)
+		reg.Paid = true
+		reg.Version = 3 // Wrong version - too high
+		err = db.UpdateRegistrationToPaid(ctx, &reg)
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		// The actual error depends on DynamoDB's condition check - could be either
+		a.Equal(registration.REASON_FAILED_TO_WRITE, regError.Reason)
+	})
+}

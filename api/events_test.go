@@ -58,13 +58,22 @@ func (m *mockEmailSender) SendEmail(ctx context.Context, e email.Email) error {
 	return nil
 }
 
-type mockCheckoutManager struct{}
+type mockCheckoutManager struct {
+	CreateCheckoutFunc  func(ctx context.Context, params payments.CheckoutParams) (payments.CheckoutInfo, error)
+	ConfirmCheckoutFunc func(ctx context.Context, payload []byte, signature string) (map[string]string, error)
+}
 
 func (m *mockCheckoutManager) CreateCheckout(ctx context.Context, params payments.CheckoutParams) (payments.CheckoutInfo, error) {
+	if m.CreateCheckoutFunc != nil {
+		return m.CreateCheckoutFunc(ctx, params)
+	}
 	return payments.CheckoutInfo{}, nil
 }
 
 func (m *mockCheckoutManager) ConfirmCheckout(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+	if m.ConfirmCheckoutFunc != nil {
+		return m.ConfirmCheckoutFunc(ctx, payload, signature)
+	}
 	return map[string]string{}, nil
 }
 

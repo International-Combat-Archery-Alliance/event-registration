@@ -334,9 +334,6 @@ func (d *DB) UpdateRegistrationToPaid(ctx context.Context, reg registration.Regi
 	if err != nil {
 		var transactionFailedErr *types.TransactionCanceledException
 		if errors.As(err, &transactionFailedErr) {
-			if transactionFailedErr.CancellationReasons[0].Code != nil {
-				return registration.NewRegistrationDoesNotExistsError(fmt.Sprintf("Registration with ID %q does not exists", dynamoReg.ID), err)
-			}
 			return registration.NewFailedToWriteError("Version conflict error", err)
 		} else if errors.Is(err, context.DeadlineExceeded) {
 			return registration.NewTimeoutError("UpdateRegistrationToPaid timed out")

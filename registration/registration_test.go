@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/payments"
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -403,5 +404,274 @@ func TestRegisterTeam(t *testing.T) {
 		var registrationErr *Error
 		assert.True(t, errors.As(err, &registrationErr))
 		assert.Equal(t, REASON_REGISTRATION_IS_CLOSED, registrationErr.Reason)
+	})
+}
+
+type mockCheckoutManager struct {
+	CreateCheckoutFunc  func(ctx context.Context, params payments.CheckoutParams) (payments.CheckoutInfo, error)
+	ConfirmCheckoutFunc func(ctx context.Context, payload []byte, signature string) (map[string]string, error)
+}
+
+func (m *mockCheckoutManager) CreateCheckout(ctx context.Context, params payments.CheckoutParams) (payments.CheckoutInfo, error) {
+	if m.CreateCheckoutFunc != nil {
+		return m.CreateCheckoutFunc(ctx, params)
+	}
+	return payments.CheckoutInfo{
+		SessionId:    "test_session_id",
+		ClientSecret: "test_client_secret",
+	}, nil
+}
+
+func (m *mockCheckoutManager) ConfirmCheckout(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+	if m.ConfirmCheckoutFunc != nil {
+		return m.ConfirmCheckoutFunc(ctx, payload, signature)
+	}
+	return map[string]string{
+		"EMAIL":    "test@example.com",
+		"EVENT_ID": "123e4567-e89b-12d3-a456-426614174000",
+	}, nil
+}
+
+func TestRegisterWithPayment(t *testing.T) {
+	t.Run("successful individual registration with payment", func(t *testing.T) {
+		eventID := uuid.New()
+		event := events.Event{
+			ID:      eventID,
+			Name:    "Test Event",
+			Version: 1,
+			RegistrationOptions: []events.EventRegistrationOption{{
+				RegType: events.BY_INDIVIDUAL,
+				Price:   money.New(5000, "USD"),
+			}},
+		}
+		eventRepo := &mockEventRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return event, nil
+			},
+		}
+		registrationRepo := &mockRegistrationRepository{
+			CreateRegistrationWithPaymentFunc: func(ctx context.Context, registration Registration, intent RegistrationIntent, evt events.Event) error {
+				assert.Equal(t, event.Version+1, evt.Version)
+				assert.Equal(t, "test_session_id", intent.PaymentSessionId)
+				return nil
+			},
+		}
+		checkoutManager := &mockCheckoutManager{}
+		registrationRequest := &IndividualRegistration{
+			EventID: eventID,
+			Email:   "test@example.com",
+		}
+
+		reg, clientSecret, evt, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+
+		assert.NoError(t, err)
+		assert.Equal(t, registrationRequest, reg)
+		assert.Equal(t, "test_client_secret", clientSecret)
+		assert.Equal(t, event.Version+1, evt.Version)
+	})
+
+	t.Run("successful team registration with payment", func(t *testing.T) {
+		eventID := uuid.New()
+		event := events.Event{
+			ID:      eventID,
+			Name:    "Test Team Event",
+			Version: 2,
+			RegistrationOptions: []events.EventRegistrationOption{{
+				RegType: events.BY_TEAM,
+				Price:   money.New(15000, "USD"),
+			}},
+			AllowedTeamSizeRange: events.Range{Min: 1, Max: 5},
+		}
+		eventRepo := &mockEventRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return event, nil
+			},
+		}
+		registrationRepo := &mockRegistrationRepository{
+			CreateRegistrationWithPaymentFunc: func(ctx context.Context, registration Registration, intent RegistrationIntent, evt events.Event) error {
+				assert.Equal(t, event.Version+1, evt.Version)
+				return nil
+			},
+		}
+		checkoutManager := &mockCheckoutManager{}
+		registrationRequest := &TeamRegistration{
+			EventID: eventID,
+			Players: []PlayerInfo{{}},
+		}
+
+		reg, clientSecret, evt, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+
+		assert.NoError(t, err)
+		assert.Equal(t, registrationRequest, reg)
+		assert.Equal(t, "test_client_secret", clientSecret)
+		assert.Equal(t, event.Version+1, evt.Version)
+	})
+
+	t.Run("event does not exist", func(t *testing.T) {
+		eventRepo := &mockEventRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
+			},
+		}
+		registrationRepo := &mockRegistrationRepository{}
+		checkoutManager := &mockCheckoutManager{}
+		registrationRequest := &IndividualRegistration{
+			EventID: uuid.New(),
+		}
+
+		_, _, _, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_ASSOCIATED_EVENT_DOES_NOT_EXIST, registrationErr.Reason)
+	})
+
+	t.Run("checkout creation fails", func(t *testing.T) {
+		eventID := uuid.New()
+		event := events.Event{
+			ID:      eventID,
+			Version: 1,
+			RegistrationOptions: []events.EventRegistrationOption{{
+				RegType: events.BY_INDIVIDUAL,
+				Price:   money.New(5000, "USD"),
+			}},
+		}
+		eventRepo := &mockEventRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return event, nil
+			},
+		}
+		registrationRepo := &mockRegistrationRepository{}
+		checkoutManager := &mockCheckoutManager{
+			CreateCheckoutFunc: func(ctx context.Context, params payments.CheckoutParams) (payments.CheckoutInfo, error) {
+				return payments.CheckoutInfo{}, errors.New("checkout creation failed")
+			},
+		}
+		registrationRequest := &IndividualRegistration{
+			EventID: eventID,
+			Email:   "test@example.com",
+		}
+
+		_, _, _, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_FAILED_TO_CREATE_CHECKOUT, registrationErr.Reason)
+	})
+
+	t.Run("unknown registration type", func(t *testing.T) {
+		eventID := uuid.New()
+		event := events.Event{
+			ID: eventID,
+		}
+		eventRepo := &mockEventRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return event, nil
+			},
+		}
+		registrationRepo := &mockRegistrationRepository{}
+		checkoutManager := &mockCheckoutManager{}
+		registrationRequest := &mockRegistration{
+			GetEventIDFunc: func() uuid.UUID {
+				return eventID
+			},
+			GetEmailFunc: func() string {
+				return "test@example.com"
+			},
+			TypeFunc: func() events.RegistrationType {
+				return 99
+			},
+		}
+
+		_, _, _, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_UNKNOWN_REGISTRATION_TYPE, registrationErr.Reason)
+	})
+}
+
+func TestConfirmRegistrationPayment(t *testing.T) {
+	t.Run("successful payment confirmation", func(t *testing.T) {
+		eventID := uuid.New()
+		email := "test@example.com"
+		reg := &IndividualRegistration{
+			ID:      uuid.New(),
+			EventID: eventID,
+			Email:   email,
+			Version: 1,
+			Paid:    false,
+		}
+
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				assert.Equal(t, eventID, eventId)
+				assert.Equal(t, email, regEmail)
+				return reg, nil
+			},
+			UpdateRegistrationToPaidFunc: func(ctx context.Context, registration Registration) error {
+				assert.Equal(t, 2, registration.(*IndividualRegistration).Version) // Should be bumped
+				assert.True(t, registration.(*IndividualRegistration).Paid)        // Should be set to paid
+				return nil
+			},
+		}
+		checkoutManager := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				assert.Equal(t, []byte("test_payload"), payload)
+				assert.Equal(t, "test_signature", signature)
+				return map[string]string{
+					"EMAIL":    email,
+					"EVENT_ID": eventID.String(),
+				}, nil
+			},
+		}
+
+		result, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, checkoutManager)
+
+		assert.NoError(t, err)
+		assert.Equal(t, reg, result)
+		assert.Equal(t, 2, result.(*IndividualRegistration).Version)
+		assert.True(t, result.(*IndividualRegistration).Paid)
+	})
+
+	t.Run("missing email in metadata", func(t *testing.T) {
+		registrationRepo := &mockRegistrationRepository{}
+		checkoutManager := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				return map[string]string{
+					"EVENT_ID": uuid.New().String(),
+				}, nil
+			},
+		}
+
+		_, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, checkoutManager)
+
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_PAYMENT_MISSING_METADATA, registrationErr.Reason)
+		assert.Contains(t, registrationErr.Message, "EMAIL")
+	})
+
+	t.Run("invalid event ID in metadata", func(t *testing.T) {
+		registrationRepo := &mockRegistrationRepository{}
+		checkoutManager := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				return map[string]string{
+					"EMAIL":    "test@example.com",
+					"EVENT_ID": "invalid-uuid",
+				}, nil
+			},
+		}
+
+		_, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, checkoutManager)
+
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_INVALID_PAYMENT_METADATA, registrationErr.Reason)
 	})
 }
