@@ -10,12 +10,23 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"github.com/International-Combat-Archery-Alliance/payments"
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/oapi-codegen/runtime/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type mockCheckoutManagerReg struct{}
+
+func (m *mockCheckoutManagerReg) CreateCheckout(ctx context.Context, params payments.CheckoutParams) (payments.CheckoutInfo, error) {
+	return payments.CheckoutInfo{}, nil
+}
+
+func (m *mockCheckoutManagerReg) ConfirmCheckout(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
 
 func TestPostEventsEventIdRegister(t *testing.T) {
 	t.Run("invalid captcha", func(t *testing.T) {
@@ -24,7 +35,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return nil, errors.New("invalid captcha")
 			},
 		}
-		api := NewAPI(&mockDB{}, noopLogger, LOCAL, &mockAuthValidator{}, mockCaptcha, &mockEmailSender{})
+		api := NewAPI(&mockDB{}, noopLogger, LOCAL, &mockAuthValidator{}, mockCaptcha, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -54,7 +65,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 	})
 
 	t.Run("invalid body", func(t *testing.T) {
-		api := NewAPI(&mockDB{}, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(&mockDB{}, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		reg := Registration{}
 		// Set a field that will cause the discriminator to fail
 		reg.FromIndividualRegistration(IndividualRegistration{})
@@ -82,7 +93,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		reg := &Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -117,7 +128,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return &registration.Error{Reason: registration.REASON_REGISTRATION_ALREADY_EXISTS}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -152,7 +163,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return &registration.Error{Reason: registration.REASON_REGISTRATION_IS_CLOSED}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -184,7 +195,7 @@ func TestPostEventsEventIdRegister(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		reg := Registration{}
 		indivReg := IndividualRegistration{
 			HomeCity:   "test city",
@@ -218,7 +229,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				return registration.GetAllRegistrationsResponse{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetEventsV1EventIdRegistrationsParams{
@@ -243,7 +254,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				return registration.GetAllRegistrationsResponse{}, &registration.Error{Reason: registration.REASON_INVALID_CURSOR}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetEventsV1EventIdRegistrationsParams{
@@ -275,7 +286,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetEventsV1EventIdRegistrationsParams{
@@ -299,7 +310,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 			GetAllRegistrationsForEventFunc: func(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
 				return registration.GetAllRegistrationsResponse{
 					Data: []registration.Registration{
-						registration.IndividualRegistration{
+						&registration.IndividualRegistration{
 							Email:      "test@test.com",
 							Experience: registration.NOVICE,
 						},
@@ -307,7 +318,7 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManagerReg{})
 		req := GetEventsV1EventIdRegistrationsRequestObject{
 			EventId: uuid.New(),
 			Params: GetEventsV1EventIdRegistrationsParams{
@@ -328,9 +339,11 @@ func TestGetEventsEventIdRegistrations(t *testing.T) {
 }
 
 type mockRegistration struct {
-	GetEventIDFunc func() uuid.UUID
-	GetEmailFunc   func() string
-	TypeFunc       func() events.RegistrationType
+	GetEventIDFunc  func() uuid.UUID
+	GetEmailFunc    func() string
+	TypeFunc        func() events.RegistrationType
+	SetToPaidFunc   func()
+	BumpVersionFunc func()
 }
 
 func (m *mockRegistration) GetEventID() uuid.UUID {
@@ -343,4 +356,16 @@ func (m *mockRegistration) GetEmail() string {
 
 func (m *mockRegistration) Type() events.RegistrationType {
 	return m.TypeFunc()
+}
+
+func (m *mockRegistration) SetToPaid() {
+	if m.SetToPaidFunc != nil {
+		m.SetToPaidFunc()
+	}
+}
+
+func (m *mockRegistration) BumpVersion() {
+	if m.BumpVersionFunc != nil {
+		m.BumpVersionFunc()
+	}
 }

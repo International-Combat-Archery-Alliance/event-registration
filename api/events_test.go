@@ -14,6 +14,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
+	"github.com/International-Combat-Archery-Alliance/payments"
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -57,17 +58,30 @@ func (m *mockEmailSender) SendEmail(ctx context.Context, e email.Email) error {
 	return nil
 }
 
+type mockCheckoutManager struct{}
+
+func (m *mockCheckoutManager) CreateCheckout(ctx context.Context, params payments.CheckoutParams) (payments.CheckoutInfo, error) {
+	return payments.CheckoutInfo{}, nil
+}
+
+func (m *mockCheckoutManager) ConfirmCheckout(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 func ctxWithLogger(ctx context.Context, logger *slog.Logger) context.Context {
 	return middleware.CtxWithLogger(ctx, logger)
 }
 
 type mockDB struct {
-	GetEventsFunc                   func(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error)
-	CreateEventFunc                 func(ctx context.Context, event events.Event) error
-	GetEventFunc                    func(ctx context.Context, id uuid.UUID) (events.Event, error)
-	UpdateEventFunc                 func(ctx context.Context, event events.Event) error
-	CreateRegistrationFunc          func(ctx context.Context, registration registration.Registration, event events.Event) error
-	GetAllRegistrationsForEventFunc func(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error)
+	GetEventsFunc                     func(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error)
+	CreateEventFunc                   func(ctx context.Context, event events.Event) error
+	GetEventFunc                      func(ctx context.Context, id uuid.UUID) (events.Event, error)
+	UpdateEventFunc                   func(ctx context.Context, event events.Event) error
+	CreateRegistrationFunc            func(ctx context.Context, registration registration.Registration, event events.Event) error
+	GetAllRegistrationsForEventFunc   func(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error)
+	CreateRegistrationWithPaymentFunc func(ctx context.Context, reg registration.Registration, intent registration.RegistrationIntent, event events.Event) error
+	GetRegistrationFunc               func(ctx context.Context, eventId uuid.UUID, email string) (registration.Registration, error)
+	UpdateRegistrationToPaidFunc      func(ctx context.Context, reg registration.Registration) error
 }
 
 func (m *mockDB) GetEvents(ctx context.Context, limit int32, cursor *string) (events.GetEventsResponse, error) {
@@ -92,6 +106,27 @@ func (m *mockDB) CreateRegistration(ctx context.Context, reg registration.Regist
 
 func (m *mockDB) GetAllRegistrationsForEvent(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (registration.GetAllRegistrationsResponse, error) {
 	return m.GetAllRegistrationsForEventFunc(ctx, eventID, limit, cursor)
+}
+
+func (m *mockDB) CreateRegistrationWithPayment(ctx context.Context, reg registration.Registration, intent registration.RegistrationIntent, event events.Event) error {
+	if m.CreateRegistrationWithPaymentFunc != nil {
+		return m.CreateRegistrationWithPaymentFunc(ctx, reg, intent, event)
+	}
+	return nil
+}
+
+func (m *mockDB) GetRegistration(ctx context.Context, eventId uuid.UUID, email string) (registration.Registration, error) {
+	if m.GetRegistrationFunc != nil {
+		return m.GetRegistrationFunc(ctx, eventId, email)
+	}
+	return nil, nil
+}
+
+func (m *mockDB) UpdateRegistrationToPaid(ctx context.Context, reg registration.Registration) error {
+	if m.UpdateRegistrationToPaidFunc != nil {
+		return m.UpdateRegistrationToPaidFunc(ctx, reg)
+	}
+	return nil
 }
 
 func TestGetEvents(t *testing.T) {
@@ -119,7 +154,7 @@ func TestGetEvents(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := GetEventsV1RequestObject{
 			Params: GetEventsV1Params{
@@ -161,7 +196,7 @@ func TestPostEvents(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -204,7 +239,7 @@ func TestGetEventsId(t *testing.T) {
 				return expectedEvent, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -232,7 +267,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -256,7 +291,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -300,7 +335,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name:                  "Updated Event Name",
@@ -359,7 +394,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 	t.Run("invalid request body", func(t *testing.T) {
 		eventID := uuid.New()
 		mock := &mockDB{}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		// Create invalid request body with invalid registration type
 		reqBody := Event{
@@ -398,7 +433,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name: "Test Event",
@@ -445,7 +480,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 				return errors.New("database connection failed")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name: "Updated Event",
@@ -494,7 +529,7 @@ func TestTimeZoneHandling(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -522,7 +557,7 @@ func TestTimeZoneHandling(t *testing.T) {
 			RegistrationOptions:   []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}},
 		}
 		mock := &mockDB{}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -555,7 +590,7 @@ func TestTimeZoneHandling(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -594,7 +629,7 @@ func TestTimeZoneHandling(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name:                  "Updated Event",
@@ -643,7 +678,7 @@ func TestTimeZoneHandling(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{})
+		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name:                  "Updated Event",

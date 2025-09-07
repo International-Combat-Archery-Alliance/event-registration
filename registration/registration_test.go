@@ -22,8 +22,11 @@ func (m *mockEventRepository) GetEvent(ctx context.Context, id uuid.UUID) (event
 }
 
 type mockRegistrationRepository struct {
-	CreateRegistrationFunc          func(ctx context.Context, registration Registration, event events.Event) error
-	GetAllRegistrationsForEventFunc func(ctx context.Context, eventId uuid.UUID, limit int32, cursor *string) (GetAllRegistrationsResponse, error)
+	CreateRegistrationFunc            func(ctx context.Context, registration Registration, event events.Event) error
+	GetAllRegistrationsForEventFunc   func(ctx context.Context, eventId uuid.UUID, limit int32, cursor *string) (GetAllRegistrationsResponse, error)
+	CreateRegistrationWithPaymentFunc func(ctx context.Context, registration Registration, intent RegistrationIntent, event events.Event) error
+	GetRegistrationFunc               func(ctx context.Context, eventId uuid.UUID, email string) (Registration, error)
+	UpdateRegistrationToPaidFunc      func(ctx context.Context, registration Registration) error
 }
 
 func (m *mockRegistrationRepository) CreateRegistration(ctx context.Context, registration Registration, event events.Event) error {
@@ -34,6 +37,27 @@ func (m *mockRegistrationRepository) GetAllRegistrationsForEvent(ctx context.Con
 	return m.GetAllRegistrationsForEventFunc(ctx, eventId, limit, cursor)
 }
 
+func (m *mockRegistrationRepository) CreateRegistrationWithPayment(ctx context.Context, registration Registration, intent RegistrationIntent, event events.Event) error {
+	if m.CreateRegistrationWithPaymentFunc != nil {
+		return m.CreateRegistrationWithPaymentFunc(ctx, registration, intent, event)
+	}
+	return nil
+}
+
+func (m *mockRegistrationRepository) GetRegistration(ctx context.Context, eventId uuid.UUID, email string) (Registration, error) {
+	if m.GetRegistrationFunc != nil {
+		return m.GetRegistrationFunc(ctx, eventId, email)
+	}
+	return nil, nil
+}
+
+func (m *mockRegistrationRepository) UpdateRegistrationToPaid(ctx context.Context, registration Registration) error {
+	if m.UpdateRegistrationToPaidFunc != nil {
+		return m.UpdateRegistrationToPaidFunc(ctx, registration)
+	}
+	return nil
+}
+
 func TestAttemptRegistration(t *testing.T) {
 	t.Run("event does not exist", func(t *testing.T) {
 		eventRepo := &mockEventRepository{
@@ -42,7 +66,7 @@ func TestAttemptRegistration(t *testing.T) {
 			},
 		}
 		registrationRepo := &mockRegistrationRepository{}
-		registrationRequest := IndividualRegistration{
+		registrationRequest := &IndividualRegistration{
 			EventID: uuid.New(),
 		}
 
@@ -60,7 +84,7 @@ func TestAttemptRegistration(t *testing.T) {
 			},
 		}
 		registrationRepo := &mockRegistrationRepository{}
-		registrationRequest := IndividualRegistration{
+		registrationRequest := &IndividualRegistration{
 			EventID: uuid.New(),
 		}
 
@@ -89,7 +113,7 @@ func TestAttemptRegistration(t *testing.T) {
 				return nil
 			},
 		}
-		registrationRequest := IndividualRegistration{
+		registrationRequest := &IndividualRegistration{
 			EventID: eventID,
 		}
 
@@ -116,7 +140,7 @@ func TestAttemptRegistration(t *testing.T) {
 				return nil
 			},
 		}
-		registrationRequest := TeamRegistration{
+		registrationRequest := &TeamRegistration{
 			EventID: eventID,
 			Players: []PlayerInfo{{}},
 		}
@@ -137,7 +161,7 @@ func TestAttemptRegistration(t *testing.T) {
 			},
 		}
 		registrationRepo := &mockRegistrationRepository{}
-		registrationRequest := IndividualRegistration{
+		registrationRequest := &IndividualRegistration{
 			EventID: eventID,
 		}
 
@@ -160,7 +184,7 @@ func TestAttemptRegistration(t *testing.T) {
 			},
 		}
 		registrationRepo := &mockRegistrationRepository{}
-		registrationRequest := TeamRegistration{
+		registrationRequest := &TeamRegistration{
 			EventID: eventID,
 		}
 
@@ -184,7 +208,7 @@ func TestAttemptRegistration(t *testing.T) {
 			},
 		}
 		registrationRepo := &mockRegistrationRepository{}
-		registrationRequest := TeamRegistration{
+		registrationRequest := &TeamRegistration{
 			EventID: eventID,
 			Players: []PlayerInfo{{}},
 		}
@@ -228,9 +252,11 @@ func TestAttemptRegistration(t *testing.T) {
 }
 
 type mockRegistration struct {
-	GetEventIDFunc func() uuid.UUID
-	GetEmailFunc   func() string
-	TypeFunc       func() events.RegistrationType
+	GetEventIDFunc  func() uuid.UUID
+	GetEmailFunc    func() string
+	TypeFunc        func() events.RegistrationType
+	SetToPaidFunc   func()
+	BumpVersionFunc func()
 }
 
 func (m *mockRegistration) GetEventID() uuid.UUID {
@@ -245,12 +271,24 @@ func (m *mockRegistration) Type() events.RegistrationType {
 	return m.TypeFunc()
 }
 
+func (m *mockRegistration) SetToPaid() {
+	if m.SetToPaidFunc != nil {
+		m.SetToPaidFunc()
+	}
+}
+
+func (m *mockRegistration) BumpVersion() {
+	if m.BumpVersionFunc != nil {
+		m.BumpVersionFunc()
+	}
+}
+
 func TestRegisterIndividualAsFreeAgent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		event := &events.Event{
 			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}},
 		}
-		reg := IndividualRegistration{}
+		reg := &IndividualRegistration{}
 
 		err := registerIndividualAsFreeAgent(event, reg)
 		assert.NoError(t, err)
@@ -261,7 +299,7 @@ func TestRegisterIndividualAsFreeAgent(t *testing.T) {
 		event := &events.Event{
 			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 		}
-		reg := IndividualRegistration{}
+		reg := &IndividualRegistration{}
 
 		err := registerIndividualAsFreeAgent(event, reg)
 		assert.Error(t, err)
@@ -275,7 +313,7 @@ func TestRegisterIndividualAsFreeAgent(t *testing.T) {
 			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}},
 			RegistrationCloseTime: time.Now().Add(-time.Hour),
 		}
-		reg := IndividualRegistration{
+		reg := &IndividualRegistration{
 			RegisteredAt: time.Now(),
 		}
 
@@ -293,7 +331,7 @@ func TestRegisterTeam(t *testing.T) {
 			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange: events.Range{Min: 1, Max: 5},
 		}
-		reg := TeamRegistration{
+		reg := &TeamRegistration{
 			Players: []PlayerInfo{{}},
 		}
 
@@ -308,7 +346,7 @@ func TestRegisterTeam(t *testing.T) {
 		event := &events.Event{
 			RegistrationOptions: []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL}},
 		}
-		reg := TeamRegistration{}
+		reg := &TeamRegistration{}
 
 		err := registerTeam(event, reg)
 		assert.Error(t, err)
@@ -322,7 +360,7 @@ func TestRegisterTeam(t *testing.T) {
 			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange: events.Range{Min: 2, Max: 5},
 		}
-		reg := TeamRegistration{
+		reg := &TeamRegistration{
 			Players: []PlayerInfo{{}},
 		}
 
@@ -338,7 +376,7 @@ func TestRegisterTeam(t *testing.T) {
 			RegistrationOptions:  []events.EventRegistrationOption{{RegType: events.BY_TEAM}},
 			AllowedTeamSizeRange: events.Range{Min: 1, Max: 1},
 		}
-		reg := TeamRegistration{
+		reg := &TeamRegistration{
 			Players: []PlayerInfo{{}, {}},
 		}
 
@@ -355,7 +393,7 @@ func TestRegisterTeam(t *testing.T) {
 			AllowedTeamSizeRange:  events.Range{Min: 1, Max: 5},
 			RegistrationCloseTime: time.Now().Add(-time.Hour),
 		}
-		reg := TeamRegistration{
+		reg := &TeamRegistration{
 			RegisteredAt: time.Now(),
 			Players:      []PlayerInfo{{}},
 		}

@@ -33,8 +33,7 @@ func TestCreateRegistration(t *testing.T) {
 		}
 
 		event.Version++
-		require.NoError(t, db.CreateRegistration(ctx, reg, *event))
-
+		require.NoError(t, db.CreateRegistration(ctx, &reg, *event))
 
 	})
 
@@ -58,8 +57,7 @@ func TestCreateRegistration(t *testing.T) {
 		}
 
 		event.Version++
-		require.NoError(t, db.CreateRegistration(ctx, reg, *event))
-
+		require.NoError(t, db.CreateRegistration(ctx, &reg, *event))
 
 	})
 
@@ -82,11 +80,11 @@ func TestCreateRegistration(t *testing.T) {
 		}
 
 		event.Version++
-		require.NoError(t, db.CreateRegistration(ctx, *reg, *event))
+		require.NoError(t, db.CreateRegistration(ctx, reg, *event))
 
 		event.Version++
 		reg.Version++
-		err := db.CreateRegistration(ctx, *reg, *event)
+		err := db.CreateRegistration(ctx, reg, *event)
 		require.Error(t, err)
 		var regError *registration.Error
 		require.ErrorAs(t, err, &regError)
@@ -94,14 +92,12 @@ func TestCreateRegistration(t *testing.T) {
 	})
 }
 
-
-
 // getRegistrationID is a helper function to extract the ID from a Registration interface.
 func getRegistrationID(reg registration.Registration) uuid.UUID {
 	switch r := reg.(type) {
-	case registration.IndividualRegistration:
+	case *registration.IndividualRegistration:
 		return r.ID
-	case registration.TeamRegistration:
+	case *registration.TeamRegistration:
 		return r.ID
 	default:
 		panic("unknown registration type")
@@ -142,9 +138,9 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		}
 
 		event1 := events.Event{ID: reg1.EventID, Version: 2}
-		require.NoError(t, db.CreateRegistration(ctx, reg1, event1))
+		require.NoError(t, db.CreateRegistration(ctx, &reg1, event1))
 		event2 := events.Event{ID: reg2.EventID, Version: 3}
-		require.NoError(t, db.CreateRegistration(ctx, reg2, event2))
+		require.NoError(t, db.CreateRegistration(ctx, &reg2, event2))
 
 		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, 100, nil)
 		a.NoError(err)
@@ -157,10 +153,10 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		foundReg2 := false
 		for _, r := range resp.Data {
 			if getRegistrationID(r) == reg1.ID {
-				a.Equal(reg1, r)
+				a.Equal(reg1, *r.(*registration.IndividualRegistration))
 				foundReg1 = true
 			} else if getRegistrationID(r) == reg2.ID {
-				a.Equal(reg2, r)
+				a.Equal(reg2, *r.(*registration.IndividualRegistration))
 				foundReg2 = true
 			}
 		}
@@ -198,9 +194,9 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		}
 
 		eventTeam1 := events.Event{ID: teamReg1.EventID, Version: 2}
-		require.NoError(t, db.CreateRegistration(ctx, teamReg1, eventTeam1))
+		require.NoError(t, db.CreateRegistration(ctx, &teamReg1, eventTeam1))
 		eventTeam2 := events.Event{ID: teamReg2.EventID, Version: 3}
-		require.NoError(t, db.CreateRegistration(ctx, teamReg2, eventTeam2))
+		require.NoError(t, db.CreateRegistration(ctx, &teamReg2, eventTeam2))
 
 		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, 100, nil)
 		a.NoError(err)
@@ -212,10 +208,10 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		foundTeamReg2 := false
 		for _, r := range resp.Data {
 			if getRegistrationID(r) == teamReg1.ID {
-				a.Equal(teamReg1, r)
+				a.Equal(teamReg1, *r.(*registration.TeamRegistration))
 				foundTeamReg1 = true
 			} else if getRegistrationID(r) == teamReg2.ID {
-				a.Equal(teamReg2, r)
+				a.Equal(teamReg2, *r.(*registration.TeamRegistration))
 				foundTeamReg2 = true
 			}
 		}
@@ -265,9 +261,9 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		}
 
 		eventIndiv := events.Event{ID: regIndiv.EventID, Version: 2}
-		require.NoError(t, db.CreateRegistration(ctx, regIndiv, eventIndiv))
+		require.NoError(t, db.CreateRegistration(ctx, &regIndiv, eventIndiv))
 		eventTeam := events.Event{ID: regTeam.EventID, Version: 3}
-		require.NoError(t, db.CreateRegistration(ctx, regTeam, eventTeam))
+		require.NoError(t, db.CreateRegistration(ctx, &regTeam, eventTeam))
 
 		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, 100, nil)
 		a.NoError(err)
@@ -279,10 +275,10 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		foundTeam := false
 		for _, r := range resp.Data {
 			if getRegistrationID(r) == regIndiv.ID {
-				a.Equal(regIndiv, r)
+				a.Equal(regIndiv, *r.(*registration.IndividualRegistration))
 				foundIndiv = true
 			} else if getRegistrationID(r) == regTeam.ID {
-				a.Equal(regTeam, r)
+				a.Equal(regTeam, *r.(*registration.TeamRegistration))
 				foundTeam = true
 			}
 		}
@@ -304,11 +300,11 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, Email: "email3@email.com", PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
 
 		event1 := events.Event{ID: reg1.EventID, Version: 2}
-		require.NoError(t, db.CreateRegistration(ctx, reg1, event1))
+		require.NoError(t, db.CreateRegistration(ctx, &reg1, event1))
 		event2 := events.Event{ID: reg2.EventID, Version: 3}
-		require.NoError(t, db.CreateRegistration(ctx, reg2, event2))
+		require.NoError(t, db.CreateRegistration(ctx, &reg2, event2))
 		event3 := events.Event{ID: reg3.EventID, Version: 4}
-		require.NoError(t, db.CreateRegistration(ctx, reg3, event3))
+		require.NoError(t, db.CreateRegistration(ctx, &reg3, event3))
 
 		// Fetch with limit 2
 		resp, err := db.GetAllRegistrationsForEvent(ctx, eventID, 2, nil)
@@ -339,11 +335,11 @@ func TestGetAllRegistrationsForEvent(t *testing.T) {
 		reg3 := registration.IndividualRegistration{ID: uuid.New(), EventID: eventID, Version: 1, Email: "email3@email.com", PlayerInfo: registration.PlayerInfo{FirstName: "P3"}}
 
 		event1 := events.Event{ID: reg1.EventID, Version: 2}
-		require.NoError(t, db.CreateRegistration(ctx, reg1, event1))
+		require.NoError(t, db.CreateRegistration(ctx, &reg1, event1))
 		event2 := events.Event{ID: reg2.EventID, Version: 3}
-		require.NoError(t, db.CreateRegistration(ctx, reg2, event2))
+		require.NoError(t, db.CreateRegistration(ctx, &reg2, event2))
 		event3 := events.Event{ID: reg3.EventID, Version: 4}
-		require.NoError(t, db.CreateRegistration(ctx, reg3, event3))
+		require.NoError(t, db.CreateRegistration(ctx, &reg3, event3))
 
 		// Fetch first page to get cursor
 		resp1, err := db.GetAllRegistrationsForEvent(ctx, eventID, 2, nil)
