@@ -202,7 +202,7 @@ func getStripeSecretKey(ctx context.Context, env api.Environment) (string, error
 
 func getStripeEndpointSecret(ctx context.Context, env api.Environment) (string, error) {
 	if env == api.LOCAL {
-		return "", nil
+		return getEnvOrDefault("STRIPE_ENDPOINT_SECRET", ""), nil
 	}
 
 	parameter, err := getParameterFromAWS(ctx, "/stripeEndpointSecret")

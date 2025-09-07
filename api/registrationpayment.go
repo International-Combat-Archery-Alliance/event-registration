@@ -1,12 +1,14 @@
 package api
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
+	"github.com/International-Combat-Archery-Alliance/payments"
 )
 
 func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware.MiddlewareFunc {
@@ -27,6 +29,16 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 
 		reg, err := registration.ConfirmRegistrationPayment(ctx, payload, r.Header.Get("Stripe-Signature"), a.db, a.checkoutManager)
 		if err != nil {
+			var paymentErr *payments.Error
+			if errors.As(err, &paymentErr) {
+				switch paymentErr.Reason {
+				case payments.ErrorReasonNotCheckoutConfirmedEvent:
+					logger.Info("Got an event we don't care about, ignoring", slog.String("error", err.Error()))
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+			}
+
 			logger.Error("Failed to confirm registration payment", slog.String("error", err.Error()))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -36,7 +48,7 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 		if err != nil {
 			logger.Error("Failed to get event ID to send email with", slog.String("error", err.Error()))
 
-			// TODO: Probably wantbetter error handling here
+			// TODO: Probably want better error handling here
 			w.WriteHeader(http.StatusOK)
 			return
 		}

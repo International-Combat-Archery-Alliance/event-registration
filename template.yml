@@ -16,6 +16,10 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Sandbox stripe secret key for testing
+  StripeEndpointSecret:
+    Type: String
+    NoEcho: true
+    Description: Sandbox local signing key for webhook
 
 Mappings:
   attributes:
@@ -30,6 +34,7 @@ Globals:
       Variables:
         DYNAMO_TABLE_NAME: !FindInMap [attributes, dynamo, tableName]
         STRIPE_SECRET_KEY: !Ref StripeSecretKey
+        STRIPE_ENDPOINT_SECRET: !Ref StripeEndpointSecret
 
 Resources:
   EventRegistrationHttp:
