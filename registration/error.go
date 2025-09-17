@@ -25,6 +25,7 @@ const (
 	REASON_FAILED_TO_CREATE_CHECKOUT       ErrorReason = "FAILED_TO_CREATE_CHECKOUT"
 	REASON_PAYMENT_MISSING_METADATA        ErrorReason = "PAYMENT_MISSING_METADATA"
 	REASON_INVALID_PAYMENT_METADATA        ErrorReason = "INVALID_PAYMENT_METADATA"
+	REASON_REGISTRATION_EXPIRED            ErrorReason = "REGISTRATION_EXPIRED"
 )
 
 type Error struct {
@@ -107,4 +108,8 @@ func NewPaymentMissingMetadataError(key string) *Error {
 
 func NewInvalidPaymentMetadata(message string, cause error) *Error {
 	return newRegistrationError(REASON_INVALID_PAYMENT_METADATA, message, cause)
+}
+
+func NewRegistrationExpiredError(message string, cause error) *Error {
+	return newRegistrationError(REASON_REGISTRATION_EXPIRED, message, cause)
 }

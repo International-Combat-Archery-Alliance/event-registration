@@ -16,9 +16,11 @@ import (
 type Repository interface {
 	CreateRegistration(ctx context.Context, registration Registration, event events.Event) error
 	GetRegistration(ctx context.Context, eventId uuid.UUID, email string) (Registration, error)
+	GetRegistrationIntent(ctx context.Context, eventId uuid.UUID, email string) (RegistrationIntent, error)
 	GetAllRegistrationsForEvent(ctx context.Context, eventId uuid.UUID, limit int32, cursor *string) (GetAllRegistrationsResponse, error)
 	CreateRegistrationWithPayment(ctx context.Context, registration Registration, intent RegistrationIntent, event events.Event) error
 	UpdateRegistrationToPaid(ctx context.Context, registration Registration) error
+	DeleteExpiredRegistration(ctx context.Context, registration Registration, intent RegistrationIntent, event events.Event) error
 }
 
 type GetAllRegistrationsResponse struct {
@@ -219,13 +221,12 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 	return registrationRequest, checkoutInfo.ClientSecret, event, nil
 }
 
-func ConfirmRegistrationPayment(ctx context.Context, payload []byte, signature string, registrationRepo Repository, checkoutManager payments.CheckoutManager) (Registration, error) {
-	metadata, err := checkoutManager.ConfirmCheckout(ctx, payload, signature)
-	if err != nil {
-		return nil, err
+func ConfirmRegistrationPayment(ctx context.Context, payload []byte, signature string, registrationRepo Repository, eventRepo events.Repository, checkoutManager payments.CheckoutManager) (Registration, error) {
+	metadata, checkoutErr := checkoutManager.ConfirmCheckout(ctx, payload, signature)
+	isExpired := checkoutIsExpired(checkoutErr)
+	if checkoutErr != nil && !isExpired {
+		return nil, checkoutErr
 	}
-
-	// TODO: Need to handle payment failed/cancelled/expired
 
 	email, ok := metadata[emailKey]
 	if !ok {
@@ -241,6 +242,18 @@ func ConfirmRegistrationPayment(ctx context.Context, payload []byte, signature s
 		return nil, NewInvalidPaymentMetadata("Event ID is not a valid UUID", err)
 	}
 
+	if !isExpired {
+		return setRegistrationToPaid(ctx, registrationRepo, eventId, email)
+	} else {
+		reg, err := deleteExpiredRegistration(ctx, registrationRepo, eventRepo, eventId, email)
+		if err != nil {
+			return nil, err
+		}
+		return reg, NewRegistrationExpiredError("Registration expired", checkoutErr)
+	}
+}
+
+func setRegistrationToPaid(ctx context.Context, registrationRepo Repository, eventId uuid.UUID, email string) (Registration, error) {
 	reg, err := registrationRepo.GetRegistration(ctx, eventId, email)
 	if err != nil {
 		return nil, err
@@ -250,6 +263,48 @@ func ConfirmRegistrationPayment(ctx context.Context, payload []byte, signature s
 
 	err = registrationRepo.UpdateRegistrationToPaid(ctx, reg)
 	return reg, err
+}
+
+func deleteExpiredRegistration(ctx context.Context, registrationRepo Repository, eventRepo events.Repository, eventId uuid.UUID, email string) (Registration, error) {
+	reg, getRegErr := registrationRepo.GetRegistration(ctx, eventId, email)
+	regIntent, getRegIntentErr := registrationRepo.GetRegistrationIntent(ctx, eventId, email)
+	if getRegErr != nil && getRegIntentErr != nil {
+		var regError *Error
+		var regIntentError *Error
+
+		// if both of them do not exist, just return nil since that means that they are already deleted
+		if errors.As(getRegErr, &regError) && errors.As(getRegIntentErr, &regIntentError) {
+			if regError.Reason == REASON_REGISTRATION_DOES_NOT_EXIST && regIntentError.Reason == REASON_REGISTRATION_DOES_NOT_EXIST {
+				return nil, nil
+			}
+		}
+
+		return nil, getRegErr
+	} else if getRegErr != nil {
+		return nil, getRegErr
+	} else if getRegIntentErr != nil {
+		return nil, getRegIntentErr
+	}
+
+	event, err := eventRepo.GetEvent(ctx, eventId)
+	if err != nil {
+		return nil, err
+	}
+
+	switch reg.Type() {
+	case events.BY_INDIVIDUAL:
+		unregisterIndividualFromEvent(&event)
+	case events.BY_TEAM:
+		unregisterTeamFromEvent(&event, reg.(*TeamRegistration))
+	}
+
+	event.Version++
+	err = registrationRepo.DeleteExpiredRegistration(ctx, reg, regIntent, event)
+	if err != nil {
+		return nil, err
+	}
+
+	return reg, nil
 }
 
 func registerIndividualAsFreeAgent(event *events.Event, reg *IndividualRegistration) error {
@@ -264,6 +319,10 @@ func registerIndividualAsFreeAgent(event *events.Event, reg *IndividualRegistrat
 	event.NumTotalPlayers++
 
 	return nil
+}
+
+func unregisterIndividualFromEvent(event *events.Event) {
+	event.NumTotalPlayers--
 }
 
 func registerTeam(event *events.Event, reg *TeamRegistration) error {
@@ -286,4 +345,17 @@ func registerTeam(event *events.Event, reg *TeamRegistration) error {
 	event.NumRosteredPlayers += teamSize
 
 	return nil
+}
+
+func unregisterTeamFromEvent(event *events.Event, reg *TeamRegistration) {
+	teamSize := len(reg.Players)
+
+	event.NumTeams--
+	event.NumTotalPlayers -= teamSize
+	event.NumRosteredPlayers -= teamSize
+}
+
+func checkoutIsExpired(err error) bool {
+	var paymentError *payments.Error
+	return err != nil && errors.As(err, &paymentError) && paymentError.Reason == payments.ErrorReasonCheckoutExpired
 }

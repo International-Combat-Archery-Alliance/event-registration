@@ -27,8 +27,26 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 			return
 		}
 
-		reg, err := registration.ConfirmRegistrationPayment(ctx, payload, r.Header.Get("Stripe-Signature"), a.db, a.checkoutManager)
+		reg, err := registration.ConfirmRegistrationPayment(ctx, payload, r.Header.Get("Stripe-Signature"), a.db, a.db, a.checkoutManager)
 		if err != nil {
+			var regErr *registration.Error
+			if errors.As(err, &regErr) {
+				switch regErr.Reason {
+				case registration.REASON_REGISTRATION_EXPIRED:
+					logArgs := []any{}
+					if reg != nil {
+						logArgs = []any{
+							slog.String("eventId", reg.GetEventID().String()),
+							slog.String("email", reg.GetEmail()),
+						}
+					}
+					logger.Info("Registration expired", logArgs...)
+
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+			}
+
 			var paymentErr *payments.Error
 			if errors.As(err, &paymentErr) {
 				switch paymentErr.Reason {

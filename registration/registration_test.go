@@ -22,12 +22,24 @@ func (m *mockEventRepository) GetEvent(ctx context.Context, id uuid.UUID) (event
 	return m.GetEventFunc(ctx, id)
 }
 
+var _ Repository = &mockRegistrationRepository{}
+
 type mockRegistrationRepository struct {
 	CreateRegistrationFunc            func(ctx context.Context, registration Registration, event events.Event) error
 	GetAllRegistrationsForEventFunc   func(ctx context.Context, eventId uuid.UUID, limit int32, cursor *string) (GetAllRegistrationsResponse, error)
 	CreateRegistrationWithPaymentFunc func(ctx context.Context, registration Registration, intent RegistrationIntent, event events.Event) error
 	GetRegistrationFunc               func(ctx context.Context, eventId uuid.UUID, email string) (Registration, error)
 	UpdateRegistrationToPaidFunc      func(ctx context.Context, registration Registration) error
+	DeleteExpiredRegistrationFunc     func(ctx context.Context, registration Registration, intent RegistrationIntent, event events.Event) error
+	GetRegistrationIntentFunc         func(ctx context.Context, eventId uuid.UUID, email string) (RegistrationIntent, error)
+}
+
+func (m *mockRegistrationRepository) DeleteExpiredRegistration(ctx context.Context, registration Registration, intent RegistrationIntent, event events.Event) error {
+	return m.DeleteExpiredRegistrationFunc(ctx, registration, intent, event)
+}
+
+func (m *mockRegistrationRepository) GetRegistrationIntent(ctx context.Context, eventId uuid.UUID, email string) (RegistrationIntent, error) {
+	return m.GetRegistrationIntentFunc(ctx, eventId, email)
 }
 
 func (m *mockRegistrationRepository) CreateRegistration(ctx context.Context, registration Registration, event events.Event) error {
@@ -606,6 +618,7 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 			Paid:    false,
 		}
 
+		eventRepo := &mockEventRepository{}
 		registrationRepo := &mockRegistrationRepository{
 			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
 				assert.Equal(t, eventID, eventId)
@@ -629,7 +642,7 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 			},
 		}
 
-		result, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, checkoutManager)
+		result, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, eventRepo, checkoutManager)
 
 		assert.NoError(t, err)
 		assert.Equal(t, reg, result)
@@ -638,6 +651,7 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 	})
 
 	t.Run("missing email in metadata", func(t *testing.T) {
+		eventRepo := &mockEventRepository{}
 		registrationRepo := &mockRegistrationRepository{}
 		checkoutManager := &mockCheckoutManager{
 			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
@@ -647,7 +661,7 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 			},
 		}
 
-		_, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, checkoutManager)
+		_, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, eventRepo, checkoutManager)
 
 		assert.Error(t, err)
 		var registrationErr *Error
@@ -657,6 +671,7 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 	})
 
 	t.Run("invalid event ID in metadata", func(t *testing.T) {
+		eventRepo := &mockEventRepository{}
 		registrationRepo := &mockRegistrationRepository{}
 		checkoutManager := &mockCheckoutManager{
 			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
@@ -667,7 +682,7 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 			},
 		}
 
-		_, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, checkoutManager)
+		_, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, eventRepo, checkoutManager)
 
 		assert.Error(t, err)
 		var registrationErr *Error
