@@ -464,6 +464,7 @@ func TestRegisterWithPayment(t *testing.T) {
 		registrationRepo := &mockRegistrationRepository{
 			CreateRegistrationWithPaymentFunc: func(ctx context.Context, registration Registration, intent RegistrationIntent, evt events.Event) error {
 				assert.Equal(t, event.Version+1, evt.Version)
+				assert.Equal(t, event.ID, intent.EventId)
 				assert.Equal(t, "test_session_id", intent.PaymentSessionId)
 				return nil
 			},
@@ -501,6 +502,7 @@ func TestRegisterWithPayment(t *testing.T) {
 		}
 		registrationRepo := &mockRegistrationRepository{
 			CreateRegistrationWithPaymentFunc: func(ctx context.Context, registration Registration, intent RegistrationIntent, evt events.Event) error {
+				assert.Equal(t, event.ID, intent.EventId)
 				assert.Equal(t, event.Version+1, evt.Version)
 				return nil
 			},

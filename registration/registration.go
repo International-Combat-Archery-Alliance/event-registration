@@ -204,6 +204,7 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 			eventIdKey: event.ID.String(),
 		},
 		AllowAdaptivePricing: true,
+		CustomerEmail:        ptr.String(registrationRequest.GetEmail()),
 	})
 	if err != nil {
 		return nil, "", events.Event{}, NewFailedToCreateCheckoutError("Failed to create checkout", err)
@@ -211,6 +212,7 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 
 	event.Version++
 	err = registrationRepo.CreateRegistrationWithPayment(ctx, registrationRequest, RegistrationIntent{
+		EventId:          eventId,
 		Version:          1,
 		PaymentSessionId: checkoutInfo.SessionId,
 		Email:            registrationRequest.GetEmail(),
