@@ -475,12 +475,26 @@ func TestRegisterWithPayment(t *testing.T) {
 			Email:   "test@example.com",
 		}
 
-		reg, clientSecret, evt, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+		before := time.Now()
+		reg, regIntent, clientSecret, evt, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+		after := time.Now()
 
 		assert.NoError(t, err)
 		assert.Equal(t, registrationRequest, reg)
 		assert.Equal(t, "test_client_secret", clientSecret)
 		assert.Equal(t, event.Version+1, evt.Version)
+
+		// Verify RegistrationIntent fields
+		assert.Equal(t, eventID, regIntent.EventId)
+		assert.Equal(t, "test_session_id", regIntent.PaymentSessionId)
+		assert.Equal(t, "test@example.com", regIntent.Email)
+		assert.Equal(t, 1, regIntent.Version)
+
+		// Verify ExpiresAt is set to 30 minutes from now
+		expectedExpiration := before.Add(30 * time.Minute)
+		actualExpiration := regIntent.ExpiresAt
+		assert.True(t, actualExpiration.After(expectedExpiration.Add(-1*time.Second)), "ExpiresAt should be approximately 30 minutes from now")
+		assert.True(t, actualExpiration.Before(after.Add(30*time.Minute).Add(1*time.Second)), "ExpiresAt should be approximately 30 minutes from now")
 	})
 
 	t.Run("successful team registration with payment", func(t *testing.T) {
@@ -509,16 +523,31 @@ func TestRegisterWithPayment(t *testing.T) {
 		}
 		checkoutManager := &mockCheckoutManager{}
 		registrationRequest := &TeamRegistration{
-			EventID: eventID,
-			Players: []PlayerInfo{{}},
+			EventID:      eventID,
+			CaptainEmail: "captain@example.com",
+			Players:      []PlayerInfo{{}},
 		}
 
-		reg, clientSecret, evt, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+		before := time.Now()
+		reg, regIntent, clientSecret, evt, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+		after := time.Now()
 
 		assert.NoError(t, err)
 		assert.Equal(t, registrationRequest, reg)
 		assert.Equal(t, "test_client_secret", clientSecret)
 		assert.Equal(t, event.Version+1, evt.Version)
+
+		// Verify RegistrationIntent fields
+		assert.Equal(t, eventID, regIntent.EventId)
+		assert.Equal(t, "test_session_id", regIntent.PaymentSessionId)
+		assert.Equal(t, "captain@example.com", regIntent.Email)
+		assert.Equal(t, 1, regIntent.Version)
+
+		// Verify ExpiresAt is set to 30 minutes from now
+		expectedExpiration := before.Add(30 * time.Minute)
+		actualExpiration := regIntent.ExpiresAt
+		assert.True(t, actualExpiration.After(expectedExpiration.Add(-1*time.Second)), "ExpiresAt should be approximately 30 minutes from now")
+		assert.True(t, actualExpiration.Before(after.Add(30*time.Minute).Add(1*time.Second)), "ExpiresAt should be approximately 30 minutes from now")
 	})
 
 	t.Run("event does not exist", func(t *testing.T) {
@@ -533,7 +562,7 @@ func TestRegisterWithPayment(t *testing.T) {
 			EventID: uuid.New(),
 		}
 
-		_, _, _, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+		_, _, _, _, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
 
 		assert.Error(t, err)
 		var registrationErr *Error
@@ -567,7 +596,7 @@ func TestRegisterWithPayment(t *testing.T) {
 			Email:   "test@example.com",
 		}
 
-		_, _, _, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+		_, _, _, _, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
 
 		assert.Error(t, err)
 		var registrationErr *Error
@@ -599,7 +628,7 @@ func TestRegisterWithPayment(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
+		_, _, _, _, err := RegisterWithPayment(context.Background(), registrationRequest, eventRepo, registrationRepo, checkoutManager, "https://return.url")
 
 		assert.Error(t, err)
 		var registrationErr *Error
@@ -704,8 +733,10 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		}
 		regIntent := RegistrationIntent{
 			Version:          1,
+			EventId:          eventID,
 			PaymentSessionId: "session_123",
 			Email:            email,
+			ExpiresAt:        time.Now().Add(30 * time.Minute),
 		}
 		event := events.Event{
 			ID:                 eventID,
@@ -766,8 +797,10 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		}
 		regIntent := RegistrationIntent{
 			Version:          1,
+			EventId:          eventID,
 			PaymentSessionId: "session_456",
 			Email:            email,
+			ExpiresAt:        time.Now().Add(30 * time.Minute),
 		}
 		event := events.Event{
 			ID:                 eventID,
@@ -858,8 +891,10 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		}
 		regIntent := RegistrationIntent{
 			Version:          1,
+			EventId:          eventID,
 			PaymentSessionId: "session_789",
 			Email:            email,
+			ExpiresAt:        time.Now().Add(30 * time.Minute),
 		}
 
 		eventRepo := &mockEventRepository{

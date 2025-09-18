@@ -732,10 +732,14 @@ components:
       type: object
       required:
         - clientSecret
+        - expiresAt
         - registration
       properties:
         clientSecret:
           type: string
+        expiresAt:
+          type: string
+          format: date-time
         registration:
           $ref: '#/components/schemas/Registration'
     RegistrationType:

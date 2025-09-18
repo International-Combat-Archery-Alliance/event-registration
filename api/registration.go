@@ -55,7 +55,7 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 		returnURL = fmt.Sprintf("http://localhost:5173/events/%s/success", request.EventId)
 	}
 
-	signedUpReg, clientSecret, _, err := registration.RegisterWithPayment(ctx, reg, a.db, a.db, a.checkoutManager, returnURL)
+	signedUpReg, regIntent, clientSecret, _, err := registration.RegisterWithPayment(ctx, reg, a.db, a.db, a.checkoutManager, returnURL)
 	if err != nil {
 		logger.Error("Error trying to register", "error", err)
 
@@ -97,7 +97,7 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 		}, nil
 	}
 
-	return PostEventsV1EventIdRegistrations200JSONResponse{Info: RegistrationPaymentInfo{Registration: respReg, ClientSecret: clientSecret}}, nil
+	return PostEventsV1EventIdRegistrations200JSONResponse{Info: RegistrationPaymentInfo{Registration: respReg, ClientSecret: clientSecret, ExpiresAt: regIntent.ExpiresAt}}, nil
 }
 
 func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEventsV1EventIdRegisterRequestObject) (PostEventsV1EventIdRegisterResponseObject, error) {

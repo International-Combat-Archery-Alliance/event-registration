@@ -149,7 +149,7 @@ func AttemptRegistration(ctx context.Context, registrationRequest Registration, 
 	return registrationRequest, event, nil
 }
 
-func RegisterWithPayment(ctx context.Context, registrationRequest Registration, eventRepo events.Repository, registrationRepo Repository, checkoutManager payments.CheckoutManager, paymentReturnURL string) (Registration, string, events.Event, error) {
+func RegisterWithPayment(ctx context.Context, registrationRequest Registration, eventRepo events.Repository, registrationRepo Repository, checkoutManager payments.CheckoutManager, paymentReturnURL string) (Registration, RegistrationIntent, string, events.Event, error) {
 	eventId := registrationRequest.GetEventID()
 
 	event, err := eventRepo.GetEvent(ctx, eventId)
@@ -158,11 +158,11 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 		if errors.As(err, &eventErr) {
 			switch eventErr.Reason {
 			case events.REASON_EVENT_DOES_NOT_EXIST:
-				return nil, "", events.Event{}, NewAssociatedEventDoesNotExistError(fmt.Sprintf("Event does not exist with ID %q", eventId), err)
+				return nil, RegistrationIntent{}, "", events.Event{}, NewAssociatedEventDoesNotExistError(fmt.Sprintf("Event does not exist with ID %q", eventId), err)
 			}
 		}
 
-		return nil, "", events.Event{}, NewFailedToFetchError(fmt.Sprintf("Failed to fetch event with ID %q", eventId), err)
+		return nil, RegistrationIntent{}, "", events.Event{}, NewFailedToFetchError(fmt.Sprintf("Failed to fetch event with ID %q", eventId), err)
 	}
 
 	var paymentItem payments.Item
@@ -171,7 +171,7 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 		regReq := registrationRequest.(*IndividualRegistration)
 		err = registerIndividualAsFreeAgent(&event, regReq)
 		if err != nil {
-			return nil, "", events.Event{}, err
+			return nil, RegistrationIntent{}, "", events.Event{}, err
 		}
 		paymentItem = payments.Item{
 			Name:     fmt.Sprintf("%s Free Agent Sign Up", event.Name),
@@ -182,7 +182,7 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 		regReq := registrationRequest.(*TeamRegistration)
 		err = registerTeam(&event, regReq)
 		if err != nil {
-			return nil, "", events.Event{}, err
+			return nil, RegistrationIntent{}, "", events.Event{}, err
 		}
 		paymentItem = payments.Item{
 			Name:     fmt.Sprintf("%s Team Sign Up", event.Name),
@@ -190,7 +190,7 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 			Price:    event.RegistrationOptions[slices.IndexFunc(event.RegistrationOptions, func(v events.EventRegistrationOption) bool { return v.RegType == events.BY_TEAM })].Price,
 		}
 	default:
-		return nil, "", events.Event{}, NewUnknownRegistrationTypeError(fmt.Sprintf("Unknown registration type: %d", registrationRequest.Type()))
+		return nil, RegistrationIntent{}, "", events.Event{}, NewUnknownRegistrationTypeError(fmt.Sprintf("Unknown registration type: %d", registrationRequest.Type()))
 	}
 
 	checkoutInfo, err := checkoutManager.CreateCheckout(ctx, payments.CheckoutParams{
@@ -207,20 +207,23 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 		CustomerEmail:        ptr.String(registrationRequest.GetEmail()),
 	})
 	if err != nil {
-		return nil, "", events.Event{}, NewFailedToCreateCheckoutError("Failed to create checkout", err)
+		return nil, RegistrationIntent{}, "", events.Event{}, NewFailedToCreateCheckoutError("Failed to create checkout", err)
 	}
 
-	event.Version++
-	err = registrationRepo.CreateRegistrationWithPayment(ctx, registrationRequest, RegistrationIntent{
+	regIntent := RegistrationIntent{
 		EventId:          eventId,
 		Version:          1,
 		PaymentSessionId: checkoutInfo.SessionId,
 		Email:            registrationRequest.GetEmail(),
-	}, event)
-	if err != nil {
-		return nil, "", events.Event{}, err
+		ExpiresAt:        time.Now().Add(30 * time.Minute),
 	}
-	return registrationRequest, checkoutInfo.ClientSecret, event, nil
+
+	event.Version++
+	err = registrationRepo.CreateRegistrationWithPayment(ctx, registrationRequest, regIntent, event)
+	if err != nil {
+		return nil, RegistrationIntent{}, "", events.Event{}, err
+	}
+	return registrationRequest, regIntent, checkoutInfo.ClientSecret, event, nil
 }
 
 func ConfirmRegistrationPayment(ctx context.Context, payload []byte, signature string, registrationRepo Repository, eventRepo events.Repository, checkoutManager payments.CheckoutManager) (Registration, error) {

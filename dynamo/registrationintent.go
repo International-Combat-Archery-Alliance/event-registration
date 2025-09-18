@@ -21,6 +21,7 @@ type registrationIntentDynamo struct {
 	EventId          uuid.UUID
 	PaymentSessionID string
 	Email            string
+	ExpiresAt        time.Time
 }
 
 const (
@@ -43,6 +44,7 @@ func regIntentToDynamo(regIntent registration.RegistrationIntent) registrationIn
 		Email:            regIntent.Email,
 		EventId:          regIntent.EventId,
 		PaymentSessionID: regIntent.PaymentSessionId,
+		ExpiresAt:        regIntent.ExpiresAt,
 	}
 }
 
@@ -52,6 +54,7 @@ func dynamoRegIntentToRegIntent(regIntent registrationIntentDynamo) registration
 		EventId:          regIntent.EventId,
 		PaymentSessionId: regIntent.PaymentSessionID,
 		Email:            regIntent.Email,
+		ExpiresAt:        regIntent.ExpiresAt,
 	}
 }
 
