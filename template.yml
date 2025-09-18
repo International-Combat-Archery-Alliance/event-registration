@@ -73,6 +73,8 @@ Resources:
             Resource: 
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cfTurnstileSecretKey"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/googleServiceAccount"
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stripeSecretKey"
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stripeEndpointSecret"
           - Effect: Allow
             Action:
               - ses:SendEmail
