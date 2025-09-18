@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -508,6 +509,144 @@ func TestCreateRegistrationWithPayment(t *testing.T) {
 		a.NoError(err)
 		a.Equal(reg, *retrieved.(*registration.TeamRegistration))
 		a.False(retrieved.(*registration.TeamRegistration).Paid) // Should still be unpaid
+	})
+
+	t.Run("successfully create individual registration with payment intent and player email", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Payment City",
+			Paid:       false, // Should be false initially
+			Email:      "payment-with-player-email@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Payment", LastName: "User", Email: ptr.String("player.payment@example.com")},
+			Experience: registration.NOVICE,
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "stripe_session_player_email",
+			Email:            "payment-with-player-email@example.com",
+		}
+
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event2)
+		a.NoError(err)
+
+		// Verify registration was created with player email preserved
+		retrieved, err := db.GetRegistration(ctx, eventID, "payment-with-player-email@example.com")
+		a.NoError(err)
+		indivReg := retrieved.(*registration.IndividualRegistration)
+		a.Equal(reg, *indivReg)
+		a.False(indivReg.Paid) // Should still be unpaid
+		a.Equal("player.payment@example.com", *indivReg.PlayerInfo.Email)
+	})
+
+	t.Run("successfully create individual registration with payment intent but no player email", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Payment City No Email",
+			Paid:       false,
+			Email:      "payment-no-player-email@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Payment", LastName: "NoEmail", Email: nil},
+			Experience: registration.INTERMEDIATE,
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "stripe_session_no_player_email",
+			Email:            "payment-no-player-email@example.com",
+		}
+
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event2)
+		a.NoError(err)
+
+		// Verify registration was created with nil player email preserved
+		retrieved, err := db.GetRegistration(ctx, eventID, "payment-no-player-email@example.com")
+		a.NoError(err)
+		indivReg := retrieved.(*registration.IndividualRegistration)
+		a.Equal(reg, *indivReg)
+		a.False(indivReg.Paid)
+		a.Nil(indivReg.PlayerInfo.Email)
+	})
+
+	t.Run("successfully create team registration with payment intent and mixed player emails", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		reg := registration.TeamRegistration{
+			ID:           uuid.New(),
+			EventID:      eventID,
+			Version:      1,
+			HomeCity:     "Payment Team City Mixed",
+			Paid:         false,
+			TeamName:     "Payment Team Mixed Emails",
+			CaptainEmail: "team-payment-mixed@example.com",
+			Players: []registration.PlayerInfo{
+				{FirstName: "TeamPlayer1", LastName: "WithEmail", Email: ptr.String("teamplayer1@example.com")},
+				{FirstName: "TeamPlayer2", LastName: "NoEmail", Email: nil},
+				{FirstName: "TeamPlayer3", LastName: "EmptyEmail", Email: ptr.String("")},
+				{FirstName: "TeamPlayer4", LastName: "AlsoWithEmail", Email: ptr.String("teamplayer4@example.com")},
+			},
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "stripe_session_team_mixed",
+			Email:            "team-payment-mixed@example.com",
+		}
+
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, event2)
+		a.NoError(err)
+
+		// Verify registration was created with all player email variations preserved
+		retrieved, err := db.GetRegistration(ctx, eventID, "team-payment-mixed@example.com")
+		a.NoError(err)
+		teamReg := retrieved.(*registration.TeamRegistration)
+		a.Equal(reg, *teamReg)
+		a.False(teamReg.Paid)
+
+		require.Len(t, teamReg.Players, 4)
+		// Player 1 - has email
+		a.Equal("TeamPlayer1", teamReg.Players[0].FirstName)
+		a.NotNil(teamReg.Players[0].Email)
+		a.Equal("teamplayer1@example.com", *teamReg.Players[0].Email)
+
+		// Player 2 - no email (nil)
+		a.Equal("TeamPlayer2", teamReg.Players[1].FirstName)
+		a.Nil(teamReg.Players[1].Email)
+
+		// Player 3 - empty email string
+		a.Equal("TeamPlayer3", teamReg.Players[2].FirstName)
+		a.NotNil(teamReg.Players[2].Email)
+		a.Equal("", *teamReg.Players[2].Email)
+
+		// Player 4 - has email
+		a.Equal("TeamPlayer4", teamReg.Players[3].FirstName)
+		a.NotNil(teamReg.Players[3].Email)
+		a.Equal("teamplayer4@example.com", *teamReg.Players[3].Email)
 	})
 
 	t.Run("fail when registration already exists", func(t *testing.T) {

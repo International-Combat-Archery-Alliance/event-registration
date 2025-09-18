@@ -359,6 +359,7 @@ func apiPlayerInfoToPlayerInfo(playerInfo PlayerInfo) registration.PlayerInfo {
 	return registration.PlayerInfo{
 		FirstName: playerInfo.FirstName,
 		LastName:  playerInfo.LastName,
+		Email:     (*string)(playerInfo.Email),
 	}
 }
 
@@ -366,6 +367,7 @@ func playerInfoToApiPlayerInfo(playerInfo registration.PlayerInfo) PlayerInfo {
 	return PlayerInfo{
 		FirstName: playerInfo.FirstName,
 		LastName:  playerInfo.LastName,
+		Email:     (*types.Email)(playerInfo.Email),
 	}
 }
 
