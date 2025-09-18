@@ -13,6 +13,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/captcha/cfturnstile"
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
 	"github.com/International-Combat-Archery-Alliance/event-registration/dynamo"
+	"github.com/International-Combat-Archery-Alliance/payments/stripe"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -53,7 +54,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	eventAPI := api.NewAPI(db, logger, env, googleAuthValidator, cfTurnstileValidator, emailSender)
+	stripeClient, err := makeStripeClient(ctx, env)
+	if err != nil {
+		logger.Error("failed to create stripe client", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	eventAPI := api.NewAPI(db, logger, env, googleAuthValidator, cfTurnstileValidator, emailSender, stripeClient)
 
 	serverSettings := getServerSettingsFromEnv()
 	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
@@ -178,4 +185,43 @@ func getGoogleServiceAccountJSON(ctx context.Context) ([]byte, error) {
 	}
 
 	return []byte(parameter), nil
+}
+
+func getStripeSecretKey(ctx context.Context, env api.Environment) (string, error) {
+	if env == api.LOCAL {
+		return getEnvOrDefault("STRIPE_SECRET_KEY", ""), nil
+	}
+
+	parameter, err := getParameterFromAWS(ctx, "/stripeSecretKey")
+	if err != nil {
+		return "", fmt.Errorf("failed to get stripe secret key: %w", err)
+	}
+
+	return parameter, nil
+}
+
+func getStripeEndpointSecret(ctx context.Context, env api.Environment) (string, error) {
+	if env == api.LOCAL {
+		return getEnvOrDefault("STRIPE_ENDPOINT_SECRET", ""), nil
+	}
+
+	parameter, err := getParameterFromAWS(ctx, "/stripeEndpointSecret")
+	if err != nil {
+		return "", fmt.Errorf("failed to get stripe endpoint secret: %w", err)
+	}
+
+	return parameter, nil
+}
+
+func makeStripeClient(ctx context.Context, env api.Environment) (*stripe.Client, error) {
+	secretKey, err := getStripeSecretKey(ctx, env)
+	if err != nil {
+		return nil, err
+	}
+	endpointSecret, err := getStripeEndpointSecret(ctx, env)
+	if err != nil {
+		return nil, err
+	}
+
+	return stripe.NewClient(secretKey, endpointSecret), nil
 }

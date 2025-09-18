@@ -14,6 +14,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
+	"github.com/International-Combat-Archery-Alliance/payments"
 )
 
 type Environment int
@@ -36,6 +37,7 @@ type API struct {
 	authValidator    auth.Validator
 	captchaValidator captcha.Validator
 	emailSender      email.Sender
+	checkoutManager  payments.CheckoutManager
 }
 
 var _ StrictServerInterface = (*API)(nil)
@@ -47,6 +49,7 @@ func NewAPI(
 	authValidator auth.Validator,
 	captchaValidator captcha.Validator,
 	emailSender email.Sender,
+	checkoutManager payments.CheckoutManager,
 ) *API {
 	return &API{
 		db:               db,
@@ -55,6 +58,7 @@ func NewAPI(
 		authValidator:    authValidator,
 		captchaValidator: captchaValidator,
 		emailSender:      emailSender,
+		checkoutManager:  checkoutManager,
 	}
 }
 
@@ -81,6 +85,7 @@ func (a *API) ListenAndServe(host string, port string) error {
 		// Executes from the bottom up
 		a.openapiValidateMiddleware(swagger),
 		a.corsMiddleware(),
+		a.stripeRegistrationPaymentWebhookMiddleware("/events/v1/registration/webhook"),
 		swaggerUIMiddleware,
 		middleware.AccessLogging(a.logger),
 	}

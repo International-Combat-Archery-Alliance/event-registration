@@ -6,4 +6,4 @@ build:
 .PHONY: local
 local: build
 	docker-compose up -d
-	sam local start-api --docker-network icaa-event-registration --parameter-overrides architecture=x86_64 --warm-containers EAGER
+	sam local start-api --docker-network icaa-event-registration --parameter-overrides architecture=x86_64 --warm-containers EAGER --env-vars env.json

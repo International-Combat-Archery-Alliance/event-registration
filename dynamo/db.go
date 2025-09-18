@@ -31,6 +31,11 @@ func existingEntityVersionConditional(version int) expression.ConditionBuilder {
 		And(expression.Name("Version").Equal(expression.Value(version - 1)))
 }
 
+func deleteEntityVersionConditional(version int) expression.ConditionBuilder {
+	return expression.Name("PK").AttributeExists().
+		And(expression.Name("Version").Equal(expression.Value(version)))
+}
+
 func exprMustBuild(builder expression.Builder) expression.Expression {
 	expr, err := builder.Build()
 	if err != nil {

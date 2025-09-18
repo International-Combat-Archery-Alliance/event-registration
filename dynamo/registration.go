@@ -59,7 +59,7 @@ func registrationSK(email string) string {
 func registrationToDynamo(reg registration.Registration) registrationDynamo {
 	switch reg.Type() {
 	case events.BY_INDIVIDUAL:
-		indivReg := reg.(registration.IndividualRegistration)
+		indivReg := reg.(*registration.IndividualRegistration)
 		return registrationDynamo{
 			PK:           registrationPK(indivReg.EventID),
 			SK:           registrationSK(indivReg.Email),
@@ -75,7 +75,7 @@ func registrationToDynamo(reg registration.Registration) registrationDynamo {
 			Experience:   indivReg.Experience,
 		}
 	case events.BY_TEAM:
-		teamReg := reg.(registration.TeamRegistration)
+		teamReg := reg.(*registration.TeamRegistration)
 		return registrationDynamo{
 			PK:           registrationPK(teamReg.EventID),
 			SK:           registrationSK(teamReg.CaptainEmail),
@@ -98,7 +98,7 @@ func registrationToDynamo(reg registration.Registration) registrationDynamo {
 func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 	switch dynReg.Type {
 	case events.BY_INDIVIDUAL:
-		return registration.IndividualRegistration{
+		return &registration.IndividualRegistration{
 			ID:           uuid.MustParse(dynReg.ID),
 			Version:      dynReg.Version,
 			EventID:      uuid.MustParse(dynReg.EventID),
@@ -110,7 +110,7 @@ func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 			Experience:   dynReg.Experience,
 		}
 	case events.BY_TEAM:
-		return registration.TeamRegistration{
+		return &registration.TeamRegistration{
 			ID:           uuid.MustParse(dynReg.ID),
 			Version:      dynReg.Version,
 			EventID:      uuid.MustParse(dynReg.EventID),
@@ -124,6 +124,36 @@ func dynamoToRegistration(dynReg registrationDynamo) registration.Registration {
 	default:
 		panic("unknown registration type")
 	}
+}
+
+func (d *DB) GetRegistration(ctx context.Context, eventId uuid.UUID, email string) (registration.Registration, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	resp, err := d.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(d.tableName),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: registrationPK(eventId)},
+			"SK": &types.AttributeValueMemberS{Value: registrationSK(email)},
+		},
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, registration.NewTimeoutError("GetRegistration timed out")
+		}
+		return nil, registration.NewFailedToFetchError(fmt.Sprintf("Failed to fetch registration for event ID %q and email %s", eventId, email), err)
+	}
+
+	if len(resp.Item) == 0 {
+		return nil, registration.NewRegistrationDoesNotExistsError(fmt.Sprintf("Registration for event ID %q and email %s not found", eventId, email), nil)
+	}
+
+	var reg registrationDynamo
+	err = attributevalue.UnmarshalMap(resp.Item, &reg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to unmarshal registration from DB: %s", err))
+	}
+	return dynamoToRegistration(reg), nil
 }
 
 func (d *DB) CreateRegistration(ctx context.Context, reg registration.Registration, event events.Event) error {
@@ -179,6 +209,206 @@ func (d *DB) CreateRegistration(ctx context.Context, reg registration.Registrati
 			return registration.NewFailedToWriteError("Version conflict error", err)
 		} else if errors.Is(err, context.DeadlineExceeded) {
 			return registration.NewTimeoutError("CreateRegistration timed out")
+		} else {
+			return registration.NewFailedToWriteError("Failed PutItem call", err)
+		}
+	}
+
+	return nil
+}
+
+func (d *DB) CreateRegistrationWithPayment(ctx context.Context, reg registration.Registration, regIntent registration.RegistrationIntent, event events.Event) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	dynamoReg := registrationToDynamo(reg)
+
+	regItem, err := attributevalue.MarshalMap(dynamoReg)
+	if err != nil {
+		return registration.NewFailedToTranslateToDBModelError("Failed to translate registration to dynamo model", err)
+	}
+	regExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(newEntityVersionConditional(dynamoReg.Version)))
+
+	dynamoRegIntent := regIntentToDynamo(regIntent)
+
+	regIntentItem, err := attributevalue.MarshalMap(dynamoRegIntent)
+	if err != nil {
+		return registration.NewFailedToTranslateToDBModelError("Failed to translate regIntent to dynamo model", err)
+	}
+	regIntentExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(newEntityVersionConditional(dynamoRegIntent.Version)))
+
+	dynamoEvent := newEventDynamo(event)
+
+	eventItem, err := attributevalue.MarshalMap(dynamoEvent)
+	if err != nil {
+		return registration.NewFailedToTranslateToDBModelError("Failed to translate event to dynamo model", err)
+	}
+	eventExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(existingEntityVersionConditional(event.Version)))
+
+	_, err = d.dynamoClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{
+			{
+				Put: &types.Put{
+					TableName:                 aws.String(d.tableName),
+					Item:                      regItem,
+					ConditionExpression:       regExpr.Condition(),
+					ExpressionAttributeNames:  regExpr.Names(),
+					ExpressionAttributeValues: regExpr.Values(),
+				},
+			},
+			{
+				Put: &types.Put{
+					TableName:                 aws.String(d.tableName),
+					Item:                      regIntentItem,
+					ConditionExpression:       regIntentExpr.Condition(),
+					ExpressionAttributeNames:  regIntentExpr.Names(),
+					ExpressionAttributeValues: regIntentExpr.Values(),
+				},
+			},
+			{
+				Put: &types.Put{
+					TableName:                 aws.String(d.tableName),
+					Item:                      eventItem,
+					ConditionExpression:       eventExpr.Condition(),
+					ExpressionAttributeNames:  eventExpr.Names(),
+					ExpressionAttributeValues: eventExpr.Values(),
+				},
+			},
+		},
+	})
+	if err != nil {
+		var transactionFailedErr *types.TransactionCanceledException
+		if errors.As(err, &transactionFailedErr) {
+			if transactionFailedErr.CancellationReasons[0].Code != nil {
+				return registration.NewRegistrationAlreadyExistsError(fmt.Sprintf("Registration with ID %q already exists", dynamoReg.ID), err)
+			}
+			return registration.NewFailedToWriteError("Version conflict error", err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			return registration.NewTimeoutError("CreateRegistration timed out")
+		} else {
+			return registration.NewFailedToWriteError("Failed PutItem call", err)
+		}
+	}
+
+	return nil
+}
+
+func (d *DB) UpdateRegistrationToPaid(ctx context.Context, reg registration.Registration) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	dynamoReg := registrationToDynamo(reg)
+
+	regItem, err := attributevalue.MarshalMap(dynamoReg)
+	if err != nil {
+		return registration.NewFailedToTranslateToDBModelError("Failed to translate registration to dynamo model", err)
+	}
+	regExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(existingEntityVersionConditional(dynamoReg.Version)))
+
+	_, err = d.dynamoClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{
+			{
+				Put: &types.Put{
+					TableName:                 aws.String(d.tableName),
+					Item:                      regItem,
+					ConditionExpression:       regExpr.Condition(),
+					ExpressionAttributeNames:  regExpr.Names(),
+					ExpressionAttributeValues: regExpr.Values(),
+				},
+			},
+			{
+				Delete: &types.Delete{
+					TableName: aws.String(d.tableName),
+					Key: map[string]types.AttributeValue{
+						"PK": &types.AttributeValueMemberS{Value: registrationIntentPK(reg.GetEventID())},
+						"SK": &types.AttributeValueMemberS{Value: registrationIntentSK(reg.GetEmail())},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		var transactionFailedErr *types.TransactionCanceledException
+		if errors.As(err, &transactionFailedErr) {
+			return registration.NewFailedToWriteError("Version conflict error", err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			return registration.NewTimeoutError("UpdateRegistrationToPaid timed out")
+		} else {
+			return registration.NewFailedToWriteError("Failed PutItem call", err)
+		}
+	}
+
+	return nil
+}
+
+func (d *DB) DeleteExpiredRegistration(ctx context.Context, reg registration.Registration, regIntent registration.RegistrationIntent, event events.Event) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	dynamoReg := registrationToDynamo(reg)
+	regExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(deleteEntityVersionConditional(dynamoReg.Version)))
+
+	dynamoRegIntent := regIntentToDynamo(regIntent)
+	regIntentExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(deleteEntityVersionConditional(dynamoRegIntent.Version)))
+
+	dynamoEvent := newEventDynamo(event)
+	eventItem, err := attributevalue.MarshalMap(dynamoEvent)
+	if err != nil {
+		return registration.NewFailedToTranslateToDBModelError("Failed to translate event to dynamo model", err)
+	}
+	eventExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(existingEntityVersionConditional(event.Version)))
+
+	_, err = d.dynamoClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{
+			// Delete the reg and reg intent, update the event to have the updated stats
+			{
+				Delete: &types.Delete{
+					TableName: aws.String(d.tableName),
+					Key: map[string]types.AttributeValue{
+						"PK": &types.AttributeValueMemberS{Value: dynamoReg.PK},
+						"SK": &types.AttributeValueMemberS{Value: dynamoReg.SK},
+					},
+					ConditionExpression:       regExpr.Condition(),
+					ExpressionAttributeNames:  regExpr.Names(),
+					ExpressionAttributeValues: regExpr.Values(),
+				},
+			},
+			{
+				Delete: &types.Delete{
+					TableName: aws.String(d.tableName),
+					Key: map[string]types.AttributeValue{
+						"PK": &types.AttributeValueMemberS{Value: dynamoRegIntent.PK},
+						"SK": &types.AttributeValueMemberS{Value: dynamoRegIntent.SK},
+					},
+					ConditionExpression:       regIntentExpr.Condition(),
+					ExpressionAttributeNames:  regIntentExpr.Names(),
+					ExpressionAttributeValues: regIntentExpr.Values(),
+				},
+			},
+			{
+				Put: &types.Put{
+					TableName:                 aws.String(d.tableName),
+					Item:                      eventItem,
+					ConditionExpression:       eventExpr.Condition(),
+					ExpressionAttributeNames:  eventExpr.Names(),
+					ExpressionAttributeValues: eventExpr.Values(),
+				},
+			},
+		},
+	})
+	if err != nil {
+		var transactionFailedErr *types.TransactionCanceledException
+		if errors.As(err, &transactionFailedErr) {
+			return registration.NewFailedToWriteError("Version conflict error", err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			return registration.NewTimeoutError("DeleteExpiredRegistration timed out")
 		} else {
 			return registration.NewFailedToWriteError("Failed PutItem call", err)
 		}

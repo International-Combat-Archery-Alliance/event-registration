@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
@@ -13,6 +14,91 @@ import (
 	"github.com/google/uuid"
 	"github.com/oapi-codegen/runtime/types"
 )
+
+func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request PostEventsV1EventIdRegistrationsRequestObject) (PostEventsV1EventIdRegistrationsResponseObject, error) {
+	logger := a.getLoggerOrBaseLogger(ctx)
+
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	validatedData, err := a.captchaValidator.Validate(ctx, request.Params.CfTurnstileResponse, "")
+	if err != nil {
+		logger.Warn("Invalid captcha", slog.String("error", err.Error()))
+
+		return PostEventsV1EventIdRegistrations400JSONResponse{
+			Code:    CaptchaInvalid,
+			Message: "Invalid captcha",
+		}, nil
+	}
+	if a.env == PROD && validatedData.Hostname() != "icaa.world" {
+		logger.Warn("Invalid captcha hostname", slog.String("givenHostname", validatedData.Hostname()))
+
+		return PostEventsV1EventIdRegistrations400JSONResponse{
+			Code:    CaptchaInvalid,
+			Message: "Invalid hostname, must come from icaa.world",
+		}, nil
+	}
+
+	// request.Body is guaranteed to be non-nil from openapi doc
+	reg, err := apiRegistrationToRegistration(*request.Body, request.EventId)
+	if err != nil {
+		logger.Warn("Invalid body for registration", "error", err)
+
+		return PostEventsV1EventIdRegistrations400JSONResponse{
+			Code:    InvalidBody,
+			Message: "Invalid body",
+		}, nil
+	}
+
+	returnURL := fmt.Sprintf("https://icaa.world/events/%s/success", request.EventId)
+	if a.env == LOCAL {
+		returnURL = fmt.Sprintf("http://localhost:5173/events/%s/success", request.EventId)
+	}
+
+	signedUpReg, regIntent, clientSecret, _, err := registration.RegisterWithPayment(ctx, reg, a.db, a.db, a.checkoutManager, returnURL)
+	if err != nil {
+		logger.Error("Error trying to register", "error", err)
+
+		var registrationErr *registration.Error
+
+		if errors.As(err, &registrationErr) {
+			switch registrationErr.Reason {
+			case registration.REASON_ASSOCIATED_EVENT_DOES_NOT_EXIST:
+				return PostEventsV1EventIdRegistrations404JSONResponse{
+					Code:    NotFound,
+					Message: "Event to register with was not found",
+				}, nil
+			case registration.REASON_REGISTRATION_IS_CLOSED:
+				return PostEventsV1EventIdRegistrations403JSONResponse{
+					Code:    RegistrationClosed,
+					Message: "Registration has closed for this event",
+				}, nil
+			case registration.REASON_REGISTRATION_ALREADY_EXISTS:
+				return PostEventsV1EventIdRegistrations409JSONResponse{
+					Code:    AlreadyExists,
+					Message: "Registration already exists for this email",
+				}, nil
+			}
+		}
+
+		return PostEventsV1EventIdRegistrations500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to register",
+		}, nil
+	}
+
+	respReg, err := registrationToApiRegistration(signedUpReg)
+	if err != nil {
+		logger.Error("Failed to convert registration to api registration", "error", err)
+
+		return PostEventsV1EventIdRegistrations500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to register",
+		}, nil
+	}
+
+	return PostEventsV1EventIdRegistrations200JSONResponse{Info: RegistrationPaymentInfo{Registration: respReg, ClientSecret: clientSecret, ExpiresAt: regIntent.ExpiresAt}}, nil
+}
 
 func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEventsV1EventIdRegisterRequestObject) (PostEventsV1EventIdRegisterResponseObject, error) {
 	logger := a.getLoggerOrBaseLogger(ctx)
@@ -176,14 +262,14 @@ func apiRegistrationToRegistration(apiReg Registration, eventId uuid.UUID) (regi
 			return nil, err
 		}
 
-		return registration.IndividualRegistration{
+		return &registration.IndividualRegistration{
 			ID:           id,
 			EventID:      eventId,
 			Version:      version,
 			RegisteredAt: registeredAt,
 			HomeCity:     apiIndivReg.HomeCity,
 			Paid:         paid,
-			Email:        string(apiIndivReg.Email),
+			Email:        strings.ToLower(string(apiIndivReg.Email)),
 			PlayerInfo:   apiPlayerInfoToPlayerInfo(apiIndivReg.PlayerInfo),
 			Experience:   experience,
 		}, nil
@@ -193,7 +279,7 @@ func apiRegistrationToRegistration(apiReg Registration, eventId uuid.UUID) (regi
 			return nil, fmt.Errorf("Failed to convert to team registration")
 		}
 
-		return registration.TeamRegistration{
+		return &registration.TeamRegistration{
 			ID:           id,
 			EventID:      eventId,
 			Version:      version,
@@ -201,7 +287,7 @@ func apiRegistrationToRegistration(apiReg Registration, eventId uuid.UUID) (regi
 			HomeCity:     apiTeamReg.HomeCity,
 			TeamName:     apiTeamReg.TeamName,
 			Paid:         paid,
-			CaptainEmail: string(apiTeamReg.CaptainEmail),
+			CaptainEmail: strings.ToLower(string(apiTeamReg.CaptainEmail)),
 			Players: slices.Map(apiTeamReg.Players, func(v PlayerInfo) registration.PlayerInfo {
 				return apiPlayerInfoToPlayerInfo(v)
 			}),
@@ -214,7 +300,7 @@ func apiRegistrationToRegistration(apiReg Registration, eventId uuid.UUID) (regi
 func registrationToApiRegistration(reg registration.Registration) (Registration, error) {
 	switch reg.Type() {
 	case events.BY_INDIVIDUAL:
-		indivReg := reg.(registration.IndividualRegistration)
+		indivReg := reg.(*registration.IndividualRegistration)
 
 		experience, err := experienceToApiExperience(indivReg.Experience)
 		if err != nil {
@@ -241,7 +327,7 @@ func registrationToApiRegistration(reg registration.Registration) (Registration,
 
 		return *apiReg, nil
 	case events.BY_TEAM:
-		teamReg := reg.(registration.TeamRegistration)
+		teamReg := reg.(*registration.TeamRegistration)
 
 		apiTeamReg := TeamRegistration{
 			Id:           &teamReg.ID,
