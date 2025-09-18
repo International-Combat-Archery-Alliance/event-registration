@@ -5,6 +5,7 @@ package registration
 type PlayerInfo struct {
 	FirstName string
 	LastName  string
+	Email     *string
 }
 
 type ExperienceLevel int

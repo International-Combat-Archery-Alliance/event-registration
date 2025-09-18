@@ -638,6 +638,13 @@ components:
           minLength: 1
           maxLength: 50
           example: Doe
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 100
+          example: player@example.com
+          description: Optional email for each player
     Location:
       type: object
       required:
