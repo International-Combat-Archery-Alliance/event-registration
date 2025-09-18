@@ -705,3 +705,347 @@ func TestUpdateRegistrationToPaid(t *testing.T) {
 		a.Equal(registration.REASON_FAILED_TO_WRITE, regError.Reason)
 	})
 }
+
+func TestDeleteExpiredRegistration(t *testing.T) {
+	ctx := context.Background()
+	a := assert.New(t)
+
+	t.Run("successfully delete expired individual registration", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		// Create initial event
+		event := events.Event{
+			ID:              eventID,
+			Version:         1,
+			NumTotalPlayers: 0,
+		}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		// Create individual registration with payment intent
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Expired City",
+			Paid:       false,
+			Email:      "expired@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Expired", LastName: "User"},
+			Experience: registration.INTERMEDIATE,
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "expired_stripe_session",
+			Email:            "expired@example.com",
+		}
+
+		// Create registration with payment intent and updated event counters
+		eventWithRegistration := events.Event{
+			ID:              eventID,
+			Version:         2,
+			NumTotalPlayers: 1, // Should be incremented when registration is created
+		}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, eventWithRegistration)
+		a.NoError(err)
+
+		// Now delete the expired registration - event counters should be decremented
+		eventForDeletion := events.Event{
+			ID:              eventID,
+			Version:         3, // Version should be incremented for the delete operation
+			NumTotalPlayers: 0, // Should be decremented back to 0
+		}
+
+		err = db.DeleteExpiredRegistration(ctx, &reg, regIntent, eventForDeletion)
+		a.NoError(err)
+
+		// Verify registration is deleted
+		_, err = db.GetRegistration(ctx, eventID, "expired@example.com")
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_REGISTRATION_DOES_NOT_EXIST, regError.Reason)
+
+		// Verify registration intent is deleted
+		_, err = db.GetRegistrationIntent(ctx, eventID, "expired@example.com")
+		a.Error(err)
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_REGISTRATION_DOES_NOT_EXIST, regError.Reason)
+
+		// Verify event was updated with new version and decremented counters
+		updatedEvent, err := db.GetEvent(ctx, eventID)
+		a.NoError(err)
+		a.Equal(3, updatedEvent.Version)
+		a.Equal(0, updatedEvent.NumTotalPlayers)
+	})
+
+	t.Run("successfully delete expired team registration", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		// Create initial event
+		event := events.Event{
+			ID:                 eventID,
+			Version:            1,
+			NumTotalPlayers:    0,
+			NumTeams:           0,
+			NumRosteredPlayers: 0,
+		}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		// Create team registration with payment intent
+		reg := registration.TeamRegistration{
+			ID:           uuid.New(),
+			EventID:      eventID,
+			Version:      1,
+			HomeCity:     "Expired Team City",
+			Paid:         false,
+			TeamName:     "Expired Team",
+			CaptainEmail: "expired-team@example.com",
+			Players:      []registration.PlayerInfo{{FirstName: "Player1", LastName: "Team"}, {FirstName: "Player2", LastName: "Team"}}, // 2 players
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "expired_team_stripe_session",
+			Email:            "expired-team@example.com",
+		}
+
+		// Create registration with payment intent and updated event counters
+		eventWithRegistration := events.Event{
+			ID:                 eventID,
+			Version:            2,
+			NumTotalPlayers:    2, // Should be incremented by team size
+			NumTeams:           1, // Should be incremented by 1
+			NumRosteredPlayers: 2, // Should be incremented by team size
+		}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, eventWithRegistration)
+		a.NoError(err)
+
+		// Now delete the expired registration - event counters should be decremented
+		eventForDeletion := events.Event{
+			ID:                 eventID,
+			Version:            3, // Version should be incremented for the delete operation
+			NumTotalPlayers:    0, // Should be decremented back to 0
+			NumTeams:           0, // Should be decremented back to 0
+			NumRosteredPlayers: 0, // Should be decremented back to 0
+		}
+
+		err = db.DeleteExpiredRegistration(ctx, &reg, regIntent, eventForDeletion)
+		a.NoError(err)
+
+		// Verify registration is deleted
+		_, err = db.GetRegistration(ctx, eventID, "expired-team@example.com")
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_REGISTRATION_DOES_NOT_EXIST, regError.Reason)
+
+		// Verify registration intent is deleted
+		_, err = db.GetRegistrationIntent(ctx, eventID, "expired-team@example.com")
+		a.Error(err)
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_REGISTRATION_DOES_NOT_EXIST, regError.Reason)
+
+		// Verify event was updated with new version and decremented counters
+		updatedEvent, err := db.GetEvent(ctx, eventID)
+		a.NoError(err)
+		a.Equal(3, updatedEvent.Version)
+		a.Equal(0, updatedEvent.NumTotalPlayers)
+		a.Equal(0, updatedEvent.NumTeams)
+		a.Equal(0, updatedEvent.NumRosteredPlayers)
+	})
+
+	t.Run("fail when registration does not exist", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		// Create initial event
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		// Try to delete non-existent registration
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			Email:      "nonexistent@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Nonexistent", LastName: "User"},
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "nonexistent_session",
+			Email:            "nonexistent@example.com",
+		}
+
+		eventForDeletion := events.Event{
+			ID:      eventID,
+			Version: 2,
+		}
+
+		err := db.DeleteExpiredRegistration(ctx, &reg, regIntent, eventForDeletion)
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_FAILED_TO_WRITE, regError.Reason)
+	})
+
+	t.Run("fail when registration intent does not exist", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		// Create initial event
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		// Create only registration without intent
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "No Intent City",
+			Paid:       true, // Already paid, so no intent should exist
+			Email:      "nointent@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "NoIntent", LastName: "User"},
+			Experience: registration.NOVICE,
+		}
+
+		event2 := events.Event{ID: eventID, Version: 2}
+		err := db.CreateRegistration(ctx, &reg, event2)
+		a.NoError(err)
+
+		// Try to delete with a non-existent intent
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "nonexistent_session",
+			Email:            "nointent@example.com",
+		}
+
+		eventForDeletion := events.Event{
+			ID:      eventID,
+			Version: 3,
+		}
+
+		err = db.DeleteExpiredRegistration(ctx, &reg, regIntent, eventForDeletion)
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_FAILED_TO_WRITE, regError.Reason)
+	})
+
+	t.Run("fail when event version conflict occurs", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		// Create initial event
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		// Create registration with payment intent
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Version Conflict City",
+			Paid:       false,
+			Email:      "version@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "Version", LastName: "User"},
+			Experience: registration.INTERMEDIATE,
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "version_conflict_session",
+			Email:            "version@example.com",
+		}
+
+		eventWithRegistration := events.Event{
+			ID:              eventID,
+			Version:         2,
+			NumTotalPlayers: 1,
+		}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, eventWithRegistration)
+		a.NoError(err)
+
+		// Try to delete with wrong event version (simulate stale data)
+		eventForDeletion := events.Event{
+			ID:              eventID,
+			Version:         5, // Wrong version - too high
+			NumTotalPlayers: 0,
+		}
+
+		err = db.DeleteExpiredRegistration(ctx, &reg, regIntent, eventForDeletion)
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_FAILED_TO_WRITE, regError.Reason)
+
+		// Verify registration still exists (not deleted due to version conflict)
+		retrievedReg, err := db.GetRegistration(ctx, eventID, "version@example.com")
+		a.NoError(err)
+		a.NotNil(retrievedReg)
+	})
+
+	t.Run("fail when registration version conflict occurs", func(t *testing.T) {
+		resetTable(ctx)
+		eventID := uuid.New()
+
+		// Create initial event
+		event := events.Event{ID: eventID, Version: 1}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		// Create registration with payment intent
+		reg := registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Version:    1,
+			HomeCity:   "Reg Version Conflict City",
+			Paid:       false,
+			Email:      "regversion@example.com",
+			PlayerInfo: registration.PlayerInfo{FirstName: "RegVersion", LastName: "User"},
+			Experience: registration.ADVANCED,
+		}
+
+		regIntent := registration.RegistrationIntent{
+			Version:          1,
+			EventId:          eventID,
+			PaymentSessionId: "reg_version_conflict_session",
+			Email:            "regversion@example.com",
+		}
+
+		eventWithRegistration := events.Event{
+			ID:              eventID,
+			Version:         2,
+			NumTotalPlayers: 1,
+		}
+		err := db.CreateRegistrationWithPayment(ctx, &reg, regIntent, eventWithRegistration)
+		a.NoError(err)
+
+		// Try to delete with wrong registration version
+		regWithWrongVersion := reg
+		regWithWrongVersion.Version = 5 // Wrong version - too high
+
+		eventForDeletion := events.Event{
+			ID:              eventID,
+			Version:         3,
+			NumTotalPlayers: 0,
+		}
+
+		err = db.DeleteExpiredRegistration(ctx, &regWithWrongVersion, regIntent, eventForDeletion)
+		a.Error(err)
+		var regError *registration.Error
+		require.ErrorAs(t, err, &regError)
+		a.Equal(registration.REASON_FAILED_TO_WRITE, regError.Reason)
+
+		// Verify registration still exists (not deleted due to version conflict)
+		retrievedReg, err := db.GetRegistration(ctx, eventID, "regversion@example.com")
+		a.NoError(err)
+		a.NotNil(retrievedReg)
+	})
+}

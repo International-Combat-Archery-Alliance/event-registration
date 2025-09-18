@@ -157,4 +157,38 @@ func TestStripeRegistrationPaymentWebhookMiddleware(t *testing.T) {
 
 		assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 	})
+
+	t.Run("webhook with registration expired error", func(t *testing.T) {
+		eventID := uuid.New()
+		email := "expired@example.com"
+
+		mockDB := &mockDB{}
+
+		mockCheckout := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				return map[string]string{
+						"EMAIL":    email,
+						"EVENT_ID": eventID.String(),
+					}, &registration.Error{
+						Reason:  registration.REASON_REGISTRATION_EXPIRED,
+						Message: "Registration expired",
+					}
+			},
+		}
+
+		api := NewAPI(mockDB, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
+
+		middleware := api.stripeRegistrationPaymentWebhookMiddleware("/test/webhook")
+		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+
+		req := httptest.NewRequest("POST", "/test/webhook", strings.NewReader("test_payload"))
+		req.Header.Set("Stripe-Signature", "test_signature")
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code) // Should return OK for expired registrations
+	})
 }

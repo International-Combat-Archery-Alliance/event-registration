@@ -689,4 +689,203 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		assert.True(t, errors.As(err, &registrationErr))
 		assert.Equal(t, REASON_INVALID_PAYMENT_METADATA, registrationErr.Reason)
 	})
+
+	t.Run("expired checkout - individual registration", func(t *testing.T) {
+		eventID := uuid.New()
+		email := "expired@example.com"
+		reg := &IndividualRegistration{
+			ID:      uuid.New(),
+			EventID: eventID,
+			Email:   email,
+			Version: 1,
+			Paid:    false,
+		}
+		regIntent := RegistrationIntent{
+			Version:          1,
+			PaymentSessionId: "session_123",
+			Email:            email,
+		}
+		event := events.Event{
+			ID:                 eventID,
+			Version:            1,
+			NumTotalPlayers:    1,
+			NumTeams:           0,
+			NumRosteredPlayers: 0,
+		}
+
+		eventRepo := &mockEventRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return event, nil
+			},
+		}
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				return reg, nil
+			},
+			GetRegistrationIntentFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (RegistrationIntent, error) {
+				return regIntent, nil
+			},
+			DeleteExpiredRegistrationFunc: func(ctx context.Context, registration Registration, intent RegistrationIntent, evt events.Event) error {
+				assert.Equal(t, reg, registration)
+				assert.Equal(t, regIntent, intent)
+				assert.Equal(t, event.Version+1, evt.Version)
+				assert.Equal(t, 0, evt.NumTotalPlayers) // Should be decremented
+				return nil
+			},
+		}
+		checkoutManager := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				return map[string]string{
+					"EMAIL":    email,
+					"EVENT_ID": eventID.String(),
+				}, &payments.Error{Reason: payments.ErrorReasonCheckoutExpired}
+			},
+		}
+
+		result, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, eventRepo, checkoutManager)
+
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_REGISTRATION_EXPIRED, registrationErr.Reason)
+		assert.Equal(t, reg, result)
+	})
+
+	t.Run("expired checkout - team registration", func(t *testing.T) {
+		eventID := uuid.New()
+		email := "team@example.com"
+		reg := &TeamRegistration{
+			ID:           uuid.New(),
+			EventID:      eventID,
+			CaptainEmail: email,
+			Version:      1,
+			Paid:         false,
+			Players:      []PlayerInfo{{}, {}, {}}, // 3 players
+		}
+		regIntent := RegistrationIntent{
+			Version:          1,
+			PaymentSessionId: "session_456",
+			Email:            email,
+		}
+		event := events.Event{
+			ID:                 eventID,
+			Version:            2,
+			NumTotalPlayers:    3,
+			NumTeams:           1,
+			NumRosteredPlayers: 3,
+		}
+
+		eventRepo := &mockEventRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return event, nil
+			},
+		}
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				return reg, nil
+			},
+			GetRegistrationIntentFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (RegistrationIntent, error) {
+				return regIntent, nil
+			},
+			DeleteExpiredRegistrationFunc: func(ctx context.Context, registration Registration, intent RegistrationIntent, evt events.Event) error {
+				assert.Equal(t, reg, registration)
+				assert.Equal(t, regIntent, intent)
+				assert.Equal(t, event.Version+1, evt.Version)
+				assert.Equal(t, 0, evt.NumTotalPlayers)    // Should be decremented by 3
+				assert.Equal(t, 0, evt.NumTeams)           // Should be decremented by 1
+				assert.Equal(t, 0, evt.NumRosteredPlayers) // Should be decremented by 3
+				return nil
+			},
+		}
+		checkoutManager := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				return map[string]string{
+					"EMAIL":    email,
+					"EVENT_ID": eventID.String(),
+				}, &payments.Error{Reason: payments.ErrorReasonCheckoutExpired}
+			},
+		}
+
+		result, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, eventRepo, checkoutManager)
+
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_REGISTRATION_EXPIRED, registrationErr.Reason)
+		assert.Equal(t, reg, result)
+	})
+
+	t.Run("expired checkout - registration already deleted", func(t *testing.T) {
+		eventID := uuid.New()
+		email := "deleted@example.com"
+
+		eventRepo := &mockEventRepository{}
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				return nil, &Error{Reason: REASON_REGISTRATION_DOES_NOT_EXIST}
+			},
+			GetRegistrationIntentFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (RegistrationIntent, error) {
+				return RegistrationIntent{}, &Error{Reason: REASON_REGISTRATION_DOES_NOT_EXIST}
+			},
+		}
+		checkoutManager := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				return map[string]string{
+					"EMAIL":    email,
+					"EVENT_ID": eventID.String(),
+				}, &payments.Error{Reason: payments.ErrorReasonCheckoutExpired}
+			},
+		}
+
+		result, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, eventRepo, checkoutManager)
+
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_REGISTRATION_EXPIRED, registrationErr.Reason)
+		assert.Nil(t, result) // Should return nil since registration was already deleted
+	})
+
+	t.Run("expired checkout - failed to get event", func(t *testing.T) {
+		eventID := uuid.New()
+		email := "event-error@example.com"
+		reg := &IndividualRegistration{
+			ID:      uuid.New(),
+			EventID: eventID,
+			Email:   email,
+		}
+		regIntent := RegistrationIntent{
+			Version:          1,
+			PaymentSessionId: "session_789",
+			Email:            email,
+		}
+
+		eventRepo := &mockEventRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{}, errors.New("failed to get event")
+			},
+		}
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				return reg, nil
+			},
+			GetRegistrationIntentFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (RegistrationIntent, error) {
+				return regIntent, nil
+			},
+		}
+		checkoutManager := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				return map[string]string{
+					"EMAIL":    email,
+					"EVENT_ID": eventID.String(),
+				}, &payments.Error{Reason: payments.ErrorReasonCheckoutExpired}
+			},
+		}
+
+		result, err := ConfirmRegistrationPayment(context.Background(), []byte("test_payload"), "test_signature", registrationRepo, eventRepo, checkoutManager)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get event")
+		assert.Nil(t, result)
+	})
 }
