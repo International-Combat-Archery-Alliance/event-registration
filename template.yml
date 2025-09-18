@@ -15,10 +15,12 @@ Parameters:
   StripeSecretKey:
     Type: String
     NoEcho: true
+    Default: ""
     Description: Sandbox stripe secret key for testing
   StripeEndpointSecret:
     Type: String
     NoEcho: true
+    Default: ""
     Description: Sandbox local signing key for webhook
 
 Mappings:
