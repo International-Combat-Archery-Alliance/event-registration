@@ -14,12 +14,12 @@ require (
 	github.com/International-Combat-Archery-Alliance/middleware v0.1.3
 	github.com/International-Combat-Archery-Alliance/payments v0.4.0
 	github.com/Rhymond/go-money v1.0.15
-	github.com/aws/aws-sdk-go-v2 v1.38.3
+	github.com/aws/aws-sdk-go-v2 v1.39.2
 	github.com/aws/aws-sdk-go-v2/config v1.31.3
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.7
-	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.20.6
+	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.20.14
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression v1.8.4
-	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.49.1
+	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.51.0
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.64.2
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/google/go-cmp v0.7.0
@@ -46,12 +46,12 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.6 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.6 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.9 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.9 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.30.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.11.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.31.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.11.9 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.53.1
 	github.com/aws/aws-sdk-go-v2/service/sso v1.28.2 // indirect
