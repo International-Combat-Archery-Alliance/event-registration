@@ -17,8 +17,9 @@ const _RegistrationType_name = "BY_INDIVIDUALBY_TEAM"
 var _RegistrationType_index = [...]uint8{0, 13, 20}
 
 func (i RegistrationType) String() string {
-	if i < 0 || i >= RegistrationType(len(_RegistrationType_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_RegistrationType_index)-1 {
 		return "RegistrationType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _RegistrationType_name[_RegistrationType_index[i]:_RegistrationType_index[i+1]]
+	return _RegistrationType_name[_RegistrationType_index[idx]:_RegistrationType_index[idx+1]]
 }

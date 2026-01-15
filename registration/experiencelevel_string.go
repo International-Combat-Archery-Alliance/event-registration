@@ -18,8 +18,9 @@ const _ExperienceLevel_name = "NOVICEINTERMEDIATEADVANCED"
 var _ExperienceLevel_index = [...]uint8{0, 6, 18, 26}
 
 func (i ExperienceLevel) String() string {
-	if i < 0 || i >= ExperienceLevel(len(_ExperienceLevel_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_ExperienceLevel_index)-1 {
 		return "ExperienceLevel(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _ExperienceLevel_name[_ExperienceLevel_index[i]:_ExperienceLevel_index[i+1]]
+	return _ExperienceLevel_name[_ExperienceLevel_index[idx]:_ExperienceLevel_index[idx+1]]
 }
