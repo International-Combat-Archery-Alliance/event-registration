@@ -106,7 +106,7 @@
             <div>
                 {{if .Event.ImageName}}
                 <div class="logo">
-                    <img src="https://icaa.world/images/logos/{{.Event.ImageName}}" style="width: 200px; object-fit: contain;" />
+                    <img src="{{.Event.ImageName}}" style="width: 200px; object-fit: contain;" />
                 </div>
                 {{end}}
 
@@ -196,8 +196,8 @@
             <h2>Important Information</h2>
             <p>Please review the event rules and guidelines:</p>
             <ul>
-                <li><a href="https://icaa.world/docs/{{.Event.RulesDocLink}}">Event Rules Document</a></li>
-                <li><a href="https://icaa.world/docs/2000%20-%20OFFICIAL%20ICAA%20GAMEPLAY%20RULES.pdf">Official ICAA Rules</a></li>
+                <li><a href="{{.Event.RulesDocLink}}">Event Rules Document</a></li>
+                <li><a href="https://assets.icaa.world/8e3e50ec-4c99-4d30-8273-234f0eef8914.pdf">Official ICAA Rules</a></li>
             </ul>
         </div>
         {{end}}
