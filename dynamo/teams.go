@@ -17,9 +17,50 @@ import (
 	"github.com/google/uuid"
 )
 
-var _ teams.Repository = &DB{}
+var _ teams.TeamRepository = &DB{}
+var _ teams.EventTeamRepository = &DB{}
 
-type teamDynamo struct {
+// Global Team DynamoDB model
+type globalTeamDynamo struct {
+	PK        string
+	SK        string
+	ID        string
+	Name      string
+	CreatedAt time.Time
+}
+
+const (
+	globalTeamEntityName = "TEAM"
+)
+
+func globalTeamPK(teamID uuid.UUID) string {
+	return fmt.Sprintf("%s#%s", globalTeamEntityName, teamID)
+}
+
+func globalTeamSK(teamID uuid.UUID) string {
+	return fmt.Sprintf("%s#%s", globalTeamEntityName, teamID)
+}
+
+func newGlobalTeamDynamo(team teams.Team) globalTeamDynamo {
+	return globalTeamDynamo{
+		PK:        globalTeamPK(team.ID),
+		SK:        globalTeamSK(team.ID),
+		ID:        team.ID.String(),
+		Name:      team.Name,
+		CreatedAt: team.CreatedAt,
+	}
+}
+
+func globalTeamFromDynamo(d globalTeamDynamo) teams.Team {
+	return teams.Team{
+		ID:        uuid.MustParse(d.ID),
+		Name:      d.Name,
+		CreatedAt: d.CreatedAt,
+	}
+}
+
+// Event Team DynamoDB model
+type eventTeamDynamo struct {
 	PK             string
 	SK             string
 	GSI1PK         string
@@ -27,14 +68,15 @@ type teamDynamo struct {
 	ID             string
 	Version        int
 	EventID        string
+	TeamID         string
 	Name           string
 	SourceType     teams.TeamSourceType
 	RegistrationID *string
-	Players        []teamPlayerDynamo
+	Players        []eventTeamPlayerDynamo
 	CreatedAt      time.Time
 }
 
-type teamPlayerDynamo struct {
+type eventTeamPlayerDynamo struct {
 	FirstName      string
 	LastName       string
 	Email          *string
@@ -44,45 +86,46 @@ type teamPlayerDynamo struct {
 }
 
 const (
-	teamEntityName = "TEAM"
+	eventTeamEntityName = "EVENTTEAM"
 )
 
-func teamPK(eventID uuid.UUID) string {
+func eventTeamPK(eventID uuid.UUID) string {
 	return eventPK(eventID)
 }
 
-func teamSK(teamID uuid.UUID) string {
-	return fmt.Sprintf("%s#%s", teamEntityName, teamID)
+func eventTeamSK(eventTeamID uuid.UUID) string {
+	return fmt.Sprintf("%s#%s", eventTeamEntityName, eventTeamID)
 }
 
-func teamGSI1PK() string {
-	return teamEntityName
+func eventTeamGSI1PK(teamID uuid.UUID) string {
+	return fmt.Sprintf("%s#%s", globalTeamEntityName, teamID)
 }
 
-func teamGSI1SK(eventID uuid.UUID, name string) string {
-	return fmt.Sprintf("%s#%s#%s", teamEntityName, eventID, name)
+func eventTeamGSI1SK(eventID uuid.UUID) string {
+	return fmt.Sprintf("%s#%s", eventEntityName, eventID)
 }
 
-func newTeamDynamo(team teams.Team) teamDynamo {
+func newEventTeamDynamo(eventTeam teams.EventTeam) eventTeamDynamo {
 	var regID *string
-	if team.RegistrationID != nil {
-		rid := team.RegistrationID.String()
+	if eventTeam.RegistrationID != nil {
+		rid := eventTeam.RegistrationID.String()
 		regID = &rid
 	}
 
-	return teamDynamo{
-		PK:             teamPK(team.EventID),
-		SK:             teamSK(team.ID),
-		GSI1PK:         teamGSI1PK(),
-		GSI1SK:         teamGSI1SK(team.EventID, team.Name),
-		ID:             team.ID.String(),
-		Version:        team.Version,
-		EventID:        team.EventID.String(),
-		Name:           team.Name,
-		SourceType:     team.SourceType,
+	return eventTeamDynamo{
+		PK:             eventTeamPK(eventTeam.EventID),
+		SK:             eventTeamSK(eventTeam.ID),
+		GSI1PK:         eventTeamGSI1PK(eventTeam.TeamID),
+		GSI1SK:         eventTeamGSI1SK(eventTeam.EventID),
+		ID:             eventTeam.ID.String(),
+		Version:        eventTeam.Version,
+		EventID:        eventTeam.EventID.String(),
+		TeamID:         eventTeam.TeamID.String(),
+		Name:           eventTeam.Name,
+		SourceType:     eventTeam.SourceType,
 		RegistrationID: regID,
-		Players: slices.Map(team.Players, func(p teams.TeamPlayer) teamPlayerDynamo {
-			return teamPlayerDynamo{
+		Players: slices.Map(eventTeam.Players, func(p teams.TeamPlayer) eventTeamPlayerDynamo {
+			return eventTeamPlayerDynamo{
 				FirstName:      p.PlayerInfo.FirstName,
 				LastName:       p.PlayerInfo.LastName,
 				Email:          p.PlayerInfo.Email,
@@ -91,25 +134,26 @@ func newTeamDynamo(team teams.Team) teamDynamo {
 				AssignedAt:     p.AssignedAt,
 			}
 		}),
-		CreatedAt: team.CreatedAt,
+		CreatedAt: eventTeam.CreatedAt,
 	}
 }
 
-func teamFromDynamo(d teamDynamo) teams.Team {
+func eventTeamFromDynamo(d eventTeamDynamo) teams.EventTeam {
 	var regID *uuid.UUID
 	if d.RegistrationID != nil {
 		rid := uuid.MustParse(*d.RegistrationID)
 		regID = &rid
 	}
 
-	return teams.Team{
+	return teams.EventTeam{
 		ID:             uuid.MustParse(d.ID),
 		Version:        d.Version,
 		EventID:        uuid.MustParse(d.EventID),
+		TeamID:         uuid.MustParse(d.TeamID),
 		Name:           d.Name,
 		SourceType:     d.SourceType,
 		RegistrationID: regID,
-		Players: slices.Map(d.Players, func(p teamPlayerDynamo) teams.TeamPlayer {
+		Players: slices.Map(d.Players, func(p eventTeamPlayerDynamo) teams.TeamPlayer {
 			return teams.TeamPlayer{
 				PlayerInfo: registration.PlayerInfo{
 					FirstName: p.FirstName,
@@ -125,15 +169,17 @@ func teamFromDynamo(d teamDynamo) teams.Team {
 	}
 }
 
-func (d *DB) GetTeam(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID) (teams.Team, error) {
+// ==================== Global Team Repository Implementation ====================
+
+func (d *DB) GetTeam(ctx context.Context, teamID uuid.UUID) (teams.Team, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
 	resp, err := d.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(d.tableName),
 		Key: map[string]types.AttributeValue{
-			"PK": &types.AttributeValueMemberS{Value: teamPK(eventID)},
-			"SK": &types.AttributeValueMemberS{Value: teamSK(teamID)},
+			"PK": &types.AttributeValueMemberS{Value: globalTeamPK(teamID)},
+			"SK": &types.AttributeValueMemberS{Value: globalTeamSK(teamID)},
 		},
 	})
 	if err != nil {
@@ -147,20 +193,19 @@ func (d *DB) GetTeam(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID) (
 		return teams.Team{}, teams.NewTeamDoesNotExistError(fmt.Sprintf("Team with ID %q not found", teamID), nil)
 	}
 
-	var team teamDynamo
+	var team globalTeamDynamo
 	err = attributevalue.UnmarshalMap(resp.Item, &team)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal team from DB: %s", err))
 	}
-	return teamFromDynamo(team), nil
+	return globalTeamFromDynamo(team), nil
 }
 
-func (d *DB) GetTeamsForEvent(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (teams.GetTeamsResponse, error) {
+func (d *DB) GetTeams(ctx context.Context, limit int32, cursor *string) (teams.GetTeamsResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
-	keyCond := expression.Key("PK").Equal(expression.Value(teamPK(eventID))).
-		And(expression.Key("SK").BeginsWith(teamEntityName))
+	keyCond := expression.Key("PK").BeginsWith(globalTeamEntityName)
 
 	expr, err := expression.NewBuilder().WithKeyCondition(keyCond).Build()
 	if err != nil {
@@ -185,12 +230,12 @@ func (d *DB) GetTeamsForEvent(ctx context.Context, eventID uuid.UUID, limit int3
 	})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return teams.GetTeamsResponse{}, teams.NewTimeoutError("GetTeamsForEvent timed out")
+			return teams.GetTeamsResponse{}, teams.NewTimeoutError("GetTeams timed out")
 		}
 		return teams.GetTeamsResponse{}, teams.NewFailedToFetchError("Failed to fetch teams from dynamo", err)
 	}
 
-	var dynamoItems []teamDynamo
+	var dynamoItems []globalTeamDynamo
 	err = attributevalue.UnmarshalListOfMaps(result.Items, &dynamoItems)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal dynamo teams: %s", err))
@@ -210,8 +255,8 @@ func (d *DB) GetTeamsForEvent(ctx context.Context, eventID uuid.UUID, limit int3
 	}
 
 	return teams.GetTeamsResponse{
-		Data: slices.Map(dynamoItems, func(v teamDynamo) teams.Team {
-			return teamFromDynamo(v)
+		Data: slices.Map(dynamoItems, func(v globalTeamDynamo) teams.Team {
+			return globalTeamFromDynamo(v)
 		})[:min(int(limit), len(dynamoItems))],
 		Cursor:      newCursor,
 		HasNextPage: hasNextPage,
@@ -222,32 +267,22 @@ func (d *DB) CreateTeam(ctx context.Context, team teams.Team) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
-	dynamoTeam := newTeamDynamo(team)
+	dynamoTeam := newGlobalTeamDynamo(team)
 
 	item, err := attributevalue.MarshalMap(dynamoTeam)
 	if err != nil {
-		return teams.NewFailedToTranslateToDBModelError("Failed to convert Team to teamDynamo", err)
+		return teams.NewFailedToTranslateToDBModelError("Failed to convert Team to globalTeamDynamo", err)
 	}
 
-	expr := exprMustBuild(expression.NewBuilder().
-		WithCondition(newEntityVersionConditional(dynamoTeam.Version)))
-
 	_, err = d.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:                 aws.String(d.tableName),
-		Item:                      item,
-		ConditionExpression:       expr.Condition(),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
+		TableName: aws.String(d.tableName),
+		Item:      item,
 	})
 	if err != nil {
-		var condCheckFailedErr *types.ConditionalCheckFailedException
-		if errors.As(err, &condCheckFailedErr) {
-			return teams.NewTeamAlreadyExistsError(fmt.Sprintf("Team with ID %q already exists", team.ID), err)
-		} else if errors.Is(err, context.DeadlineExceeded) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return teams.NewTimeoutError("CreateTeam timed out")
-		} else {
-			return teams.NewFailedToWriteError("Failed PutItem call", err)
 		}
+		return teams.NewFailedToWriteError("Failed PutItem call", err)
 	}
 
 	return nil
@@ -257,46 +292,36 @@ func (d *DB) UpdateTeam(ctx context.Context, team teams.Team) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
-	dynamoTeam := newTeamDynamo(team)
+	dynamoTeam := newGlobalTeamDynamo(team)
 
 	item, err := attributevalue.MarshalMap(dynamoTeam)
 	if err != nil {
-		return teams.NewFailedToTranslateToDBModelError("Failed to convert Team to teamDynamo", err)
+		return teams.NewFailedToTranslateToDBModelError("Failed to convert Team to globalTeamDynamo", err)
 	}
 
-	expr := exprMustBuild(expression.NewBuilder().
-		WithCondition(existingEntityVersionConditional(dynamoTeam.Version)))
-
 	_, err = d.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:                 aws.String(d.tableName),
-		Item:                      item,
-		ConditionExpression:       expr.Condition(),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
+		TableName: aws.String(d.tableName),
+		Item:      item,
 	})
 	if err != nil {
-		var condCheckFailedErr *types.ConditionalCheckFailedException
-		if errors.As(err, &condCheckFailedErr) {
-			return teams.NewTeamDoesNotExistError(fmt.Sprintf("Team with ID %q does not exist", team.ID), err)
-		} else if errors.Is(err, context.DeadlineExceeded) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return teams.NewTimeoutError("UpdateTeam timed out")
-		} else {
-			return teams.NewFailedToWriteError("Failed PutItem call", err)
 		}
+		return teams.NewFailedToWriteError("Failed PutItem call", err)
 	}
 
 	return nil
 }
 
-func (d *DB) DeleteTeam(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID) error {
+func (d *DB) DeleteTeam(ctx context.Context, teamID uuid.UUID) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
 	_, err := d.dynamoClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(d.tableName),
 		Key: map[string]types.AttributeValue{
-			"PK": &types.AttributeValueMemberS{Value: teamPK(eventID)},
-			"SK": &types.AttributeValueMemberS{Value: teamSK(teamID)},
+			"PK": &types.AttributeValueMemberS{Value: globalTeamPK(teamID)},
+			"SK": &types.AttributeValueMemberS{Value: globalTeamSK(teamID)},
 		},
 	})
 	if err != nil {
@@ -309,56 +334,303 @@ func (d *DB) DeleteTeam(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID
 	return nil
 }
 
-func (d *DB) AddPlayerToTeam(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID, player teams.TeamPlayer) error {
+// ==================== Event Team Repository Implementation ====================
+
+func (d *DB) GetEventTeam(ctx context.Context, eventID uuid.UUID, eventTeamID uuid.UUID) (teams.EventTeam, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
-	// Get current team
-	team, err := d.GetTeam(ctx, eventID, teamID)
+	resp, err := d.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(d.tableName),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: eventTeamPK(eventID)},
+			"SK": &types.AttributeValueMemberS{Value: eventTeamSK(eventTeamID)},
+		},
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return teams.EventTeam{}, teams.NewTimeoutError("GetEventTeam timed out")
+		}
+		return teams.EventTeam{}, teams.NewFailedToFetchError(fmt.Sprintf("Failed to fetch event team with ID %q", eventTeamID), err)
+	}
+
+	if len(resp.Item) == 0 {
+		return teams.EventTeam{}, teams.NewTeamDoesNotExistError(fmt.Sprintf("Event team with ID %q not found", eventTeamID), nil)
+	}
+
+	var eventTeam eventTeamDynamo
+	err = attributevalue.UnmarshalMap(resp.Item, &eventTeam)
+	if err != nil {
+		panic(fmt.Sprintf("failed to unmarshal event team from DB: %s", err))
+	}
+	return eventTeamFromDynamo(eventTeam), nil
+}
+
+func (d *DB) GetEventTeamsForEvent(ctx context.Context, eventID uuid.UUID, limit int32, cursor *string) (teams.GetEventTeamsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	keyCond := expression.Key("PK").Equal(expression.Value(eventTeamPK(eventID))).
+		And(expression.Key("SK").BeginsWith(eventTeamEntityName))
+
+	expr, err := expression.NewBuilder().WithKeyCondition(keyCond).Build()
+	if err != nil {
+		panic(fmt.Sprintf("failed to build dynamo key expression: %s", err))
+	}
+
+	var startKey map[string]types.AttributeValue
+	if cursor != nil {
+		startKey, err = cursorToLastEval(*cursor)
+		if err != nil {
+			return teams.GetEventTeamsResponse{}, teams.NewInvalidCursorError("Invalid cursor", err)
+		}
+	}
+
+	result, err := d.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(d.tableName),
+		KeyConditionExpression:    expr.KeyCondition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		Limit:                     aws.Int32(limit + 1),
+		ExclusiveStartKey:         startKey,
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return teams.GetEventTeamsResponse{}, teams.NewTimeoutError("GetEventTeamsForEvent timed out")
+		}
+		return teams.GetEventTeamsResponse{}, teams.NewFailedToFetchError("Failed to fetch event teams from dynamo", err)
+	}
+
+	var dynamoItems []eventTeamDynamo
+	err = attributevalue.UnmarshalListOfMaps(result.Items, &dynamoItems)
+	if err != nil {
+		panic(fmt.Sprintf("failed to unmarshal dynamo event teams: %s", err))
+	}
+
+	hasNextPage := len(dynamoItems) > int(limit)
+
+	var newCursor *string
+	if hasNextPage && len(result.LastEvaluatedKey) > 0 {
+		lastItemGivenToUser := result.Items[len(result.Items)-2]
+		lastItemKey := getKeyFromItem(result.LastEvaluatedKey, lastItemGivenToUser)
+		c, err := lastEvalKeyToCursor(lastItemKey)
+		if err != nil {
+			panic(fmt.Sprintf("failed to make cursor from lastEvalKey: %s", err))
+		}
+		newCursor = &c
+	}
+
+	return teams.GetEventTeamsResponse{
+		Data: slices.Map(dynamoItems, func(v eventTeamDynamo) teams.EventTeam {
+			return eventTeamFromDynamo(v)
+		})[:min(int(limit), len(dynamoItems))],
+		Cursor:      newCursor,
+		HasNextPage: hasNextPage,
+	}, nil
+}
+
+func (d *DB) GetEventTeamsByTeam(ctx context.Context, teamID uuid.UUID, limit int32, cursor *string) (teams.GetEventTeamsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	keyCond := expression.Key("GSI1PK").Equal(expression.Value(eventTeamGSI1PK(teamID)))
+
+	expr, err := expression.NewBuilder().WithKeyCondition(keyCond).Build()
+	if err != nil {
+		panic(fmt.Sprintf("failed to build dynamo key expression: %s", err))
+	}
+
+	var startKey map[string]types.AttributeValue
+	if cursor != nil {
+		startKey, err = cursorToLastEval(*cursor)
+		if err != nil {
+			return teams.GetEventTeamsResponse{}, teams.NewInvalidCursorError("Invalid cursor", err)
+		}
+	}
+
+	result, err := d.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		IndexName:                 aws.String(gsi1),
+		TableName:                 aws.String(d.tableName),
+		KeyConditionExpression:    expr.KeyCondition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		Limit:                     aws.Int32(limit + 1),
+		ExclusiveStartKey:         startKey,
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return teams.GetEventTeamsResponse{}, teams.NewTimeoutError("GetEventTeamsByTeam timed out")
+		}
+		return teams.GetEventTeamsResponse{}, teams.NewFailedToFetchError("Failed to fetch event teams from dynamo", err)
+	}
+
+	var dynamoItems []eventTeamDynamo
+	err = attributevalue.UnmarshalListOfMaps(result.Items, &dynamoItems)
+	if err != nil {
+		panic(fmt.Sprintf("failed to unmarshal dynamo event teams: %s", err))
+	}
+
+	hasNextPage := len(dynamoItems) > int(limit)
+
+	var newCursor *string
+	if hasNextPage && len(result.LastEvaluatedKey) > 0 {
+		lastItemGivenToUser := result.Items[len(result.Items)-2]
+		lastItemKey := getKeyFromItem(result.LastEvaluatedKey, lastItemGivenToUser)
+		c, err := lastEvalKeyToCursor(lastItemKey)
+		if err != nil {
+			panic(fmt.Sprintf("failed to make cursor from lastEvalKey: %s", err))
+		}
+		newCursor = &c
+	}
+
+	return teams.GetEventTeamsResponse{
+		Data: slices.Map(dynamoItems, func(v eventTeamDynamo) teams.EventTeam {
+			return eventTeamFromDynamo(v)
+		})[:min(int(limit), len(dynamoItems))],
+		Cursor:      newCursor,
+		HasNextPage: hasNextPage,
+	}, nil
+}
+
+func (d *DB) CreateEventTeam(ctx context.Context, eventTeam teams.EventTeam) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	dynamoEventTeam := newEventTeamDynamo(eventTeam)
+
+	item, err := attributevalue.MarshalMap(dynamoEventTeam)
+	if err != nil {
+		return teams.NewFailedToTranslateToDBModelError("Failed to convert EventTeam to eventTeamDynamo", err)
+	}
+
+	expr := exprMustBuild(expression.NewBuilder().
+		WithCondition(newEntityVersionConditional(dynamoEventTeam.Version)))
+
+	_, err = d.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName:                 aws.String(d.tableName),
+		Item:                      item,
+		ConditionExpression:       expr.Condition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+	})
+	if err != nil {
+		var condCheckFailedErr *types.ConditionalCheckFailedException
+		if errors.As(err, &condCheckFailedErr) {
+			return teams.NewTeamAlreadyExistsError(fmt.Sprintf("Event team with ID %q already exists", eventTeam.ID), err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			return teams.NewTimeoutError("CreateEventTeam timed out")
+		} else {
+			return teams.NewFailedToWriteError("Failed PutItem call", err)
+		}
+	}
+
+	return nil
+}
+
+func (d *DB) UpdateEventTeam(ctx context.Context, eventTeam teams.EventTeam) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	dynamoEventTeam := newEventTeamDynamo(eventTeam)
+
+	item, err := attributevalue.MarshalMap(dynamoEventTeam)
+	if err != nil {
+		return teams.NewFailedToTranslateToDBModelError("Failed to convert EventTeam to eventTeamDynamo", err)
+	}
+
+	expr := exprMustBuild(expression.NewBuilder().
+		WithCondition(existingEntityVersionConditional(dynamoEventTeam.Version)))
+
+	_, err = d.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName:                 aws.String(d.tableName),
+		Item:                      item,
+		ConditionExpression:       expr.Condition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+	})
+	if err != nil {
+		var condCheckFailedErr *types.ConditionalCheckFailedException
+		if errors.As(err, &condCheckFailedErr) {
+			return teams.NewTeamDoesNotExistError(fmt.Sprintf("Event team with ID %q does not exist", eventTeam.ID), err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			return teams.NewTimeoutError("UpdateEventTeam timed out")
+		} else {
+			return teams.NewFailedToWriteError("Failed PutItem call", err)
+		}
+	}
+
+	return nil
+}
+
+func (d *DB) DeleteEventTeam(ctx context.Context, eventID uuid.UUID, eventTeamID uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	_, err := d.dynamoClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(d.tableName),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: eventTeamPK(eventID)},
+			"SK": &types.AttributeValueMemberS{Value: eventTeamSK(eventTeamID)},
+		},
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return teams.NewTimeoutError("DeleteEventTeam timed out")
+		}
+		return teams.NewFailedToWriteError("Failed DeleteItem call", err)
+	}
+
+	return nil
+}
+
+func (d *DB) AddPlayerToEventTeam(ctx context.Context, eventID uuid.UUID, eventTeamID uuid.UUID, player teams.TeamPlayer) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	// Get current event team
+	eventTeam, err := d.GetEventTeam(ctx, eventID, eventTeamID)
 	if err != nil {
 		return err
 	}
 
 	// Add player
-	team.Players = append(team.Players, player)
-	team.Version++
+	eventTeam.Players = append(eventTeam.Players, player)
+	eventTeam.Version++
 
-	// Save updated team
-	return d.UpdateTeam(ctx, team)
+	// Save updated event team
+	return d.UpdateEventTeam(ctx, eventTeam)
 }
 
-func (d *DB) RemovePlayerFromTeam(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID, registrationID uuid.UUID) error {
+func (d *DB) RemovePlayerFromEventTeam(ctx context.Context, eventID uuid.UUID, eventTeamID uuid.UUID, registrationID uuid.UUID) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
-	// Get current team
-	team, err := d.GetTeam(ctx, eventID, teamID)
+	// Get current event team
+	eventTeam, err := d.GetEventTeam(ctx, eventID, eventTeamID)
 	if err != nil {
 		return err
 	}
 
 	// Remove player
-	for i, player := range team.Players {
+	for i, player := range eventTeam.Players {
 		if player.RegistrationID == registrationID {
-			team.Players = append(team.Players[:i], team.Players[i+1:]...)
+			eventTeam.Players = append(eventTeam.Players[:i], eventTeam.Players[i+1:]...)
 			break
 		}
 	}
-	team.Version++
+	eventTeam.Version++
 
-	// Save updated team
-	return d.UpdateTeam(ctx, team)
+	// Save updated event team
+	return d.UpdateEventTeam(ctx, eventTeam)
 }
 
-func (d *DB) HasGames(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID) (bool, error) {
+func (d *DB) HasGames(ctx context.Context, eventID uuid.UUID, eventTeamID uuid.UUID) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
-	// Query games where this team is either team1 or team2
+	// Query games where this event team is either team1 or team2
 	// We'll use a scan with filter since we need to check both Team1ID and Team2ID
-	// In production, you might want to add GSIs for this
 
-	// For now, let's query all games for the event and filter
 	keyCond := expression.Key("PK").Equal(expression.Value(eventPK(eventID))).
 		And(expression.Key("SK").BeginsWith(gameEntityName))
 
@@ -386,9 +658,9 @@ func (d *DB) HasGames(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID) 
 		return false, err
 	}
 
-	teamIDStr := teamID.String()
+	eventTeamIDStr := eventTeamID.String()
 	for _, game := range games {
-		if game.Team1ID == teamIDStr || game.Team2ID == teamIDStr {
+		if game.Team1ID == eventTeamIDStr || game.Team2ID == eventTeamIDStr {
 			return true, nil
 		}
 	}
@@ -400,15 +672,15 @@ func (d *DB) IsIndividualAssigned(ctx context.Context, eventID uuid.UUID, regist
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
-	// Get all teams for the event
-	teams, err := d.GetTeamsForEvent(ctx, eventID, 1000, nil)
+	// Get all event teams for the event
+	eventTeams, err := d.GetEventTeamsForEvent(ctx, eventID, 1000, nil)
 	if err != nil {
 		return false, err
 	}
 
 	regIDStr := registrationID.String()
-	for _, team := range teams.Data {
-		for _, player := range team.Players {
+	for _, eventTeam := range eventTeams.Data {
+		for _, player := range eventTeam.Players {
 			if player.RegistrationID.String() == regIDStr {
 				return true, nil
 			}

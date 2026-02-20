@@ -30,7 +30,8 @@ const (
 type DB interface {
 	events.Repository
 	registration.Repository
-	teams.Repository
+	teams.TeamRepository
+	teams.EventTeamRepository
 	games.Repository
 }
 

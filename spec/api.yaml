@@ -946,6 +946,259 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /teams/v1:
+    get:
+      summary: Get all global teams
+      description: Retrieves a list of all global teams
+      security: []
+      parameters:
+        - name: cursor
+          in: query
+          description: Cursor of where to start from
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Max amount of teams to fetch
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: A list of teams.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - hasNextPage
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GlobalTeam'
+                  cursor:
+                    type: string
+                  hasNextPage:
+                    type: boolean
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new global team
+      description: Admin endpoint to create a new global team
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
+      requestBody:
+        description: Team to be created
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalTeam'
+      responses:
+        '200':
+          description: The created team.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalTeam'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /teams/v1/{teamId}:
+    get:
+      summary: Get a global team
+      description: Get one team by id
+      security: []
+      parameters:
+        - name: teamId
+          in: path
+          description: ID of the team
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalTeam'
+        '404':
+          description: Team not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Update a global team
+      description: Admin endpoint to update a global team
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
+      parameters:
+        - name: teamId
+          in: path
+          description: ID of the team
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Team to be updated
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalTeam'
+      responses:
+        '200':
+          description: The updated team.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalTeam'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Team not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete a global team
+      description: Admin endpoint to delete a global team
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
+      parameters:
+        - name: teamId
+          in: path
+          description: ID of the team
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Team deleted successfully.
+        '404':
+          description: Team not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /teams/v1/{teamId}/events:
+    get:
+      summary: Get all event participations for a team
+      description: Retrieves all events where this team has participated
+      security: []
+      parameters:
+        - name: teamId
+          in: path
+          description: ID of the global team
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          description: Cursor of where to start from
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Max amount of events to fetch
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: A list of event team participations.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - hasNextPage
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EventTeam'
+                  cursor:
+                    type: string
+                  hasNextPage:
+                    type: boolean
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   securitySchemes:
     googleCookieAuth:
@@ -1335,6 +1588,80 @@ components:
         message:
           type: string
           example: An unexpected error occurred.
+    GlobalTeam:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: The Fighting Mongooses
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2025-08-19T18:46:53.185Z"
+    EventTeam:
+      type: object
+      required:
+        - id
+        - version
+        - eventId
+        - teamId
+        - name
+        - sourceType
+        - players
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        version:
+          type: integer
+          readOnly: true
+          example: 1
+        eventId:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        teamId:
+          type: string
+          format: uuid
+          description: Reference to the global team
+          example: 00000000-0000-0000-0000-000000000001
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: The Fighting Mongooses
+        sourceType:
+          $ref: '#/components/schemas/TeamSourceType'
+        registrationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Reference to the original team registration if created from registration.
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamPlayer'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2025-08-19T18:46:53.185Z"
     Team:
       type: object
       required:

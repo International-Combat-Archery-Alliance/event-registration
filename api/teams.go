@@ -8,8 +8,11 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/event-registration/teams"
+	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// ==================== Event Team Endpoints ====================
 
 func (a *API) GetEventsV1EventIdTeams(ctx context.Context, request GetEventsV1EventIdTeamsRequestObject) (GetEventsV1EventIdTeamsResponseObject, error) {
 	logger := a.getLoggerOrBaseLogger(ctx)
@@ -22,9 +25,9 @@ func (a *API) GetEventsV1EventIdTeams(ctx context.Context, request GetEventsV1Ev
 		limit = int32(*request.Params.Limit)
 	}
 
-	result, err := a.db.GetTeamsForEvent(ctx, request.EventId, limit, request.Params.Cursor)
+	result, err := a.db.GetEventTeamsForEvent(ctx, request.EventId, limit, request.Params.Cursor)
 	if err != nil {
-		logger.Error("Failed to get teams from the DB", "error", err)
+		logger.Error("Failed to get event teams from the DB", "error", err)
 
 		var teamErr *teams.Error
 		if errors.As(err, &teamErr) {
@@ -44,7 +47,7 @@ func (a *API) GetEventsV1EventIdTeams(ctx context.Context, request GetEventsV1Ev
 
 	respTeams := []Team{}
 	for _, v := range result.Data {
-		respTeams = append(respTeams, teamToApiTeam(v))
+		respTeams = append(respTeams, eventTeamToApiTeam(v))
 	}
 
 	return GetEventsV1EventIdTeams200JSONResponse{
@@ -61,7 +64,7 @@ func (a *API) PostEventsV1EventIdTeams(ctx context.Context, request PostEventsV1
 	defer cancel()
 
 	request.Body.EventId = &request.EventId
-	team, err := apiTeamToTeam(*request.Body)
+	eventTeam, err := apiTeamToEventTeam(*request.Body)
 	if err != nil {
 		logger.Error("Failed to convert team into core type", "error", err)
 		return PostEventsV1EventIdTeams400JSONResponse{
@@ -70,18 +73,18 @@ func (a *API) PostEventsV1EventIdTeams(ctx context.Context, request PostEventsV1
 		}, nil
 	}
 
-	createdTeam, err := teams.CreateTeam(ctx, a.db, team)
+	createdEventTeam, err := teams.CreateEventTeam(ctx, a.db, eventTeam)
 	if err != nil {
-		logger.Error("Failed to create a team", "error", err)
+		logger.Error("Failed to create an event team", "error", err)
 		return PostEventsV1EventIdTeams500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to create the team",
 		}, nil
 	}
 
-	logger.Info("created new team", slog.String("team-id", createdTeam.ID.String()))
+	logger.Info("created new event team", slog.String("event-team-id", createdEventTeam.ID.String()))
 
-	apiTeam := teamToApiTeam(createdTeam)
+	apiTeam := eventTeamToApiTeam(createdEventTeam)
 	return PostEventsV1EventIdTeams200JSONResponse(apiTeam), nil
 }
 
@@ -91,9 +94,9 @@ func (a *API) GetEventsV1EventIdTeamsTeamId(ctx context.Context, request GetEven
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	team, err := a.db.GetTeam(ctx, request.EventId, request.TeamId)
+	eventTeam, err := a.db.GetEventTeam(ctx, request.EventId, request.TeamId)
 	if err != nil {
-		logger.Error("Failed to fetch a team", "error", err)
+		logger.Error("Failed to fetch an event team", "error", err)
 
 		var teamErr *teams.Error
 		if errors.As(err, &teamErr) {
@@ -112,7 +115,7 @@ func (a *API) GetEventsV1EventIdTeamsTeamId(ctx context.Context, request GetEven
 		}, nil
 	}
 
-	return GetEventsV1EventIdTeamsTeamId200JSONResponse(teamToApiTeam(team)), nil
+	return GetEventsV1EventIdTeamsTeamId200JSONResponse(eventTeamToApiTeam(eventTeam)), nil
 }
 
 func (a *API) PatchEventsV1EventIdTeamsTeamId(ctx context.Context, request PatchEventsV1EventIdTeamsTeamIdRequestObject) (PatchEventsV1EventIdTeamsTeamIdResponseObject, error) {
@@ -122,7 +125,7 @@ func (a *API) PatchEventsV1EventIdTeamsTeamId(ctx context.Context, request Patch
 	request.Body.EventId = &request.EventId
 	request.Body.Version = ptrInt(1)
 
-	team, err := apiTeamToTeam(*request.Body)
+	eventTeam, err := apiTeamToEventTeam(*request.Body)
 	if err != nil {
 		logger.Error("Invalid team body", slog.String("error", err.Error()))
 		return PatchEventsV1EventIdTeamsTeamId400JSONResponse{
@@ -131,9 +134,9 @@ func (a *API) PatchEventsV1EventIdTeamsTeamId(ctx context.Context, request Patch
 		}, nil
 	}
 
-	updatedTeam, err := teams.UpdateTeam(ctx, a.db, request.EventId, request.TeamId, team)
+	updatedEventTeam, err := teams.UpdateEventTeam(ctx, a.db, request.EventId, request.TeamId, eventTeam)
 	if err != nil {
-		logger.Error("failed to update team", slog.String("error", err.Error()))
+		logger.Error("failed to update event team", slog.String("error", err.Error()))
 
 		var teamErr *teams.Error
 		if errors.As(err, &teamErr) {
@@ -152,7 +155,7 @@ func (a *API) PatchEventsV1EventIdTeamsTeamId(ctx context.Context, request Patch
 		}, nil
 	}
 
-	return PatchEventsV1EventIdTeamsTeamId200JSONResponse(teamToApiTeam(updatedTeam)), nil
+	return PatchEventsV1EventIdTeamsTeamId200JSONResponse(eventTeamToApiTeam(updatedEventTeam)), nil
 }
 
 func (a *API) PostEventsV1EventIdTeamsTeamIdPlayers(ctx context.Context, request PostEventsV1EventIdTeamsTeamIdPlayersRequestObject) (PostEventsV1EventIdTeamsTeamIdPlayersResponseObject, error) {
@@ -163,9 +166,9 @@ func (a *API) PostEventsV1EventIdTeamsTeamIdPlayers(ctx context.Context, request
 
 	player := apiTeamPlayerToTeamPlayer(*request.Body)
 
-	err := teams.AddPlayerToTeam(ctx, a.db, request.EventId, request.TeamId, player)
+	err := teams.AddPlayerToEventTeam(ctx, a.db, request.EventId, request.TeamId, player)
 	if err != nil {
-		logger.Error("failed to add player to team", slog.String("error", err.Error()))
+		logger.Error("failed to add player to event team", slog.String("error", err.Error()))
 
 		var teamErr *teams.Error
 		if errors.As(err, &teamErr) {
@@ -189,22 +192,24 @@ func (a *API) PostEventsV1EventIdTeamsTeamIdPlayers(ctx context.Context, request
 		}, nil
 	}
 
-	// Return the updated team
-	team, err := a.db.GetTeam(ctx, request.EventId, request.TeamId)
+	// Return the updated event team
+	eventTeam, err := a.db.GetEventTeam(ctx, request.EventId, request.TeamId)
 	if err != nil {
-		logger.Error("Failed to fetch updated team", "error", err)
+		logger.Error("Failed to fetch updated event team", "error", err)
 		return PostEventsV1EventIdTeamsTeamIdPlayers500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to add player to team",
 		}, nil
 	}
 
-	return PostEventsV1EventIdTeamsTeamIdPlayers200JSONResponse(teamToApiTeam(team)), nil
+	return PostEventsV1EventIdTeamsTeamIdPlayers200JSONResponse(eventTeamToApiTeam(eventTeam)), nil
 }
 
-func teamToApiTeam(team teams.Team) Team {
-	players := make([]TeamPlayer, len(team.Players))
-	for i, p := range team.Players {
+// ==================== Helper Functions ====================
+
+func eventTeamToApiTeam(eventTeam teams.EventTeam) Team {
+	players := make([]TeamPlayer, len(eventTeam.Players))
+	for i, p := range eventTeam.Players {
 		var email *openapi_types.Email
 		if p.PlayerInfo.Email != nil {
 			e := openapi_types.Email(*p.PlayerInfo.Email)
@@ -220,10 +225,10 @@ func teamToApiTeam(team teams.Team) Team {
 		}
 	}
 
-	createdAt := team.CreatedAt
+	createdAt := eventTeam.CreatedAt
 
 	var sourceType TeamSourceType
-	switch team.SourceType {
+	switch eventTeam.SourceType {
 	case teams.SOURCE_TEAM_REGISTRATION:
 		sourceType = TeamSourceTypeTeamRegistration
 	case teams.SOURCE_ADMIN_CREATED:
@@ -233,23 +238,23 @@ func teamToApiTeam(team teams.Team) Team {
 	}
 
 	apiTeam := Team{
-		Id:         &team.ID,
-		Version:    &team.Version,
-		EventId:    &team.EventID,
-		Name:       team.Name,
+		Id:         &eventTeam.ID,
+		Version:    &eventTeam.Version,
+		EventId:    &eventTeam.EventID,
+		Name:       eventTeam.Name,
 		SourceType: sourceType,
 		Players:    players,
 		CreatedAt:  &createdAt,
 	}
 
-	if team.RegistrationID != nil {
-		apiTeam.RegistrationId = team.RegistrationID
+	if eventTeam.RegistrationID != nil {
+		apiTeam.RegistrationId = eventTeam.RegistrationID
 	}
 
 	return apiTeam
 }
 
-func apiTeamToTeam(team Team) (teams.Team, error) {
+func apiTeamToEventTeam(team Team) (teams.EventTeam, error) {
 	players := make([]teams.TeamPlayer, len(team.Players))
 	for i, p := range team.Players {
 		var sourceType teams.PlayerSourceType
@@ -288,10 +293,19 @@ func apiTeamToTeam(team Team) (teams.Team, error) {
 		sourceType = teams.SOURCE_MIXED
 	}
 
-	return teams.Team{
+	// TeamID is not in the API spec yet, so we use a zero UUID for now
+	// This will need to be updated when the API spec is updated
+	var teamID uuid.UUID
+	if team.RegistrationId != nil {
+		// Use registration ID as a proxy for team ID if available
+		teamID = *team.RegistrationId
+	}
+
+	return teams.EventTeam{
 		ID:             *team.Id,
 		Version:        *team.Version,
 		EventID:        *team.EventId,
+		TeamID:         teamID,
 		Name:           team.Name,
 		SourceType:     sourceType,
 		RegistrationID: team.RegistrationId,
