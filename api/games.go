@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/games"
+	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
 )
 
 func (a *API) GetEventsV1EventIdGames(ctx context.Context, request GetEventsV1EventIdGamesRequestObject) (GetEventsV1EventIdGamesResponseObject, error) {
@@ -59,10 +60,9 @@ func (a *API) GetEventsV1EventIdGames(ctx context.Context, request GetEventsV1Ev
 		}, nil
 	}
 
-	respGames := []Game{}
-	for _, v := range result.Data {
-		respGames = append(respGames, gameToApiGame(v))
-	}
+	respGames := slices.Map(result.Data, func(v games.Game) Game {
+		return gameToApiGame(v)
+	})
 
 	return GetEventsV1EventIdGames200JSONResponse{
 		Data:        respGames,
