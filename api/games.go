@@ -15,6 +15,8 @@ func (a *API) GetEventsV1EventIdGames(ctx context.Context, request GetEventsV1Ev
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
+	isAdmin := a.userIsAdmin(ctx)
+
 	// Check if schedule is public
 	event, err := a.db.GetEvent(ctx, request.EventId)
 	if err != nil {
@@ -25,7 +27,7 @@ func (a *API) GetEventsV1EventIdGames(ctx context.Context, request GetEventsV1Ev
 		}, nil
 	}
 
-	if !event.SchedulePublic {
+	if !isAdmin && !event.SchedulePublic {
 		return GetEventsV1EventIdGames403JSONResponse{
 			Code:    AuthError,
 			Message: "Schedule is not public",
@@ -106,6 +108,8 @@ func (a *API) GetEventsV1EventIdGamesGameId(ctx context.Context, request GetEven
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
+	isAdmin := a.userIsAdmin(ctx)
+
 	// Check if schedule is public
 	event, err := a.db.GetEvent(ctx, request.EventId)
 	if err != nil {
@@ -116,7 +120,7 @@ func (a *API) GetEventsV1EventIdGamesGameId(ctx context.Context, request GetEven
 		}, nil
 	}
 
-	if !event.SchedulePublic {
+	if !isAdmin && !event.SchedulePublic {
 		return GetEventsV1EventIdGamesGameId403JSONResponse{
 			Code:    AuthError,
 			Message: "Schedule is not public",
@@ -186,7 +190,7 @@ func (a *API) PatchEventsV1EventIdGamesGameId(ctx context.Context, request Patch
 		}
 
 		// Get admin email from context (assuming it's set by auth middleware)
-		recordedBy := "admin@example.com" // TODO: Get from context
+		recordedBy := a.getUserEmail(ctx)
 
 		updatedGame, err := games.RecordGameResult(ctx, a.db, request.EventId, request.GameId, result, recordedBy)
 		if err != nil {

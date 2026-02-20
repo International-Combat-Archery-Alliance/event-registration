@@ -948,8 +948,8 @@ paths:
 
   /teams/v1:
     get:
-      summary: Get all global teams
-      description: Retrieves a list of all global teams
+      summary: Get all teams
+      description: Retrieves a list of all teams
       security: []
       parameters:
         - name: cursor
@@ -999,8 +999,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     post:
-      summary: Create a new global team
-      description: Admin endpoint to create a new global team
+      summary: Create a new team
+      description: Admin endpoint to create a new team
       security:
         - googleCookieAuth: [admin]
         - googleBearerAuth: [admin]
@@ -1033,7 +1033,7 @@ paths:
 
   /teams/v1/{teamId}:
     get:
-      summary: Get a global team
+      summary: Get a team
       description: Get one team by id
       security: []
       parameters:
@@ -1064,8 +1064,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     patch:
-      summary: Update a global team
-      description: Admin endpoint to update a global team
+      summary: Update a team
+      description: Admin endpoint to update a team
       security:
         - googleCookieAuth: [admin]
         - googleBearerAuth: [admin]
@@ -1110,8 +1110,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     delete:
-      summary: Delete a global team
-      description: Admin endpoint to delete a global team
+      summary: Delete a team
+      description: Admin endpoint to delete a team
       security:
         - googleCookieAuth: [admin]
         - googleBearerAuth: [admin]
@@ -1147,7 +1147,7 @@ paths:
       parameters:
         - name: teamId
           in: path
-          description: ID of the global team
+          description: ID of the team
           required: true
           schema:
             type: string
@@ -1639,7 +1639,7 @@ components:
         teamId:
           type: string
           format: uuid
-          description: Reference to the global team
+          description: Reference to the team
           example: 00000000-0000-0000-0000-000000000001
         name:
           type: string

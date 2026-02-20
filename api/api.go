@@ -118,3 +118,19 @@ func (a *API) getLoggerOrBaseLogger(ctx context.Context) *slog.Logger {
 	}
 	return logger
 }
+
+func (a *API) userIsAdmin(ctx context.Context) bool {
+	if authToken, ok := middleware.GetJWTFromCtx(ctx); ok {
+		return authToken.IsAdmin()
+	}
+
+	return false
+}
+
+func (a *API) getUserEmail(ctx context.Context) string {
+	if authToken, ok := middleware.GetJWTFromCtx(ctx); ok {
+		return authToken.UserEmail()
+	}
+
+	return ""
+}
