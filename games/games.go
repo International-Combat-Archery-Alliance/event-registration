@@ -54,11 +54,14 @@ type Repository interface {
 	UpdateGame(ctx context.Context, game Game) error
 	DeleteGame(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID) error
 	// RecordResult saves the game result and both team standings atomically
-	RecordResult(ctx context.Context, game Game, team1Standing TeamStanding, team2Standing TeamStanding) error
+	RecordResult(ctx context.Context, game Game, team1Standing Standing, team2Standing Standing) error
+	// GetStandingsForEvent retrieves all standings for an event
+	GetStandingsForEvent(ctx context.Context, eventID uuid.UUID) (GetStandingsResponse, error)
 }
 
-// TeamStanding represents a team's standing data for the games package
-type TeamStanding struct {
+// Standing represents a team's standing
+type Standing struct {
+	EventID       uuid.UUID
 	TeamID        uuid.UUID
 	TeamName      string
 	Wins          int
@@ -66,6 +69,12 @@ type TeamStanding struct {
 	PointsFor     int
 	PointsAgainst int
 	GamesPlayed   int
+	WinPercentage float64
+}
+
+// GetStandingsResponse is the response for GetStandingsForEvent
+type GetStandingsResponse struct {
+	Data []Standing
 }
 
 type GameResult struct {
@@ -148,18 +157,20 @@ func RecordGameResult(ctx context.Context, repo Repository, eventID uuid.UUID, g
 	return game, nil
 }
 
-func calculateStandingsFromResult(game Game, result GameResult) (TeamStanding, TeamStanding) {
+func calculateStandingsFromResult(game Game, result GameResult) (Standing, Standing) {
 	// This is a simplified version - in reality you'd fetch existing standings and update them
 	// For now, we'll create new standings based on this game result
 
-	team1Standing := TeamStanding{
+	team1Standing := Standing{
+		EventID:       game.EventID,
 		TeamID:        game.Team1ID,
 		GamesPlayed:   1,
 		PointsFor:     result.Team1Score,
 		PointsAgainst: result.Team2Score,
 	}
 
-	team2Standing := TeamStanding{
+	team2Standing := Standing{
+		EventID:       game.EventID,
 		TeamID:        game.Team2ID,
 		GamesPlayed:   1,
 		PointsFor:     result.Team2Score,

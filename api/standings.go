@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/International-Combat-Archery-Alliance/event-registration/standings"
+	"github.com/International-Combat-Archery-Alliance/event-registration/games"
 )
 
 func (a *API) GetEventsV1EventIdStandings(ctx context.Context, request GetEventsV1EventIdStandingsRequestObject) (GetEventsV1EventIdStandingsResponseObject, error) {
@@ -35,7 +35,7 @@ func (a *API) GetEventsV1EventIdStandings(ctx context.Context, request GetEvents
 	if err != nil {
 		logger.Error("Failed to get standings from the DB", "error", err)
 
-		var standingsErr *standings.Error
+		var standingsErr *games.Error
 		if errors.As(err, &standingsErr) {
 			return GetEventsV1EventIdStandings500JSONResponse{
 				Code:    InternalError,
@@ -58,7 +58,7 @@ func (a *API) GetEventsV1EventIdStandings(ctx context.Context, request GetEvents
 	}, nil
 }
 
-func standingToApiStanding(standing standings.Standing) Standing {
+func standingToApiStanding(standing games.Standing) Standing {
 	return Standing{
 		EventId:       standing.EventID,
 		TeamId:        standing.TeamID,

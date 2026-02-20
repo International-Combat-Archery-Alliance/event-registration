@@ -314,7 +314,7 @@ func (d *DB) DeleteGame(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID
 	return nil
 }
 
-func (d *DB) RecordResult(ctx context.Context, game games.Game, team1Standing games.TeamStanding, team2Standing games.TeamStanding) error {
+func (d *DB) RecordResult(ctx context.Context, game games.Game, team1Standing games.Standing, team2Standing games.Standing) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
@@ -342,10 +342,10 @@ func (d *DB) RecordResult(ctx context.Context, game games.Game, team1Standing ga
 	})
 
 	// 2. Update team 1 standing
-	team1Dynamo := newStandingDynamoFromTeamStanding(game.EventID, team1Standing)
+	team1Dynamo := newStandingDynamoFromStanding(team1Standing)
 	team1Item, err := attributevalue.MarshalMap(team1Dynamo)
 	if err != nil {
-		return games.NewFailedToTranslateToDBModelError("Failed to convert TeamStanding to standingDynamo", err)
+		return games.NewFailedToTranslateToDBModelError("Failed to convert Standing to standingDynamo", err)
 	}
 
 	transactItems = append(transactItems, types.TransactWriteItem{
@@ -356,10 +356,10 @@ func (d *DB) RecordResult(ctx context.Context, game games.Game, team1Standing ga
 	})
 
 	// 3. Update team 2 standing
-	team2Dynamo := newStandingDynamoFromTeamStanding(game.EventID, team2Standing)
+	team2Dynamo := newStandingDynamoFromStanding(team2Standing)
 	team2Item, err := attributevalue.MarshalMap(team2Dynamo)
 	if err != nil {
-		return games.NewFailedToTranslateToDBModelError("Failed to convert TeamStanding to standingDynamo", err)
+		return games.NewFailedToTranslateToDBModelError("Failed to convert Standing to standingDynamo", err)
 	}
 
 	transactItems = append(transactItems, types.TransactWriteItem{
@@ -388,7 +388,7 @@ func (d *DB) RecordResult(ctx context.Context, game games.Game, team1Standing ga
 	return nil
 }
 
-func newStandingDynamoFromTeamStanding(eventID uuid.UUID, standing games.TeamStanding) standingDynamo {
+func newStandingDynamoFromStanding(standing games.Standing) standingDynamo {
 	now := time.Now().UTC()
 	winPercentage := 0.0
 	if standing.GamesPlayed > 0 {
@@ -396,9 +396,9 @@ func newStandingDynamoFromTeamStanding(eventID uuid.UUID, standing games.TeamSta
 	}
 
 	return standingDynamo{
-		PK:            standingPK(eventID),
+		PK:            standingPK(standing.EventID),
 		SK:            standingSK(standing.TeamID),
-		EventID:       eventID.String(),
+		EventID:       standing.EventID.String(),
 		TeamID:        standing.TeamID.String(),
 		TeamName:      standing.TeamName,
 		Wins:          standing.Wins,

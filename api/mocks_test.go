@@ -11,7 +11,6 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/games"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
-	"github.com/International-Combat-Archery-Alliance/event-registration/standings"
 	"github.com/International-Combat-Archery-Alliance/event-registration/teams"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
@@ -109,10 +108,9 @@ type mockDB struct {
 	CreateGameFunc       func(ctx context.Context, game games.Game) error
 	UpdateGameFunc       func(ctx context.Context, game games.Game) error
 	DeleteGameFunc       func(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID) error
-	RecordResultFunc     func(ctx context.Context, game games.Game, team1Standing games.TeamStanding, team2Standing games.TeamStanding) error
+	RecordResultFunc     func(ctx context.Context, game games.Game, team1Standing games.Standing, team2Standing games.Standing) error
 	// Standings
-	GetStandingsForEventFunc func(ctx context.Context, eventID uuid.UUID) (standings.GetStandingsResponse, error)
-	UpdateStandingsFunc      func(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID, standing standings.Standing) error
+	GetStandingsForEventFunc func(ctx context.Context, eventID uuid.UUID) (games.GetStandingsResponse, error)
 }
 
 func (m *mockDB) DeleteExpiredRegistration(ctx context.Context, registration registration.Registration, intent registration.RegistrationIntent, event events.Event) error {
@@ -268,7 +266,7 @@ func (m *mockDB) DeleteGame(ctx context.Context, eventID uuid.UUID, gameID uuid.
 	return nil
 }
 
-func (m *mockDB) RecordResult(ctx context.Context, game games.Game, team1Standing games.TeamStanding, team2Standing games.TeamStanding) error {
+func (m *mockDB) RecordResult(ctx context.Context, game games.Game, team1Standing games.Standing, team2Standing games.Standing) error {
 	if m.RecordResultFunc != nil {
 		return m.RecordResultFunc(ctx, game, team1Standing, team2Standing)
 	}
@@ -276,16 +274,9 @@ func (m *mockDB) RecordResult(ctx context.Context, game games.Game, team1Standin
 }
 
 // Standings
-func (m *mockDB) GetStandingsForEvent(ctx context.Context, eventID uuid.UUID) (standings.GetStandingsResponse, error) {
+func (m *mockDB) GetStandingsForEvent(ctx context.Context, eventID uuid.UUID) (games.GetStandingsResponse, error) {
 	if m.GetStandingsForEventFunc != nil {
 		return m.GetStandingsForEventFunc(ctx, eventID)
 	}
-	return standings.GetStandingsResponse{}, nil
-}
-
-func (m *mockDB) UpdateStandings(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID, standing standings.Standing) error {
-	if m.UpdateStandingsFunc != nil {
-		return m.UpdateStandingsFunc(ctx, eventID, teamID, standing)
-	}
-	return nil
+	return games.GetStandingsResponse{}, nil
 }
