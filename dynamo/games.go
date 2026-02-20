@@ -314,27 +314,99 @@ func (d *DB) DeleteGame(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID
 	return nil
 }
 
-func (d *DB) RecordResult(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID, result games.GameResult, recordedBy string) error {
+func (d *DB) RecordResult(ctx context.Context, game games.Game, team1Standing games.TeamStanding, team2Standing games.TeamStanding) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
-	// Get current game
-	game, err := d.GetGame(ctx, eventID, gameID)
+	// Build the transaction items
+	transactItems := make([]types.TransactWriteItem, 0, 3)
+
+	// 1. Update the game
+	dynamoGame := newGameDynamo(game)
+	gameItem, err := attributevalue.MarshalMap(dynamoGame)
 	if err != nil {
-		return err
+		return games.NewFailedToTranslateToDBModelError("Failed to convert Game to gameDynamo", err)
 	}
 
-	// Update game with result
-	game.Version++
-	game.Status = games.STATUS_COMPLETED
-	game.Team1Score = &result.Team1Score
-	game.Team2Score = &result.Team2Score
-	game.WinnerID = &result.WinnerID
-	game.RoundResults = result.RoundResults
-	now := time.Now().UTC()
-	game.RecordedAt = &now
-	game.RecordedBy = &recordedBy
+	gameCondition := existingEntityVersionConditional(dynamoGame.Version - 1) // Version before increment
+	gameExpr := exprMustBuild(expression.NewBuilder().WithCondition(gameCondition))
 
-	// Save updated game
-	return d.UpdateGame(ctx, game)
+	transactItems = append(transactItems, types.TransactWriteItem{
+		Put: &types.Put{
+			TableName:                 aws.String(d.tableName),
+			Item:                      gameItem,
+			ConditionExpression:       gameExpr.Condition(),
+			ExpressionAttributeNames:  gameExpr.Names(),
+			ExpressionAttributeValues: gameExpr.Values(),
+		},
+	})
+
+	// 2. Update team 1 standing
+	team1Dynamo := newStandingDynamoFromTeamStanding(game.EventID, team1Standing)
+	team1Item, err := attributevalue.MarshalMap(team1Dynamo)
+	if err != nil {
+		return games.NewFailedToTranslateToDBModelError("Failed to convert TeamStanding to standingDynamo", err)
+	}
+
+	transactItems = append(transactItems, types.TransactWriteItem{
+		Put: &types.Put{
+			TableName: aws.String(d.tableName),
+			Item:      team1Item,
+		},
+	})
+
+	// 3. Update team 2 standing
+	team2Dynamo := newStandingDynamoFromTeamStanding(game.EventID, team2Standing)
+	team2Item, err := attributevalue.MarshalMap(team2Dynamo)
+	if err != nil {
+		return games.NewFailedToTranslateToDBModelError("Failed to convert TeamStanding to standingDynamo", err)
+	}
+
+	transactItems = append(transactItems, types.TransactWriteItem{
+		Put: &types.Put{
+			TableName: aws.String(d.tableName),
+			Item:      team2Item,
+		},
+	})
+
+	// Execute the transaction
+	_, err = d.dynamoClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: transactItems,
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return games.NewTimeoutError("RecordResult transaction timed out")
+		}
+		var tcfErr *types.TransactionCanceledException
+		if errors.As(err, &tcfErr) {
+			// One of the items failed its condition check (likely version mismatch)
+			return games.NewGameAlreadyHasResultError("Game already has results recorded or was modified")
+		}
+		return games.NewFailedToWriteError("Failed TransactWriteItems call", err)
+	}
+
+	return nil
+}
+
+func newStandingDynamoFromTeamStanding(eventID uuid.UUID, standing games.TeamStanding) standingDynamo {
+	now := time.Now().UTC()
+	winPercentage := 0.0
+	if standing.GamesPlayed > 0 {
+		winPercentage = float64(standing.Wins) / float64(standing.GamesPlayed)
+	}
+
+	return standingDynamo{
+		PK:            standingPK(eventID),
+		SK:            standingSK(standing.TeamID),
+		EventID:       eventID.String(),
+		TeamID:        standing.TeamID.String(),
+		TeamName:      standing.TeamName,
+		Wins:          standing.Wins,
+		Losses:        standing.Losses,
+		PointsFor:     standing.PointsFor,
+		PointsAgainst: standing.PointsAgainst,
+		GamesPlayed:   standing.GamesPlayed,
+		WinPercentage: winPercentage,
+		UpdatedAt:     now,
+	}
 }

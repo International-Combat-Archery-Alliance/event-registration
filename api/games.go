@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/games"
-	"github.com/google/uuid"
 )
 
 func (a *API) GetEventsV1EventIdGames(ctx context.Context, request GetEventsV1EventIdGamesRequestObject) (GetEventsV1EventIdGamesResponseObject, error) {
@@ -213,14 +212,6 @@ func (a *API) PatchEventsV1EventIdGamesGameId(ctx context.Context, request Patch
 				Code:    InternalError,
 				Message: "Recording game result failed",
 			}, nil
-		}
-
-		// Recalculate standings
-		err = a.db.(interface {
-			RecalculateStandings(context.Context, uuid.UUID) error
-		}).RecalculateStandings(ctx, request.EventId)
-		if err != nil {
-			logger.Error("failed to recalculate standings", slog.String("error", err.Error()))
 		}
 
 		return PatchEventsV1EventIdGamesGameId200JSONResponse(gameToApiGame(updatedGame)), nil

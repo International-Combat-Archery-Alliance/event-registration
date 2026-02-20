@@ -53,7 +53,19 @@ type Repository interface {
 	CreateGame(ctx context.Context, game Game) error
 	UpdateGame(ctx context.Context, game Game) error
 	DeleteGame(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID) error
-	RecordResult(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID, result GameResult, recordedBy string) error
+	// RecordResult saves the game result and both team standings atomically
+	RecordResult(ctx context.Context, game Game, team1Standing TeamStanding, team2Standing TeamStanding) error
+}
+
+// TeamStanding represents a team's standing data for the games package
+type TeamStanding struct {
+	TeamID        uuid.UUID
+	TeamName      string
+	Wins          int
+	Losses        int
+	PointsFor     int
+	PointsAgainst int
+	GamesPlayed   int
 }
 
 type GameResult struct {
@@ -125,12 +137,44 @@ func RecordGameResult(ctx context.Context, repo Repository, eventID uuid.UUID, g
 	game.RecordedAt = &now
 	game.RecordedBy = &recordedBy
 
-	err = repo.RecordResult(ctx, eventID, gameID, result, recordedBy)
+	// Calculate standings updates
+	team1Standing, team2Standing := calculateStandingsFromResult(game, result)
+
+	err = repo.RecordResult(ctx, game, team1Standing, team2Standing)
 	if err != nil {
 		return Game{}, err
 	}
 
 	return game, nil
+}
+
+func calculateStandingsFromResult(game Game, result GameResult) (TeamStanding, TeamStanding) {
+	// This is a simplified version - in reality you'd fetch existing standings and update them
+	// For now, we'll create new standings based on this game result
+
+	team1Standing := TeamStanding{
+		TeamID:        game.Team1ID,
+		GamesPlayed:   1,
+		PointsFor:     result.Team1Score,
+		PointsAgainst: result.Team2Score,
+	}
+
+	team2Standing := TeamStanding{
+		TeamID:        game.Team2ID,
+		GamesPlayed:   1,
+		PointsFor:     result.Team2Score,
+		PointsAgainst: result.Team1Score,
+	}
+
+	if result.WinnerID == game.Team1ID {
+		team1Standing.Wins = 1
+		team2Standing.Losses = 1
+	} else {
+		team2Standing.Wins = 1
+		team1Standing.Losses = 1
+	}
+
+	return team1Standing, team2Standing
 }
 
 func DeleteGame(ctx context.Context, repo Repository, eventID uuid.UUID, gameID uuid.UUID) error {

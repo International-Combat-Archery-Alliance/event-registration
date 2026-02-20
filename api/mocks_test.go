@@ -109,7 +109,7 @@ type mockDB struct {
 	CreateGameFunc       func(ctx context.Context, game games.Game) error
 	UpdateGameFunc       func(ctx context.Context, game games.Game) error
 	DeleteGameFunc       func(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID) error
-	RecordResultFunc     func(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID, result games.GameResult, recordedBy string) error
+	RecordResultFunc     func(ctx context.Context, game games.Game, team1Standing games.TeamStanding, team2Standing games.TeamStanding) error
 	// Standings
 	GetStandingsForEventFunc func(ctx context.Context, eventID uuid.UUID) (standings.GetStandingsResponse, error)
 	UpdateStandingsFunc      func(ctx context.Context, eventID uuid.UUID, teamID uuid.UUID, standing standings.Standing) error
@@ -268,9 +268,9 @@ func (m *mockDB) DeleteGame(ctx context.Context, eventID uuid.UUID, gameID uuid.
 	return nil
 }
 
-func (m *mockDB) RecordResult(ctx context.Context, eventID uuid.UUID, gameID uuid.UUID, result games.GameResult, recordedBy string) error {
+func (m *mockDB) RecordResult(ctx context.Context, game games.Game, team1Standing games.TeamStanding, team2Standing games.TeamStanding) error {
 	if m.RecordResultFunc != nil {
-		return m.RecordResultFunc(ctx, eventID, gameID, result, recordedBy)
+		return m.RecordResultFunc(ctx, game, team1Standing, team2Standing)
 	}
 	return nil
 }
