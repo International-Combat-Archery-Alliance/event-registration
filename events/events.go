@@ -24,6 +24,7 @@ type Event struct {
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
+	SchedulePublic        bool
 }
 
 type EventRegistrationOption struct {
@@ -71,6 +72,7 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		NumTotalPlayers:       existingEvent.NumTotalPlayers,
 		RulesDocLink:          event.RulesDocLink,
 		ImageName:             event.ImageName,
+		SchedulePublic:        event.SchedulePublic,
 	}
 
 	err = repo.UpdateEvent(ctx, updatedEvent)

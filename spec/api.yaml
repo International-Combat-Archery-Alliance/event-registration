@@ -404,6 +404,548 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /events/v1/{eventId}/teams:
+    get:
+      summary: Get all teams for an event
+      description: Retrieves a list of all teams for an event
+      security: []
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+        - name: cursor
+          in: query
+          description: Cursor of where to start from
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Max amount of teams to fetch
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: A list of teams.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - hasNextPage
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Team'
+                  cursor:
+                    type: string
+                  hasNextPage:
+                    type: boolean
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new team
+      description: Admin endpoint to create a new team for an event
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Team to be created
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Team'
+      responses:
+        '200':
+          description: The created team.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/v1/{eventId}/teams/{teamId}:
+    get:
+      summary: Get a team
+      description: Get one team by id
+      security: []
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: teamId
+          in: path
+          description: ID of the team
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '404':
+          description: Team not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Update a team
+      description: Admin endpoint to update a team
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: teamId
+          in: path
+          description: ID of the team
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Team to be updated
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Team'
+      responses:
+        '200':
+          description: The updated team.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Team not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/v1/{eventId}/teams/{teamId}/players:
+    post:
+      summary: Add a player to a team
+      description: Admin endpoint to add an individual registration to a team
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: teamId
+          in: path
+          description: ID of the team
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Player to add
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamPlayer'
+      responses:
+        '200':
+          description: The updated team.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Team not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/v1/{eventId}/games:
+    get:
+      summary: Get all games for an event
+      description: Retrieves a list of all games for an event. Requires event schedule to be public.
+      security: []
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          description: Cursor of where to start from
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Max amount of games to fetch
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: A list of games.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - hasNextPage
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Game'
+                  cursor:
+                    type: string
+                  hasNextPage:
+                    type: boolean
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Schedule is not public.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new game
+      description: Admin endpoint to create a new game for an event
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Game to be created
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Game'
+      responses:
+        '200':
+          description: The created game.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/v1/{eventId}/games/{gameId}:
+    get:
+      summary: Get a game
+      description: Get one game by id. Requires event schedule to be public.
+      security: []
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: gameId
+          in: path
+          description: ID of the game
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The game
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '403':
+          description: Schedule is not public.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Game not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Update a game
+      description: Admin endpoint to update a game or record results
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: gameId
+          in: path
+          description: ID of the game
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Game to be updated
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Game'
+      responses:
+        '200':
+          description: The updated game.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Game not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete a game
+      description: Admin endpoint to delete a game. Cannot delete games with recorded results.
+      security:
+        - googleCookieAuth: [admin]
+        - googleBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: gameId
+          in: path
+          description: ID of the game
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Game deleted successfully.
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Game not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/v1/{eventId}/standings:
+    get:
+      summary: Get standings for an event
+      description: Retrieves the standings for an event. Requires event schedule to be public.
+      security: []
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The standings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Standing'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Schedule is not public.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   securitySchemes:
     googleCookieAuth:
@@ -479,6 +1021,11 @@ components:
           maxLength: 500
           description: A file name that exists in the UI assets to use as the logo.
           example: boston-tournament.jpg
+        schedulePublic:
+          type: boolean
+          description: Whether the schedule and standings are publicly visible.
+          default: false
+          example: true
     SignUpStats:
       type: object
       readOnly: true
@@ -788,3 +1335,238 @@ components:
         message:
           type: string
           example: An unexpected error occurred.
+    Team:
+      type: object
+      required:
+        - id
+        - version
+        - eventId
+        - name
+        - sourceType
+        - players
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        version:
+          type: integer
+          readOnly: true
+          example: 1
+        eventId:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: The Fighting Mongooses
+        sourceType:
+          $ref: '#/components/schemas/TeamSourceType'
+        registrationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Reference to the original team registration if created from registration.
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamPlayer'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2025-08-19T18:46:53.185Z"
+    TeamSourceType:
+      type: string
+      enum:
+        - TeamRegistration
+        - AdminCreated
+        - Mixed
+      example: TeamRegistration
+    TeamPlayer:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - sourceType
+        - registrationId
+        - assignedAt
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: Jane
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: Doe
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 100
+          example: player@example.com
+        sourceType:
+          $ref: '#/components/schemas/PlayerSourceType'
+        registrationId:
+          type: string
+          format: uuid
+          example: 00000000-0000-0000-0000-000000000000
+        assignedAt:
+          type: string
+          format: date-time
+          example: "2025-08-19T18:46:53.185Z"
+    PlayerSourceType:
+      type: string
+      enum:
+        - TeamRegistration
+        - IndividualRegistration
+      example: TeamRegistration
+    Game:
+      type: object
+      required:
+        - id
+        - version
+        - eventId
+        - team1Id
+        - team2Id
+        - scheduledTime
+        - location
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        version:
+          type: integer
+          readOnly: true
+          example: 1
+        eventId:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        team1Id:
+          type: string
+          format: uuid
+          example: 00000000-0000-0000-0000-000000000001
+        team2Id:
+          type: string
+          format: uuid
+          example: 00000000-0000-0000-0000-000000000002
+        scheduledTime:
+          type: string
+          format: date-time
+          example: "2025-08-19T18:46:53.185Z"
+        location:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Court 1
+        status:
+          $ref: '#/components/schemas/GameStatus'
+        team1Score:
+          type: integer
+          nullable: true
+          example: 3
+        team2Score:
+          type: integer
+          nullable: true
+          example: 2
+        winnerId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 00000000-0000-0000-0000-000000000001
+        roundResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoundResult'
+        recordedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-08-19T20:00:00.000Z"
+        recordedBy:
+          type: string
+          nullable: true
+          example: admin@example.com
+    GameStatus:
+      type: string
+      enum:
+        - Scheduled
+        - InProgress
+        - Completed
+      example: Scheduled
+    RoundResult:
+      type: object
+      required:
+        - roundNumber
+        - winnerTeamId
+      properties:
+        roundNumber:
+          type: integer
+          minimum: 1
+          example: 1
+        winnerTeamId:
+          type: string
+          format: uuid
+          example: 00000000-0000-0000-0000-000000000001
+    Standing:
+      type: object
+      required:
+        - eventId
+        - teamId
+        - teamName
+        - wins
+        - losses
+        - pointsFor
+        - pointsAgainst
+        - gamesPlayed
+        - winPercentage
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          example: 00000000-0000-0000-0000-000000000000
+        teamId:
+          type: string
+          format: uuid
+          example: 00000000-0000-0000-0000-000000000001
+        teamName:
+          type: string
+          example: The Fighting Mongooses
+        wins:
+          type: integer
+          minimum: 0
+          example: 5
+        losses:
+          type: integer
+          minimum: 0
+          example: 2
+        pointsFor:
+          type: integer
+          minimum: 0
+          example: 150
+        pointsAgainst:
+          type: integer
+          minimum: 0
+          example: 120
+        gamesPlayed:
+          type: integer
+          minimum: 0
+          example: 7
+        winPercentage:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.714
