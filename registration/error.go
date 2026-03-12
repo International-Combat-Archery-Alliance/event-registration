@@ -26,6 +26,7 @@ const (
 	REASON_PAYMENT_MISSING_METADATA        ErrorReason = "PAYMENT_MISSING_METADATA"
 	REASON_INVALID_PAYMENT_METADATA        ErrorReason = "INVALID_PAYMENT_METADATA"
 	REASON_REGISTRATION_EXPIRED            ErrorReason = "REGISTRATION_EXPIRED"
+	REASON_WRONG_TRANSACTION_TYPE          ErrorReason = "WRONG_TRANSACTION_TYPE"
 )
 
 type Error struct {
@@ -112,4 +113,8 @@ func NewInvalidPaymentMetadata(message string, cause error) *Error {
 
 func NewRegistrationExpiredError(message string, cause error) *Error {
 	return newRegistrationError(REASON_REGISTRATION_EXPIRED, message, cause)
+}
+
+func NewWrongTransactionTypeError(message string) *Error {
+	return newRegistrationError(REASON_WRONG_TRANSACTION_TYPE, message, nil)
 }
