@@ -439,8 +439,9 @@ func (m *mockCheckoutManager) ConfirmCheckout(ctx context.Context, payload []byt
 		return m.ConfirmCheckoutFunc(ctx, payload, signature)
 	}
 	return map[string]string{
-		"EMAIL":    "test@example.com",
-		"EVENT_ID": "123e4567-e89b-12d3-a456-426614174000",
+		"EMAIL":     "test@example.com",
+		"EVENT_ID":  "123e4567-e89b-12d3-a456-426614174000",
+		"ITEM_TYPE": "event_registration",
 	}, nil
 }
 
@@ -667,8 +668,9 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 				assert.Equal(t, []byte("test_payload"), payload)
 				assert.Equal(t, "test_signature", signature)
 				return map[string]string{
-					"EMAIL":    email,
-					"EVENT_ID": eventID.String(),
+					"EMAIL":     email,
+					"EVENT_ID":  eventID.String(),
+					"ITEM_TYPE": "event_registration",
 				}, nil
 			},
 		}
@@ -687,7 +689,8 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		checkoutManager := &mockCheckoutManager{
 			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
 				return map[string]string{
-					"EVENT_ID": uuid.New().String(),
+					"EVENT_ID":  uuid.New().String(),
+					"ITEM_TYPE": "event_registration",
 				}, nil
 			},
 		}
@@ -707,8 +710,9 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		checkoutManager := &mockCheckoutManager{
 			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
 				return map[string]string{
-					"EMAIL":    "test@example.com",
-					"EVENT_ID": "invalid-uuid",
+					"EMAIL":     "test@example.com",
+					"EVENT_ID":  "invalid-uuid",
+					"ITEM_TYPE": "event_registration",
 				}, nil
 			},
 		}
@@ -769,8 +773,9 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		checkoutManager := &mockCheckoutManager{
 			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
 				return map[string]string{
-					"EMAIL":    email,
-					"EVENT_ID": eventID.String(),
+					"EMAIL":     email,
+					"EVENT_ID":  eventID.String(),
+					"ITEM_TYPE": "event_registration",
 				}, &payments.Error{Reason: payments.ErrorReasonCheckoutExpired}
 			},
 		}
@@ -835,8 +840,9 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		checkoutManager := &mockCheckoutManager{
 			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
 				return map[string]string{
-					"EMAIL":    email,
-					"EVENT_ID": eventID.String(),
+					"EMAIL":     email,
+					"EVENT_ID":  eventID.String(),
+					"ITEM_TYPE": "event_registration",
 				}, &payments.Error{Reason: payments.ErrorReasonCheckoutExpired}
 			},
 		}
@@ -866,8 +872,9 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		checkoutManager := &mockCheckoutManager{
 			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
 				return map[string]string{
-					"EMAIL":    email,
-					"EVENT_ID": eventID.String(),
+					"EMAIL":     email,
+					"EVENT_ID":  eventID.String(),
+					"ITEM_TYPE": "event_registration",
 				}, &payments.Error{Reason: payments.ErrorReasonCheckoutExpired}
 			},
 		}
@@ -913,8 +920,9 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		checkoutManager := &mockCheckoutManager{
 			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
 				return map[string]string{
-					"EMAIL":    email,
-					"EVENT_ID": eventID.String(),
+					"EMAIL":     email,
+					"EVENT_ID":  eventID.String(),
+					"ITEM_TYPE": "event_registration",
 				}, &payments.Error{Reason: payments.ErrorReasonCheckoutExpired}
 			},
 		}

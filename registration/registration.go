@@ -106,8 +106,10 @@ func (r *TeamRegistration) BumpVersion() {
 }
 
 const (
-	emailKey   = "EMAIL"
-	eventIdKey = "EVENT_ID"
+	emailKey      = "EMAIL"
+	eventIdKey    = "EVENT_ID"
+	itemTypeKey   = "ITEM_TYPE"
+	itemTypeEvent = "event_registration"
 )
 
 func AttemptRegistration(ctx context.Context, registrationRequest Registration, eventRepo events.Repository, registrationRepo Repository) (Registration, events.Event, error) {
@@ -200,8 +202,9 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 			paymentItem,
 		},
 		Metadata: map[string]string{
-			emailKey:   registrationRequest.GetEmail(),
-			eventIdKey: event.ID.String(),
+			emailKey:    registrationRequest.GetEmail(),
+			eventIdKey:  event.ID.String(),
+			itemTypeKey: itemTypeEvent,
 		},
 		AllowAdaptivePricing: true,
 		CustomerEmail:        ptr.String(registrationRequest.GetEmail()),
@@ -231,6 +234,12 @@ func ConfirmRegistrationPayment(ctx context.Context, payload []byte, signature s
 	isExpired := checkoutIsExpired(checkoutErr)
 	if checkoutErr != nil && !isExpired {
 		return nil, checkoutErr
+	}
+
+	// Check if this is an event registration transaction
+	itemType, ok := metadata[itemTypeKey]
+	if !ok || itemType != itemTypeEvent {
+		return nil, NewWrongTransactionTypeError(fmt.Sprintf("Transaction is not an event registration. item_type=%q", itemType))
 	}
 
 	email, ok := metadata[emailKey]

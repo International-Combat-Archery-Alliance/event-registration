@@ -44,6 +44,10 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 
 					w.WriteHeader(http.StatusOK)
 					return
+				case registration.REASON_WRONG_TRANSACTION_TYPE:
+					logger.Info("Got a non-event registration transaction, ignoring", slog.String("error", err.Error()))
+					w.WriteHeader(http.StatusOK)
+					return
 				}
 			}
 
