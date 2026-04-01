@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/auth"
+	"github.com/International-Combat-Archery-Alliance/auth/token"
 	"github.com/International-Combat-Archery-Alliance/captcha"
 	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
@@ -17,17 +18,24 @@ import (
 
 var noopLogger = slog.New(slog.DiscardHandler)
 
-type mockAuthValidator struct{}
+// newTestTokenService creates a token service for testing with a test signing key
+func newTestTokenService() *token.TokenService {
+	testKey := token.SigningKey{
+		ID:  "test",
+		Key: []byte("test-signing-key-minimum-32-characters-long"),
+	}
+	return token.NewTokenService(testKey)
+}
 
-type mockAuthToken struct{}
-
-func (m *mockAuthToken) ExpiresAt() time.Time  { return time.Now().Add(time.Hour) }
-func (m *mockAuthToken) ProfilePicURL() string { return "" }
-func (m *mockAuthToken) IsAdmin() bool         { return false }
-func (m *mockAuthToken) UserEmail() string     { return "test@example.com" }
-
-func (m *mockAuthValidator) Validate(ctx context.Context, token string, clientID string) (auth.AuthToken, error) {
-	return &mockAuthToken{}, nil
+// generateTestToken generates a valid test access token for a user
+func generateTestToken(email string, isAdmin bool) string {
+	ts := newTestTokenService()
+	var roles []auth.Role
+	if isAdmin {
+		roles = []auth.Role{auth.RoleAdmin}
+	}
+	tokenStr, _ := ts.GenerateAccessToken(email, "", roles)
+	return tokenStr
 }
 
 type mockCaptchaValidator struct {

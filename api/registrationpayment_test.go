@@ -52,7 +52,7 @@ func TestStripeRegistrationPaymentWebhookMiddleware(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mockDB, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
+		api := NewAPI(mockDB, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
 
 		// Create a test server with the middleware
 		middleware := api.stripeRegistrationPaymentWebhookMiddleware("/test/webhook")
@@ -77,7 +77,7 @@ func TestStripeRegistrationPaymentWebhookMiddleware(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mockDB, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
+		api := NewAPI(mockDB, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
 
 		middleware := api.stripeRegistrationPaymentWebhookMiddleware("/test/webhook")
 		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,7 @@ func TestStripeRegistrationPaymentWebhookMiddleware(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mockDB, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
+		api := NewAPI(mockDB, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
 
 		middleware := api.stripeRegistrationPaymentWebhookMiddleware("/test/webhook")
 		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +121,7 @@ func TestStripeRegistrationPaymentWebhookMiddleware(t *testing.T) {
 		mockDB := &mockDB{}
 		mockCheckout := &mockCheckoutManager{}
 
-		api := NewAPI(mockDB, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
+		api := NewAPI(mockDB, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
 
 		middleware := api.stripeRegistrationPaymentWebhookMiddleware("/test/webhook")
 		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +140,7 @@ func TestStripeRegistrationPaymentWebhookMiddleware(t *testing.T) {
 		mockDB := &mockDB{}
 		mockCheckout := &mockCheckoutManager{}
 
-		api := NewAPI(mockDB, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
+		api := NewAPI(mockDB, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
 
 		middleware := api.stripeRegistrationPaymentWebhookMiddleware("/test/webhook")
 		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +176,7 @@ func TestStripeRegistrationPaymentWebhookMiddleware(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mockDB, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
+		api := NewAPI(mockDB, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, mockCheckout)
 
 		middleware := api.stripeRegistrationPaymentWebhookMiddleware("/test/webhook")
 		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
