@@ -10,14 +10,14 @@ github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 h1:He8af
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6/go.mod h1:8o94RPi1/7XTJvwPpRSzSUedZrtlirdB3r9Z20bi2f8=
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEKWjV8V+WSxDXJ4NFATAsZjh8iIbsQIg=
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
-github.com/International-Combat-Archery-Alliance/auth v0.2.1 h1:Vb7ygqQwG5Q/fzFIfZRSGH95tYnSclRFAf1be0P5GWE=
-github.com/International-Combat-Archery-Alliance/auth v0.2.1/go.mod h1:G4MX0I1PpX1bTWEidKvPrmTIjE4ygN27CuejF/jGia4=
+github.com/International-Combat-Archery-Alliance/auth v0.3.0 h1:0UK/3Zont90fdyYaSEmzeh1MR4uypLzs+qMPoF9FiWQ=
+github.com/International-Combat-Archery-Alliance/auth v0.3.0/go.mod h1:5bQS/2zDLOw+xKeCBGa9VIt6FOgqNHe76s216dtfK/E=
 github.com/International-Combat-Archery-Alliance/captcha v0.1.0 h1:QAXrGpm8XulV2biJZSMPLhHBi17E0/XtR/1sktKGnk4=
 github.com/International-Combat-Archery-Alliance/captcha v0.1.0/go.mod h1:a7DP91/hhCXZLiFdRdgNkz6+qpGwY6dflL9dBEqEN1M=
 github.com/International-Combat-Archery-Alliance/email v0.3.1 h1:pncRje4KZpcDzlaqYq4nL6bm3TsnE/VfN6cnrLqZzkk=
 github.com/International-Combat-Archery-Alliance/email v0.3.1/go.mod h1:R5fKDByAPyQZ5fQYCPEHPLiyAgeliHyS27REB1zL3No=
-github.com/International-Combat-Archery-Alliance/middleware v0.1.4 h1:aYyHzW5ikuMirHHyfykXu5C8InwTtKqV85dtPiDbkOg=
-github.com/International-Combat-Archery-Alliance/middleware v0.1.4/go.mod h1:BHii4XlmkCDHo1lWoD6lH7iRs8Y+si/H8I8X10M3PAE=
+github.com/International-Combat-Archery-Alliance/middleware v0.2.1 h1:Ghgu/ur9yp5C2KBlpXIGtqdNliszJPrCvaVZNamfB5k=
+github.com/International-Combat-Archery-Alliance/middleware v0.2.1/go.mod h1:/QPRfURS8dXuCZ3n9yph3ZTdrxOaz6fehAP2u1GaQmM=
 github.com/International-Combat-Archery-Alliance/payments v0.4.1 h1:V5RStCL3XB2y6V6umfB1Lbq1iu4/Cmc1F/Efd8WLYds=
 github.com/International-Combat-Archery-Alliance/payments v0.4.1/go.mod h1:IEhizLo4cV3KIgfvo2kHJlxThR73KcBBLvpeVrievtc=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
@@ -131,6 +131,8 @@ github.com/go-openapi/testify/v2 v2.0.2/go.mod h1:HCPmvFFnheKK2BuwSA0TbbdxJ3I16p
 github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0/go.mod h1:fyg7847qk6SyHyPtNmDHnmrv/HOrqktSC+C9fM+CJOE=
 github.com/go-test/deep v1.0.8 h1:TDsG77qcSprGbC6vTN8OuXp5g+J+b5Pcguhf7Zt61VM=
 github.com/go-test/deep v1.0.8/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
+github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
+github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.4.0-rc.1/go.mod h1:ceaxUfeHdC40wWswd/P6IGgMaK3YpKi5j83Wpe3EHw8=
 github.com/golang/protobuf v1.4.0-rc.1.0.20200221234624-67d41d38c208/go.mod h1:xKAWHe0F5eneWXFV3EuXVDTCmh+JuBKY0li0aMyXATA=

@@ -8,7 +8,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/International-Combat-Archery-Alliance/auth"
+	"github.com/International-Combat-Archery-Alliance/auth/token"
 	"github.com/International-Combat-Archery-Alliance/captcha"
 	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
@@ -34,7 +34,7 @@ type API struct {
 	logger *slog.Logger
 	env    Environment
 
-	authValidator    auth.Validator
+	tokenService     *token.TokenService
 	captchaValidator captcha.Validator
 	emailSender      email.Sender
 	checkoutManager  payments.CheckoutManager
@@ -46,7 +46,7 @@ func NewAPI(
 	db DB,
 	logger *slog.Logger,
 	env Environment,
-	authValidator auth.Validator,
+	tokenService *token.TokenService,
 	captchaValidator captcha.Validator,
 	emailSender email.Sender,
 	checkoutManager payments.CheckoutManager,
@@ -55,7 +55,7 @@ func NewAPI(
 		db:               db,
 		logger:           logger,
 		env:              env,
-		authValidator:    authValidator,
+		tokenService:     tokenService,
 		captchaValidator: captchaValidator,
 		emailSender:      emailSender,
 		checkoutManager:  checkoutManager,
