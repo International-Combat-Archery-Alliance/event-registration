@@ -8,7 +8,7 @@ tool (
 )
 
 require (
-	github.com/International-Combat-Archery-Alliance/auth v0.3.0
+	github.com/International-Combat-Archery-Alliance/auth v0.3.1
 	github.com/International-Combat-Archery-Alliance/captcha v0.1.0
 	github.com/International-Combat-Archery-Alliance/email v0.3.1
 	github.com/International-Combat-Archery-Alliance/middleware v0.2.1
@@ -26,7 +26,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/runtime v1.1.2
-	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.40.0
 )
@@ -37,6 +36,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.4 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/rs/cors v1.11.1 // indirect
 	github.com/stripe/stripe-go/v82 v82.5.1 // indirect
 	github.com/testcontainers/testcontainers-go v0.40.0 // indirect
 )
