@@ -38,7 +38,7 @@ func TestGetEvents(t *testing.T) {
 				}, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := GetEventsV1RequestObject{
 			Params: GetEventsV1Params{
@@ -80,7 +80,7 @@ func TestPostEvents(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -123,7 +123,7 @@ func TestGetEventsId(t *testing.T) {
 				return expectedEvent, nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -151,7 +151,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -175,7 +175,7 @@ func TestGetEventsId(t *testing.T) {
 				return events.Event{}, errors.New("some error")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := GetEventsV1IdRequestObject{
 			Id: id,
@@ -219,7 +219,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name:                  "Updated Event Name",
@@ -278,7 +278,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 	t.Run("invalid request body", func(t *testing.T) {
 		eventID := uuid.New()
 		mock := &mockDB{}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		// Create invalid request body with invalid registration type
 		reqBody := Event{
@@ -317,7 +317,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 				return events.Event{}, &events.Error{Reason: events.REASON_EVENT_DOES_NOT_EXIST}
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name: "Test Event",
@@ -364,7 +364,7 @@ func TestPatchEventsV1Id(t *testing.T) {
 				return errors.New("database connection failed")
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name: "Updated Event",
@@ -413,7 +413,7 @@ func TestTimeZoneHandling(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -441,7 +441,7 @@ func TestTimeZoneHandling(t *testing.T) {
 			RegistrationOptions:   []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}},
 		}
 		mock := &mockDB{}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -474,7 +474,7 @@ func TestTimeZoneHandling(t *testing.T) {
 				return nil
 			},
 		}
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		req := PostEventsV1RequestObject{
 			Body: &reqBody,
@@ -513,7 +513,7 @@ func TestTimeZoneHandling(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name:                  "Updated Event",
@@ -562,7 +562,7 @@ func TestTimeZoneHandling(t *testing.T) {
 			},
 		}
 
-		api := NewAPI(mock, noopLogger, LOCAL, &mockAuthValidator{}, &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{})
 
 		reqBody := Event{
 			Name:                  "Updated Event",
