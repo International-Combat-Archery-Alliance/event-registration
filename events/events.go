@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 var tracer = otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/events")
@@ -61,6 +62,8 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 
 	existingEvent, err := repo.GetEvent(ctx, id)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return Event{}, err
 	}
 
@@ -84,6 +87,8 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 
 	err = repo.UpdateEvent(ctx, updatedEvent)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return Event{}, err
 	}
 
