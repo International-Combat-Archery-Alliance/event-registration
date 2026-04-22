@@ -11,8 +11,8 @@ require (
 	github.com/International-Combat-Archery-Alliance/auth v0.3.1
 	github.com/International-Combat-Archery-Alliance/captcha v0.1.0
 	github.com/International-Combat-Archery-Alliance/email v0.3.1
-	github.com/International-Combat-Archery-Alliance/middleware v0.2.1
-	github.com/International-Combat-Archery-Alliance/payments v0.4.1
+	github.com/International-Combat-Archery-Alliance/middleware v0.3.0
+	github.com/International-Combat-Archery-Alliance/payments v0.8.1
 	github.com/Rhymond/go-money v1.0.15
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.7
@@ -28,17 +28,29 @@ require (
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.40.0
+	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws v0.64.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0
+	go.opentelemetry.io/otel v1.39.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.39.0
+	go.opentelemetry.io/otel/sdk v1.39.0
 )
 
 require (
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.17 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sns v1.39.8 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.18 // indirect
+	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.4 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/rs/cors v1.11.1 // indirect
-	github.com/stripe/stripe-go/v82 v82.5.1 // indirect
+	github.com/stripe/stripe-go/v85 v85.0.0 // indirect
 	github.com/testcontainers/testcontainers-go v0.40.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.39.0 // indirect
+	go.opentelemetry.io/otel/trace v1.39.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 )
 
 require (
@@ -84,7 +96,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.11 // indirect
 	github.com/googleapis/gax-go/v2 v2.16.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 // indirect
@@ -118,10 +130,7 @@ require (
 	github.com/woodsbury/decimal128 v1.4.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0 // indirect
-	go.opentelemetry.io/otel v1.39.0 // indirect
 	go.opentelemetry.io/otel/metric v1.39.0 // indirect
-	go.opentelemetry.io/otel/trace v1.39.0 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/mod v0.31.0 // indirect
 	golang.org/x/net v0.49.0 // indirect

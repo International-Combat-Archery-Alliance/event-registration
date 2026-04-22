@@ -6,6 +6,16 @@ services:
       - "8000:8000"
     networks:
       - icaa-event-registration
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - icaa-event-registration
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
   dynamo-create-table:
     depends_on:
       - dynamodb

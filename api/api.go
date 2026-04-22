@@ -15,6 +15,9 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Environment int
@@ -33,6 +36,7 @@ type API struct {
 	db     DB
 	logger *slog.Logger
 	env    Environment
+	tracer trace.Tracer
 
 	tokenService     *token.TokenService
 	captchaValidator captcha.Validator
@@ -55,6 +59,7 @@ func NewAPI(
 		db:               db,
 		logger:           logger,
 		env:              env,
+		tracer:           otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/api"),
 		tokenService:     tokenService,
 		captchaValidator: captchaValidator,
 		emailSender:      emailSender,
@@ -100,6 +105,7 @@ func (a *API) ListenAndServe(host string, port string) error {
 	}
 
 	h := middleware.UseMiddlewares(r, middlewares...)
+	h = otelhttp.NewHandler(h, "")
 
 	s := &http.Server{
 		Handler: h,

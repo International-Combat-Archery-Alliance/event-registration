@@ -12,6 +12,10 @@ Parameters:
     AllowedValues:
       - arm64
       - x86_64
+  OTELCollectorEndpoint:
+    Type: String
+    Default: "localhost:4317"
+    Description: OpenTelemetry collector endpoint
   StripeSecretKey:
     Type: String
     NoEcho: true
@@ -35,6 +39,7 @@ Globals:
     Environment:
       Variables:
         DYNAMO_TABLE_NAME: !FindInMap [attributes, dynamo, tableName]
+        OTEL_COLLECTOR_ENDPOINT: !Ref OTELCollectorEndpoint
         STRIPE_SECRET_KEY: !Ref StripeSecretKey
         STRIPE_ENDPOINT_SECRET: !Ref StripeEndpointSecret
 
@@ -74,6 +79,7 @@ Resources:
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cfTurnstileSecretKey"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/googleServiceAccount"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jwtSigningKeys"
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/newrelic-license-key"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stripeSecretKey"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stripeEndpointSecret"
           - Effect: Allow

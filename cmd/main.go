@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 	_ "time/tzdata" // Embeds timezone data
 
@@ -15,17 +17,33 @@ import (
 	"github.com/International-Combat-Archery-Alliance/captcha/cfturnstile"
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
 	"github.com/International-Combat-Archery-Alliance/event-registration/dynamo"
+	"github.com/International-Combat-Archery-Alliance/event-registration/telemetry"
 	"github.com/International-Combat-Archery-Alliance/payments/stripe"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	traceShutdown, err := telemetry.Init(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialize telemetry: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := traceShutdown(shutdownCtx); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to shutdown telemetry: %v\n", err)
+		}
+	}()
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
@@ -53,7 +71,8 @@ func main() {
 		logger.Error("failed to get turnstile secret key", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
-	cfTurnstileValidator := cfturnstile.NewValidator(http.DefaultClient, cfSecretKey)
+	instrumentedHTTPClient := &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
+	cfTurnstileValidator := cfturnstile.NewValidator(instrumentedHTTPClient, cfSecretKey)
 
 	emailSender, err := createEmailSender(ctx, logger, env)
 	if err != nil {
@@ -61,7 +80,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	stripeClient, err := makeStripeClient(ctx, env)
+	stripeClient, err := makeStripeClient(ctx, env, instrumentedHTTPClient)
 	if err != nil {
 		logger.Error("failed to create stripe client", slog.String("error", err.Error()))
 		os.Exit(1)
@@ -70,12 +89,22 @@ func main() {
 	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, stripeClient)
 
 	serverSettings := getServerSettingsFromEnv()
-	err = eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
-	if err != nil {
+
+	sigCtx, sigStop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer sigStop()
+
+	serverErrCh := make(chan error, 1)
+	go func() {
+		serverErrCh <- eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
+	}()
+
+	select {
+	case <-sigCtx.Done():
+		logger.Info("shutting down gracefully")
+	case err := <-serverErrCh:
 		logger.Error("error running server", "error", err)
 		os.Exit(1)
 	}
-	logger.Info("shutting down")
 }
 
 type ServerSettings struct {
@@ -139,6 +168,8 @@ func createLocalDynamoClient(ctx context.Context) (*dynamodb.Client, error) {
 		return nil, err
 	}
 
+	otelaws.AppendMiddlewares(&cfg.APIOptions)
+
 	return dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
 		o.BaseEndpoint = aws.String("http://dynamodb:8000")
 	}), nil
@@ -149,6 +180,9 @@ func createProdDynamoClient(ctx context.Context) (*dynamodb.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	otelaws.AppendMiddlewares(&cfg.APIOptions)
+
 	return dynamodb.NewFromConfig(cfg), nil
 }
 
@@ -220,7 +254,7 @@ func getStripeEndpointSecret(ctx context.Context, env api.Environment) (string, 
 	return parameter, nil
 }
 
-func makeStripeClient(ctx context.Context, env api.Environment) (*stripe.Client, error) {
+func makeStripeClient(ctx context.Context, env api.Environment, httpClient *http.Client) (*stripe.Client, error) {
 	secretKey, err := getStripeSecretKey(ctx, env)
 	if err != nil {
 		return nil, err
@@ -230,7 +264,7 @@ func makeStripeClient(ctx context.Context, env api.Environment) (*stripe.Client,
 		return nil, err
 	}
 
-	return stripe.NewClient(secretKey, endpointSecret), nil
+	return stripe.NewClient(secretKey, endpointSecret, stripe.WithHTTPClient(httpClient)), nil
 }
 
 // jwtSigningKeysData represents the JSON structure for signing keys

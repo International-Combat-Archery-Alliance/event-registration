@@ -13,9 +13,13 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
 	"github.com/google/uuid"
 	"github.com/oapi-codegen/runtime/types"
+	"go.opentelemetry.io/otel/codes"
 )
 
 func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request PostEventsV1EventIdRegistrationsRequestObject) (PostEventsV1EventIdRegistrationsResponseObject, error) {
+	ctx, span := a.tracer.Start(ctx, "PostEventsV1EventIdRegistrations")
+	defer span.End()
+
 	logger := a.getLoggerOrBaseLogger(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -23,6 +27,7 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 
 	validatedData, err := a.captchaValidator.Validate(ctx, request.Params.CfTurnstileResponse, "")
 	if err != nil {
+		span.RecordError(err)
 		logger.Warn("Invalid captcha", slog.String("error", err.Error()))
 
 		return PostEventsV1EventIdRegistrations400JSONResponse{
@@ -42,6 +47,7 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 	// request.Body is guaranteed to be non-nil from openapi doc
 	reg, err := apiRegistrationToRegistration(*request.Body, request.EventId)
 	if err != nil {
+		span.RecordError(err)
 		logger.Warn("Invalid body for registration", "error", err)
 
 		return PostEventsV1EventIdRegistrations400JSONResponse{
@@ -57,6 +63,7 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 
 	signedUpReg, regIntent, clientSecret, _, err := registration.RegisterWithPayment(ctx, reg, a.db, a.db, a.checkoutManager, returnURL)
 	if err != nil {
+		span.RecordError(err)
 		logger.Error("Error trying to register", "error", err)
 
 		var registrationErr *registration.Error
@@ -81,6 +88,7 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 			}
 		}
 
+		span.SetStatus(codes.Error, err.Error())
 		return PostEventsV1EventIdRegistrations500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to register",
@@ -89,6 +97,8 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 
 	respReg, err := registrationToApiRegistration(signedUpReg)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		logger.Error("Failed to convert registration to api registration", "error", err)
 
 		return PostEventsV1EventIdRegistrations500JSONResponse{
@@ -101,6 +111,9 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 }
 
 func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEventsV1EventIdRegisterRequestObject) (PostEventsV1EventIdRegisterResponseObject, error) {
+	ctx, span := a.tracer.Start(ctx, "PostEventsV1EventIdRegister")
+	defer span.End()
+
 	logger := a.getLoggerOrBaseLogger(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -108,6 +121,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 
 	validatedData, err := a.captchaValidator.Validate(ctx, request.Params.CfTurnstileResponse, "")
 	if err != nil {
+		span.RecordError(err)
 		logger.Warn("Invalid captcha", slog.String("error", err.Error()))
 
 		return PostEventsV1EventIdRegister400JSONResponse{
@@ -127,6 +141,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 	// request.Body is guaranteed to be non-nil from openapi doc
 	reg, err := apiRegistrationToRegistration(*request.Body, request.EventId)
 	if err != nil {
+		span.RecordError(err)
 		logger.Warn("Invalid body for registration", "error", err)
 
 		return PostEventsV1EventIdRegister400JSONResponse{
@@ -136,6 +151,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 	}
 	signedUpReg, event, err := registration.AttemptRegistration(ctx, reg, a.db, a.db)
 	if err != nil {
+		span.RecordError(err)
 		logger.Error("Error trying to register", "error", err)
 
 		var registrationErr *registration.Error
@@ -160,6 +176,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 			}
 		}
 
+		span.SetStatus(codes.Error, err.Error())
 		return PostEventsV1EventIdRegister500JSONResponse{
 			Code:    InternalError,
 			Message: "Failed to register",
@@ -168,6 +185,8 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 
 	respReg, err := registrationToApiRegistration(signedUpReg)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		logger.Error("Failed to convert registration to api registration", "error", err)
 
 		return PostEventsV1EventIdRegister500JSONResponse{
@@ -178,6 +197,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 
 	err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, "ICAA <info@icaa.world>", signedUpReg, event)
 	if err != nil {
+		span.RecordError(err)
 		logger.Error("failed to send email to signed up player", slog.String("error", err.Error()), slog.String("email", reg.GetEmail()))
 
 		// TODO: Is there other error handling we should do here?
@@ -189,6 +209,9 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 }
 
 func (a *API) GetEventsV1EventIdRegistrations(ctx context.Context, request GetEventsV1EventIdRegistrationsRequestObject) (GetEventsV1EventIdRegistrationsResponseObject, error) {
+	ctx, span := a.tracer.Start(ctx, "GetEventsV1EventIdRegistrations")
+	defer span.End()
+
 	logger := a.getLoggerOrBaseLogger(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -199,6 +222,8 @@ func (a *API) GetEventsV1EventIdRegistrations(ctx context.Context, request GetEv
 
 	result, err := a.db.GetAllRegistrationsForEvent(ctx, request.EventId, int32(limit), request.Params.Cursor)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		logger.Error("Failed to get registrations for event", "error", err, "eventId", request.EventId)
 
 		var registrationErr *registration.Error
@@ -221,6 +246,8 @@ func (a *API) GetEventsV1EventIdRegistrations(ctx context.Context, request GetEv
 	for _, v := range result.Data {
 		convReg, err := registrationToApiRegistration(v)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			logger.Error("Failed to convert registration to api registration", "error", err)
 
 			return GetEventsV1EventIdRegistrations500JSONResponse{

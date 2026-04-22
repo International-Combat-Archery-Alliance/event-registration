@@ -11,7 +11,11 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/payments"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
+
+var tracer = otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/registration")
 
 type Repository interface {
 	CreateRegistration(ctx context.Context, registration Registration, event events.Event) error
@@ -113,10 +117,14 @@ const (
 )
 
 func AttemptRegistration(ctx context.Context, registrationRequest Registration, eventRepo events.Repository, registrationRepo Repository) (Registration, events.Event, error) {
+	ctx, span := tracer.Start(ctx, "AttemptRegistration")
+	defer span.End()
+
 	eventId := registrationRequest.GetEventID()
 
 	event, err := eventRepo.GetEvent(ctx, eventId)
 	if err != nil {
+		span.RecordError(err)
 		var eventErr *events.Error
 		if errors.As(err, &eventErr) {
 			switch eventErr.Reason {
@@ -132,11 +140,13 @@ func AttemptRegistration(ctx context.Context, registrationRequest Registration, 
 	case events.BY_INDIVIDUAL:
 		err = registerIndividualAsFreeAgent(&event, registrationRequest.(*IndividualRegistration))
 		if err != nil {
+			span.RecordError(err)
 			return nil, events.Event{}, err
 		}
 	case events.BY_TEAM:
 		err = registerTeam(&event, registrationRequest.(*TeamRegistration))
 		if err != nil {
+			span.RecordError(err)
 			return nil, events.Event{}, err
 		}
 	default:
@@ -146,12 +156,16 @@ func AttemptRegistration(ctx context.Context, registrationRequest Registration, 
 	event.Version++
 	err = registrationRepo.CreateRegistration(ctx, registrationRequest, event)
 	if err != nil {
+		span.RecordError(err)
 		return nil, events.Event{}, err
 	}
 	return registrationRequest, event, nil
 }
 
 func RegisterWithPayment(ctx context.Context, registrationRequest Registration, eventRepo events.Repository, registrationRepo Repository, checkoutManager payments.CheckoutManager, paymentReturnURL string) (Registration, RegistrationIntent, string, events.Event, error) {
+	ctx, span := tracer.Start(ctx, "RegisterWithPayment")
+	defer span.End()
+
 	eventId := registrationRequest.GetEventID()
 
 	event, err := eventRepo.GetEvent(ctx, eventId)
@@ -195,6 +209,8 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 		return nil, RegistrationIntent{}, "", events.Event{}, NewUnknownRegistrationTypeError(fmt.Sprintf("Unknown registration type: %d", registrationRequest.Type()))
 	}
 
+	span.SetAttributes(attribute.String("event_id", eventId.String()))
+
 	checkoutInfo, err := checkoutManager.CreateCheckout(ctx, payments.CheckoutParams{
 		SessionAliveDuration: ptr.Duration(30 * time.Minute),
 		ReturnURL:            paymentReturnURL,
@@ -230,6 +246,9 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 }
 
 func ConfirmRegistrationPayment(ctx context.Context, payload []byte, signature string, registrationRepo Repository, eventRepo events.Repository, checkoutManager payments.CheckoutManager) (Registration, error) {
+	ctx, span := tracer.Start(ctx, "ConfirmRegistrationPayment")
+	defer span.End()
+
 	metadata, checkoutErr := checkoutManager.ConfirmCheckout(ctx, payload, signature)
 	isExpired := checkoutIsExpired(checkoutErr)
 	if checkoutErr != nil && !isExpired {

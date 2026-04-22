@@ -11,9 +11,13 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/codes"
 )
 
 func (a *API) GetEventsV1(ctx context.Context, request GetEventsV1RequestObject) (GetEventsV1ResponseObject, error) {
+	ctx, span := a.tracer.Start(ctx, "GetEventsV1")
+	defer span.End()
+
 	logger := a.getLoggerOrBaseLogger(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -24,6 +28,8 @@ func (a *API) GetEventsV1(ctx context.Context, request GetEventsV1RequestObject)
 
 	result, err := a.db.GetEvents(ctx, limit, request.Params.Cursor)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		logger.Error("Failed to get events from the DB", "error", err)
 
 		var eventErr *events.Error
@@ -46,6 +52,8 @@ func (a *API) GetEventsV1(ctx context.Context, request GetEventsV1RequestObject)
 	for _, v := range result.Data {
 		convEvent, err := eventToApiEvent(v)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			logger.Error("Failed to convert event to api event", "error", err)
 
 			return GetEventsV1500JSONResponse{
@@ -64,6 +72,9 @@ func (a *API) GetEventsV1(ctx context.Context, request GetEventsV1RequestObject)
 }
 
 func (a *API) PostEventsV1(ctx context.Context, request PostEventsV1RequestObject) (PostEventsV1ResponseObject, error) {
+	ctx, span := a.tracer.Start(ctx, "PostEventsV1")
+	defer span.End()
+
 	logger := a.getLoggerOrBaseLogger(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -80,6 +91,7 @@ func (a *API) PostEventsV1(ctx context.Context, request PostEventsV1RequestObjec
 	// request.Body is guaranteed to be non-nil from openapi doc
 	event, err := apiEventToEvent(*request.Body)
 	if err != nil {
+		span.RecordError(err)
 		logger.Error("Failed to convert event into core type", "error", err)
 
 		return PostEventsV1400JSONResponse{
@@ -90,6 +102,8 @@ func (a *API) PostEventsV1(ctx context.Context, request PostEventsV1RequestObjec
 
 	err = a.db.CreateEvent(ctx, event)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		logger.Error("Failed to create an event", "error", err)
 
 		return PostEventsV1500JSONResponse{
@@ -104,6 +118,9 @@ func (a *API) PostEventsV1(ctx context.Context, request PostEventsV1RequestObjec
 }
 
 func (a *API) GetEventsV1Id(ctx context.Context, request GetEventsV1IdRequestObject) (GetEventsV1IdResponseObject, error) {
+	ctx, span := a.tracer.Start(ctx, "GetEventsV1Id")
+	defer span.End()
+
 	logger := a.getLoggerOrBaseLogger(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -111,6 +128,8 @@ func (a *API) GetEventsV1Id(ctx context.Context, request GetEventsV1IdRequestObj
 
 	event, err := a.db.GetEvent(ctx, request.Id)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		logger.Error("Failed to fetch an event", "error", err)
 
 		var eventErr *events.Error
@@ -132,6 +151,8 @@ func (a *API) GetEventsV1Id(ctx context.Context, request GetEventsV1IdRequestObj
 
 	respEvent, err := eventToApiEvent(event)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		logger.Error("Failed to convert event into core type", "error", err)
 
 		return GetEventsV1Id500JSONResponse{
@@ -143,6 +164,9 @@ func (a *API) GetEventsV1Id(ctx context.Context, request GetEventsV1IdRequestObj
 }
 
 func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdRequestObject) (PatchEventsV1IdResponseObject, error) {
+	ctx, span := a.tracer.Start(ctx, "PatchEventsV1Id")
+	defer span.End()
+
 	logger := a.getLoggerOrBaseLogger(ctx)
 
 	// Need these for apiEventToEvent to work, they don't get used anyway though
@@ -152,6 +176,7 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 
 	event, err := apiEventToEvent(*request.Body)
 	if err != nil {
+		span.RecordError(err)
 		logger.Error("Invalid event body", slog.String("error", err.Error()))
 		return PatchEventsV1Id400JSONResponse{
 			Code:    InvalidBody,
@@ -160,6 +185,8 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 	}
 	updatedEvent, err := events.UpdateEvent(ctx, a.db, request.Id, event)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		logger.Error("failed to update event", slog.String("error", err.Error()))
 
 		var eventErr *events.Error
@@ -181,6 +208,8 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 
 	apiUpdatedEvent, err := eventToApiEvent(updatedEvent)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		logger.Error("error when converting updating event back to api event", slog.String("error", err.Error()))
 
 		return PatchEventsV1Id500JSONResponse{
