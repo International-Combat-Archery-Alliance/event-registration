@@ -12,10 +12,6 @@ Parameters:
     AllowedValues:
       - arm64
       - x86_64
-  OTELExporterOTLPEndpoint:
-    Type: String
-    Default: "localhost:4317"
-    Description: OpenTelemetry OTLP exporter endpoint
   StripeSecretKey:
     Type: String
     NoEcho: true
@@ -39,7 +35,6 @@ Globals:
     Environment:
       Variables:
         DYNAMO_TABLE_NAME: !FindInMap [attributes, dynamo, tableName]
-        OTEL_EXPORTER_OTLP_ENDPOINT: !Ref OTELExporterOTLPEndpoint
         STRIPE_SECRET_KEY: !Ref StripeSecretKey
         STRIPE_ENDPOINT_SECRET: !Ref StripeEndpointSecret
 
