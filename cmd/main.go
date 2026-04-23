@@ -28,14 +28,32 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
+const (
+	newRelicLicenseEnvVar  = "NEW_RELIC_LICENSE_KEY"
+	newRelicLicenseSSMPath = "/newrelic-license-key"
+)
+
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	endpoint := os.Getenv("OTEL_COLLECTOR_ENDPOINT")
-	traceShutdown, _, err := telemetry.Init(ctx, telemetry.Options{
+	env := getApiEnvironment()
+
+	licenseKey, err := getNewRelicLicenseKey(ctx, env)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get New Relic license key: %v\n", err)
+		os.Exit(1)
+	}
+
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "otlp.nr-data.net:4317"
+	}
+
+	traceShutdown, flushTraces, err := telemetry.Init(ctx, telemetry.Options{
 		ServiceName: "event-registration",
 		Endpoint:    endpoint,
+		APIKey:      licenseKey,
 		Lambda:      telemetry.LambdaInfoFromEnv(),
 	})
 	if err != nil {
@@ -66,8 +84,6 @@ func main() {
 		logger.Error("Error creating db client", "error", err)
 		os.Exit(1)
 	}
-
-	env := getApiEnvironment()
 
 	var signingKeys map[string]token.SigningKey
 	var currentKeyID string
@@ -121,7 +137,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, stripeClient)
+	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, stripeClient, flushTraces)
 
 	// End startup span after initialization completes
 	span.End()
@@ -308,6 +324,31 @@ func makeStripeClient(ctx context.Context, env api.Environment, httpClient *http
 	}
 
 	return stripe.NewClient(secretKey, endpointSecret, stripe.WithHTTPClient(httpClient)), nil
+}
+
+// getNewRelicLicenseKey retrieves the New Relic license key from environment variable (local)
+// or AWS Parameter Store (production)
+func getNewRelicLicenseKey(ctx context.Context, env api.Environment) (string, error) {
+	if env == api.LOCAL {
+		return os.Getenv(newRelicLicenseEnvVar), nil
+	}
+
+	cfg, err := loadAWSConfig(ctx)
+	if err != nil {
+		return "", fmt.Errorf("unable to load AWS SDK config: %w", err)
+	}
+
+	client := ssm.NewFromConfig(cfg)
+
+	result, err := client.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           aws.String(newRelicLicenseSSMPath),
+		WithDecryption: aws.Bool(true),
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get New Relic license key from Parameter Store: %w", err)
+	}
+
+	return *result.Parameter.Value, nil
 }
 
 // jwtSigningKeysData represents the JSON structure for signing keys

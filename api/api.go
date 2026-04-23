@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/International-Combat-Archery-Alliance/auth/token"
 	"github.com/International-Combat-Archery-Alliance/captcha"
@@ -41,6 +42,7 @@ type API struct {
 	captchaValidator captcha.Validator
 	emailSender      email.Sender
 	checkoutManager  payments.CheckoutManager
+	flushTraces      func(context.Context) error
 }
 
 var _ StrictServerInterface = (*API)(nil)
@@ -53,6 +55,7 @@ func NewAPI(
 	captchaValidator captcha.Validator,
 	emailSender email.Sender,
 	checkoutManager payments.CheckoutManager,
+	flushTraces func(context.Context) error,
 ) *API {
 	return &API{
 		db:               db,
@@ -63,6 +66,7 @@ func NewAPI(
 		captchaValidator: captchaValidator,
 		emailSender:      emailSender,
 		checkoutManager:  checkoutManager,
+		flushTraces:      flushTraces,
 	}
 }
 
@@ -98,6 +102,7 @@ func (a *API) ListenAndServe(host string, port string) error {
 		swaggerUIMiddleware,
 		middleware.AccessLogging(a.logger),
 		middleware.OTELHandler,
+		middleware.FlushTraces(a.flushTraces, a.logger, 3*time.Second),
 	}
 
 	if a.env == PROD {
