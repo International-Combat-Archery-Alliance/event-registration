@@ -15,7 +15,6 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -98,6 +97,7 @@ func (a *API) ListenAndServe(host string, port string) error {
 		a.stripeRegistrationPaymentWebhookMiddleware("/events/v1/registration/webhook"),
 		swaggerUIMiddleware,
 		middleware.AccessLogging(a.logger),
+		middleware.OTELHandler,
 	}
 
 	if a.env == PROD {
@@ -105,7 +105,6 @@ func (a *API) ListenAndServe(host string, port string) error {
 	}
 
 	h := middleware.UseMiddlewares(r, middlewares...)
-	h = otelhttp.NewHandler(h, "")
 
 	s := &http.Server{
 		Handler: h,
