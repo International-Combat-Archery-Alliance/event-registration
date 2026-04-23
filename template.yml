@@ -74,6 +74,7 @@ Resources:
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cfTurnstileSecretKey"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/googleServiceAccount"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jwtSigningKeys"
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/newrelic-license-key"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stripeSecretKey"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stripeEndpointSecret"
           - Effect: Allow

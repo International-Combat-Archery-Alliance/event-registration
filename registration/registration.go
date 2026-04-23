@@ -11,7 +11,12 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/payments"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
+
+var tracer = otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/registration")
 
 type Repository interface {
 	CreateRegistration(ctx context.Context, registration Registration, event events.Event) error
@@ -113,10 +118,15 @@ const (
 )
 
 func AttemptRegistration(ctx context.Context, registrationRequest Registration, eventRepo events.Repository, registrationRepo Repository) (Registration, events.Event, error) {
+	ctx, span := tracer.Start(ctx, "AttemptRegistration")
+	defer span.End()
+
 	eventId := registrationRequest.GetEventID()
 
 	event, err := eventRepo.GetEvent(ctx, eventId)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		var eventErr *events.Error
 		if errors.As(err, &eventErr) {
 			switch eventErr.Reason {
@@ -132,11 +142,15 @@ func AttemptRegistration(ctx context.Context, registrationRequest Registration, 
 	case events.BY_INDIVIDUAL:
 		err = registerIndividualAsFreeAgent(&event, registrationRequest.(*IndividualRegistration))
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, events.Event{}, err
 		}
 	case events.BY_TEAM:
 		err = registerTeam(&event, registrationRequest.(*TeamRegistration))
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, events.Event{}, err
 		}
 	default:
@@ -146,16 +160,23 @@ func AttemptRegistration(ctx context.Context, registrationRequest Registration, 
 	event.Version++
 	err = registrationRepo.CreateRegistration(ctx, registrationRequest, event)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, events.Event{}, err
 	}
 	return registrationRequest, event, nil
 }
 
 func RegisterWithPayment(ctx context.Context, registrationRequest Registration, eventRepo events.Repository, registrationRepo Repository, checkoutManager payments.CheckoutManager, paymentReturnURL string) (Registration, RegistrationIntent, string, events.Event, error) {
+	ctx, span := tracer.Start(ctx, "RegisterWithPayment")
+	defer span.End()
+
 	eventId := registrationRequest.GetEventID()
 
 	event, err := eventRepo.GetEvent(ctx, eventId)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		var eventErr *events.Error
 		if errors.As(err, &eventErr) {
 			switch eventErr.Reason {
@@ -173,6 +194,8 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 		regReq := registrationRequest.(*IndividualRegistration)
 		err = registerIndividualAsFreeAgent(&event, regReq)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, RegistrationIntent{}, "", events.Event{}, err
 		}
 		paymentItem = payments.Item{
@@ -184,6 +207,8 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 		regReq := registrationRequest.(*TeamRegistration)
 		err = registerTeam(&event, regReq)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, RegistrationIntent{}, "", events.Event{}, err
 		}
 		paymentItem = payments.Item{
@@ -192,8 +217,11 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 			Price:    event.RegistrationOptions[slices.IndexFunc(event.RegistrationOptions, func(v events.EventRegistrationOption) bool { return v.RegType == events.BY_TEAM })].Price,
 		}
 	default:
+		span.SetStatus(codes.Error, fmt.Sprintf("Unknown registration type: %d", registrationRequest.Type()))
 		return nil, RegistrationIntent{}, "", events.Event{}, NewUnknownRegistrationTypeError(fmt.Sprintf("Unknown registration type: %d", registrationRequest.Type()))
 	}
+
+	span.SetAttributes(attribute.String("event_id", eventId.String()))
 
 	checkoutInfo, err := checkoutManager.CreateCheckout(ctx, payments.CheckoutParams{
 		SessionAliveDuration: ptr.Duration(30 * time.Minute),
@@ -210,6 +238,8 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 		CustomerEmail:        ptr.String(registrationRequest.GetEmail()),
 	})
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, RegistrationIntent{}, "", events.Event{}, NewFailedToCreateCheckoutError("Failed to create checkout", err)
 	}
 
@@ -224,35 +254,47 @@ func RegisterWithPayment(ctx context.Context, registrationRequest Registration, 
 	event.Version++
 	err = registrationRepo.CreateRegistrationWithPayment(ctx, registrationRequest, regIntent, event)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, RegistrationIntent{}, "", events.Event{}, err
 	}
 	return registrationRequest, regIntent, checkoutInfo.ClientSecret, event, nil
 }
 
 func ConfirmRegistrationPayment(ctx context.Context, payload []byte, signature string, registrationRepo Repository, eventRepo events.Repository, checkoutManager payments.CheckoutManager) (Registration, error) {
+	ctx, span := tracer.Start(ctx, "ConfirmRegistrationPayment")
+	defer span.End()
+
 	metadata, checkoutErr := checkoutManager.ConfirmCheckout(ctx, payload, signature)
 	isExpired := checkoutIsExpired(checkoutErr)
 	if checkoutErr != nil && !isExpired {
+		span.RecordError(checkoutErr)
+		span.SetStatus(codes.Error, checkoutErr.Error())
 		return nil, checkoutErr
 	}
 
 	// Check if this is an event registration transaction
 	itemType, ok := metadata[itemTypeKey]
 	if !ok || itemType != itemTypeEvent {
+		span.SetStatus(codes.Error, fmt.Sprintf("Transaction is not an event registration. item_type=%q", itemType))
 		return nil, NewWrongTransactionTypeError(fmt.Sprintf("Transaction is not an event registration. item_type=%q", itemType))
 	}
 
 	email, ok := metadata[emailKey]
 	if !ok {
+		span.SetStatus(codes.Error, "missing email metadata")
 		return nil, NewPaymentMissingMetadataError(emailKey)
 	}
 	eventIdStr, ok := metadata[eventIdKey]
 	if !ok {
+		span.SetStatus(codes.Error, "missing event_id metadata")
 		return nil, NewPaymentMissingMetadataError(eventIdKey)
 	}
 
 	eventId, err := uuid.Parse(eventIdStr)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, NewInvalidPaymentMetadata("Event ID is not a valid UUID", err)
 	}
 
@@ -261,8 +303,11 @@ func ConfirmRegistrationPayment(ctx context.Context, payload []byte, signature s
 	} else {
 		reg, err := deleteExpiredRegistration(ctx, registrationRepo, eventRepo, eventId, email)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
+		span.SetStatus(codes.Error, "Registration expired")
 		return reg, NewRegistrationExpiredError("Registration expired", checkoutErr)
 	}
 }

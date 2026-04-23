@@ -8,7 +8,7 @@ This is a Go-based event registration backend service using AWS SAM, DynamoDB, a
 # Build the project (generates code and builds SAM app)
 make build
 
-# Run locally (builds, starts docker-compose, starts SAM local API)
+# Run locally (builds, starts SAM local API)
 make local
 
 # Generate Go code from OpenAPI spec
@@ -129,8 +129,9 @@ dynamo/        - Driven adapters (DynamoDB repository implementations)
 - Example: `registration/registration_test.go` mocks `Repository` and `payments.CheckoutManager`
 
 ### AWS SAM & Local Development
+- Shared infrastructure (DynamoDB, Jaeger, LocalStack) is managed in `icaa.world/docker-compose.yml`
+- Start shared infrastructure first: `cd icaa.world && docker compose up -d`
 - Use `make local` for full local development environment
-- DynamoDB runs locally via Docker on port 8000
 - SAM local API gateway runs on port 3000
 - Environment variables in `env.json` for local config
 

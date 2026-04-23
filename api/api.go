@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/International-Combat-Archery-Alliance/auth/token"
 	"github.com/International-Combat-Archery-Alliance/captcha"
@@ -15,6 +16,8 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Environment int
@@ -33,11 +36,13 @@ type API struct {
 	db     DB
 	logger *slog.Logger
 	env    Environment
+	tracer trace.Tracer
 
 	tokenService     *token.TokenService
 	captchaValidator captcha.Validator
 	emailSender      email.Sender
 	checkoutManager  payments.CheckoutManager
+	flushTraces      func(context.Context) error
 }
 
 var _ StrictServerInterface = (*API)(nil)
@@ -50,15 +55,18 @@ func NewAPI(
 	captchaValidator captcha.Validator,
 	emailSender email.Sender,
 	checkoutManager payments.CheckoutManager,
+	flushTraces func(context.Context) error,
 ) *API {
 	return &API{
 		db:               db,
 		logger:           logger,
 		env:              env,
+		tracer:           otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/api"),
 		tokenService:     tokenService,
 		captchaValidator: captchaValidator,
 		emailSender:      emailSender,
 		checkoutManager:  checkoutManager,
+		flushTraces:      flushTraces,
 	}
 }
 
@@ -93,6 +101,8 @@ func (a *API) ListenAndServe(host string, port string) error {
 		a.stripeRegistrationPaymentWebhookMiddleware("/events/v1/registration/webhook"),
 		swaggerUIMiddleware,
 		middleware.AccessLogging(a.logger),
+		middleware.OTELHandler,
+		middleware.FlushTraces(a.flushTraces, a.logger, 3*time.Second),
 	}
 
 	if a.env == PROD {

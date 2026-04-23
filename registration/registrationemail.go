@@ -15,6 +15,9 @@ import (
 var templates embed.FS
 
 func SendRegistrationConfirmationEmail(ctx context.Context, emailSender email.Sender, fromAddress string, reg Registration, event events.Event) error {
+	ctx, span := tracer.Start(ctx, "SendRegistrationConfirmationEmail")
+	defer span.End()
+
 	htmlBody, err := makeHtmlBody(event, reg)
 	if err != nil {
 		return err

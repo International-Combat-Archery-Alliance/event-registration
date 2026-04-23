@@ -9,6 +9,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
+	"go.opentelemetry.io/otel/codes"
 )
 
 func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware.MiddlewareFunc {
@@ -16,12 +17,16 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 
 	server.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		ctx, span := a.tracer.Start(ctx, "RegistrationPaymentWebhook")
+		defer span.End()
 
 		logger := a.getLoggerOrBaseLogger(ctx)
 
 		r.Body = http.MaxBytesReader(w, r.Body, 65536)
 		payload, err := io.ReadAll(r.Body)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			logger.Error("Failed to read stripe webhook body", slog.String("error", err.Error()))
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
@@ -61,6 +66,8 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 				}
 			}
 
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			logger.Error("Failed to confirm registration payment", slog.String("error", err.Error()))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -68,6 +75,7 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 
 		event, err := a.db.GetEvent(ctx, reg.GetEventID())
 		if err != nil {
+			span.RecordError(err)
 			logger.Error("Failed to get event ID to send email with", slog.String("error", err.Error()))
 
 			// TODO: Probably want better error handling here
@@ -77,6 +85,7 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 
 		err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, "ICAA <info@icaa.world>", reg, event)
 		if err != nil {
+			span.RecordError(err)
 			logger.Error("failed to send email to signed up player", slog.String("error", err.Error()), slog.String("email", reg.GetEmail()))
 
 			// TODO: Is there other error handling we should do here?

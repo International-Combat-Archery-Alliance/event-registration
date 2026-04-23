@@ -6,7 +6,12 @@ import (
 
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
+
+var tracer = otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/events")
 
 type Event struct {
 	ID                    uuid.UUID
@@ -50,8 +55,15 @@ type Repository interface {
 }
 
 func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event) (Event, error) {
+	ctx, span := tracer.Start(ctx, "UpdateEvent")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("event_id", id.String()))
+
 	existingEvent, err := repo.GetEvent(ctx, id)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return Event{}, err
 	}
 
@@ -75,6 +87,8 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 
 	err = repo.UpdateEvent(ctx, updatedEvent)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return Event{}, err
 	}
 
