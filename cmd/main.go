@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,36 +12,34 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/auth/token"
 	"github.com/International-Combat-Archery-Alliance/captcha/cfturnstile"
-	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
-	"github.com/International-Combat-Archery-Alliance/event-registration/dynamo"
-	"github.com/International-Combat-Archery-Alliance/payments/stripe"
 	"github.com/International-Combat-Archery-Alliance/telemetry"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"go.opentelemetry.io/otel"
-)
-
-const (
-	newRelicLicenseEnvVar  = "NEW_RELIC_LICENSE_KEY"
-	newRelicLicenseSSMPath = "/newrelic-license-key"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	if err := run(logger); err != nil {
+		logger.Error("startup failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run(logger *slog.Logger) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-
 	env := getApiEnvironment()
+
+	// -----------------------------------------------------------------------
+	// Phase 1: New Relic license key → telemetry init (sequential dependency)
+	// -----------------------------------------------------------------------
 
 	licenseKey, err := getNewRelicLicenseKey(ctx, env)
 	if err != nil {
-		logger.Error("failed to get New Relic license key", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("new relic license key: %w", err)
 	}
 
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -59,8 +54,7 @@ func main() {
 		Lambda:      telemetry.LambdaInfoFromEnv(),
 	})
 	if err != nil {
-		logger.Error("failed to initialize telemetry", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("telemetry init: %w", err)
 	}
 	defer func() {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -70,77 +64,79 @@ func main() {
 		}
 	}()
 
-	// Start a root trace span for startup
 	tracer := otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/cmd")
-	ctx, span := tracer.Start(ctx, "startup")
+	ctx, startupSpan := tracer.Start(ctx, "startup")
 
-	var db api.DB
-	if err := telemetry.RunWithSpan(ctx, tracer, "init-db", func(ctx context.Context) error {
-		var err error
-		db, err = makeDB(ctx)
-		return err
-	}); err != nil {
-		span.RecordError(err)
-		logger.Error("Error creating db client", "error", err)
-		os.Exit(1)
-	}
+	httpClient := telemetry.InstrumentedHTTPClient()
 
-	var signingKeys map[string]token.SigningKey
-	var currentKeyID string
-	if err := telemetry.RunWithSpan(ctx, tracer, "init-jwt-signing-keys", func(ctx context.Context) error {
-		var err error
-		signingKeys, currentKeyID, err = getJWTSigningKeys(ctx, env)
-		return err
-	}); err != nil {
-		span.RecordError(err)
-		logger.Error("failed to get JWT signing keys", slog.String("error", err.Error()))
-		os.Exit(1)
-	}
+	// -----------------------------------------------------------------------
+	// Phase 2: Fetch app config and create DB in parallel
+	// -----------------------------------------------------------------------
 
-	tokenService := token.NewTokenService(
-		signingKeys[currentKeyID],
-		token.WithSigningKeys(signingKeys, currentKeyID),
+	var (
+		cfg *AppConfig
+		db  api.DB
 	)
 
-	var cfSecretKey string
-	if err := telemetry.RunWithSpan(ctx, tracer, "init-turnstile-secret", func(ctx context.Context) error {
-		var err error
-		cfSecretKey, err = getTurnstileSecretKey(ctx, env)
-		return err
-	}); err != nil {
-		span.RecordError(err)
-		logger.Error("failed to get turnstile secret key", slog.String("error", err.Error()))
-		os.Exit(1)
-	}
-	instrumentedHTTPClient := telemetry.InstrumentedHTTPClient()
-	cfTurnstileValidator := cfturnstile.NewValidator(instrumentedHTTPClient, cfSecretKey)
+	g, gCtx := errgroup.WithContext(ctx)
 
-	var emailSender email.Sender
-	if err := telemetry.RunWithSpan(ctx, tracer, "init-email-sender", func(ctx context.Context) error {
+	g.Go(func() error {
+		_, span := tracer.Start(gCtx, "init-config")
+		defer span.End()
+
 		var err error
-		emailSender, err = createEmailSender(ctx, logger, env)
+		cfg, err = fetchAppConfig(gCtx, env)
+		if err != nil {
+			span.RecordError(err)
+		}
 		return err
-	}); err != nil {
-		span.RecordError(err)
-		logger.Error("failed to create email sender", slog.String("error", err.Error()))
-		os.Exit(1)
+	})
+
+	g.Go(func() error {
+		_, span := tracer.Start(gCtx, "init-db")
+		defer span.End()
+
+		var err error
+		db, err = makeDB(gCtx)
+		if err != nil {
+			span.RecordError(err)
+		}
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		startupSpan.RecordError(err)
+		startupSpan.End()
+		return err
 	}
 
-	var stripeClient *stripe.Client
-	if err := telemetry.RunWithSpan(ctx, tracer, "init-stripe-client", func(ctx context.Context) error {
-		var err error
-		stripeClient, err = makeStripeClient(ctx, env, instrumentedHTTPClient)
-		return err
-	}); err != nil {
-		span.RecordError(err)
-		logger.Error("failed to create stripe client", slog.String("error", err.Error()))
-		os.Exit(1)
+	// -----------------------------------------------------------------------
+	// Phase 3: Wire up services (all instant after config is loaded)
+	// -----------------------------------------------------------------------
+
+	tokenService := token.NewTokenService(
+		cfg.JWTSigningKeys[cfg.JWTCurrentKeyID],
+		token.WithSigningKeys(cfg.JWTSigningKeys, cfg.JWTCurrentKeyID),
+	)
+
+	cfTurnstileValidator := cfturnstile.NewValidator(httpClient, cfg.TurnstileSecretKey)
+
+	emailSender, err := createEmailSender(logger, env, cfg.GoogleServiceAccount)
+	if err != nil {
+		startupSpan.RecordError(err)
+		startupSpan.End()
+		return fmt.Errorf("email sender: %w", err)
 	}
+
+	stripeClient := makeStripeClient(cfg.StripeSecretKey, cfg.StripeEndpointSecret, httpClient)
 
 	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, stripeClient, flushTraces)
 
-	// End startup span after initialization completes
-	span.End()
+	startupSpan.End()
+
+	// -----------------------------------------------------------------------
+	// Start server with graceful shutdown
+	// -----------------------------------------------------------------------
 
 	serverSettings := getServerSettingsFromEnv()
 
@@ -155,9 +151,13 @@ func main() {
 	select {
 	case <-sigCtx.Done():
 		logger.Info("shutting down gracefully")
+		return nil
 	case err := <-serverErrCh:
-		logger.Error("error running server", "error", err)
-		os.Exit(1)
+		if err != nil {
+			logger.Error("error running server", "error", err)
+			return err
+		}
+		return nil
 	}
 }
 
@@ -171,245 +171,4 @@ func getServerSettingsFromEnv() ServerSettings {
 		Host: getEnvOrDefault("HOST", "0.0.0.0"),
 		Port: getEnvOrDefault("PORT", "8080"),
 	}
-}
-
-func getEnvOrDefault(key string, defaultVal string) string {
-	if v, ok := os.LookupEnv(key); ok {
-		return v
-	}
-
-	return defaultVal
-}
-
-func makeDB(ctx context.Context) (api.DB, error) {
-	var dynamoClient *dynamodb.Client
-	var err error
-	if isLocal() {
-		dynamoClient, err = createLocalDynamoClient(ctx)
-	} else {
-		dynamoClient, err = createProdDynamoClient(ctx)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to create dynamo client: %w", err)
-	}
-
-	database := dynamo.NewDB(dynamoClient, os.Getenv("DYNAMO_TABLE_NAME"))
-	return database, nil
-}
-
-func isLocal() bool {
-	return getEnvOrDefault("AWS_SAM_LOCAL", "false") == "true"
-}
-
-func getApiEnvironment() api.Environment {
-	if isLocal() {
-		return api.LOCAL
-	}
-	return api.PROD
-}
-
-func loadAWSConfig(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, optFns...)
-	if err != nil {
-		return aws.Config{}, err
-	}
-	telemetry.InstrumentAWSConfig(&cfg)
-	return cfg, nil
-}
-
-func createLocalDynamoClient(ctx context.Context) (*dynamodb.Client, error) {
-	cfg, err := loadAWSConfig(ctx,
-		config.WithRegion("localhost"),
-		config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
-			Value: aws.Credentials{
-				AccessKeyID: "local", SecretAccessKey: "local", SessionToken: "",
-				Source: "Mock credentials used above for local instance",
-			},
-		}),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-		o.BaseEndpoint = aws.String("http://dynamodb:8000")
-	}), nil
-}
-
-func createProdDynamoClient(ctx context.Context) (*dynamodb.Client, error) {
-	cfg, err := loadAWSConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return dynamodb.NewFromConfig(cfg), nil
-}
-
-func getParameterFromAWS(ctx context.Context, parameterName string) (string, error) {
-	cfg, err := loadAWSConfig(ctx)
-	if err != nil {
-		return "", fmt.Errorf("unable to load SDK config: %w", err)
-	}
-
-	client := ssm.NewFromConfig(cfg)
-
-	result, err := client.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String(parameterName),
-		WithDecryption: aws.Bool(true),
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to get parameter %s: %w", parameterName, err)
-	}
-
-	return *result.Parameter.Value, nil
-}
-
-func getTurnstileSecretKey(ctx context.Context, env api.Environment) (string, error) {
-	if env == api.LOCAL {
-		// This is the test key to always have success
-		return "1x0000000000000000000000000000000AA", nil
-	}
-
-	parameter, err := getParameterFromAWS(ctx, "/cfTurnstileSecretKey")
-	if err != nil {
-		return "", fmt.Errorf("failed to get turnstile key from aws: %w", err)
-	}
-
-	return parameter, nil
-}
-
-func getGoogleServiceAccountJSON(ctx context.Context) ([]byte, error) {
-	parameter, err := getParameterFromAWS(ctx, "/googleServiceAccount")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get google service account from aws: %w", err)
-	}
-
-	return []byte(parameter), nil
-}
-
-func getStripeSecretKey(ctx context.Context, env api.Environment) (string, error) {
-	if env == api.LOCAL {
-		return getEnvOrDefault("STRIPE_SECRET_KEY", ""), nil
-	}
-
-	parameter, err := getParameterFromAWS(ctx, "/stripeSecretKey")
-	if err != nil {
-		return "", fmt.Errorf("failed to get stripe secret key: %w", err)
-	}
-
-	return parameter, nil
-}
-
-func getStripeEndpointSecret(ctx context.Context, env api.Environment) (string, error) {
-	if env == api.LOCAL {
-		return getEnvOrDefault("STRIPE_ENDPOINT_SECRET", ""), nil
-	}
-
-	parameter, err := getParameterFromAWS(ctx, "/stripeEndpointSecret")
-	if err != nil {
-		return "", fmt.Errorf("failed to get stripe endpoint secret: %w", err)
-	}
-
-	return parameter, nil
-}
-
-func makeStripeClient(ctx context.Context, env api.Environment, httpClient *http.Client) (*stripe.Client, error) {
-	secretKey, err := getStripeSecretKey(ctx, env)
-	if err != nil {
-		return nil, err
-	}
-	endpointSecret, err := getStripeEndpointSecret(ctx, env)
-	if err != nil {
-		return nil, err
-	}
-
-	return stripe.NewClient(secretKey, endpointSecret, stripe.WithHTTPClient(httpClient)), nil
-}
-
-// getNewRelicLicenseKey retrieves the New Relic license key from environment variable (local)
-// or AWS Parameter Store (production)
-func getNewRelicLicenseKey(ctx context.Context, env api.Environment) (string, error) {
-	if env == api.LOCAL {
-		return os.Getenv(newRelicLicenseEnvVar), nil
-	}
-
-	cfg, err := loadAWSConfig(ctx)
-	if err != nil {
-		return "", fmt.Errorf("unable to load AWS SDK config: %w", err)
-	}
-
-	client := ssm.NewFromConfig(cfg)
-
-	result, err := client.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String(newRelicLicenseSSMPath),
-		WithDecryption: aws.Bool(true),
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to get New Relic license key from Parameter Store: %w", err)
-	}
-
-	return *result.Parameter.Value, nil
-}
-
-// jwtSigningKeysData represents the JSON structure for signing keys
-type jwtSigningKeysData struct {
-	CurrentKey string            `json:"currentKey"`
-	Keys       map[string]string `json:"keys"`
-}
-
-// getJWTSigningKeys retrieves the JWT signing keys from environment variable (local)
-// or AWS Parameter Store (production)
-func getJWTSigningKeys(ctx context.Context, env api.Environment) (map[string]token.SigningKey, string, error) {
-	if env == api.LOCAL {
-		// Local development: use environment variable
-		key := os.Getenv("JWT_SIGNING_KEY")
-		if key == "" {
-			key = "local-development-signing-key-minimum-32-characters-long"
-		}
-		return map[string]token.SigningKey{
-			"local": {ID: "local", Key: []byte(key)},
-		}, "local", nil
-	}
-
-	// Production: retrieve from AWS Parameter Store
-	cfg, err := loadAWSConfig(ctx)
-	if err != nil {
-		return nil, "", fmt.Errorf("unable to load AWS SDK config: %w", err)
-	}
-
-	client := ssm.NewFromConfig(cfg)
-
-	result, err := client.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String("/jwtSigningKeys"),
-		WithDecryption: aws.Bool(true),
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to get JWT signing keys from Parameter Store: %w", err)
-	}
-
-	// Parse JSON response
-	var data jwtSigningKeysData
-	if err := json.Unmarshal([]byte(*result.Parameter.Value), &data); err != nil {
-		return nil, "", fmt.Errorf("failed to parse JWT signing keys JSON: %w", err)
-	}
-
-	// Convert to map of SigningKey (keys are base64 encoded)
-	signingKeys := make(map[string]token.SigningKey)
-	for keyID, keyValue := range data.Keys {
-		decodedKey, err := base64.StdEncoding.DecodeString(keyValue)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to decode base64 key %q: %w", keyID, err)
-		}
-		signingKeys[keyID] = token.SigningKey{
-			ID:  keyID,
-			Key: decodedKey,
-		}
-	}
-
-	// Validate that current key exists
-	if _, ok := signingKeys[data.CurrentKey]; !ok {
-		return nil, "", fmt.Errorf("current key ID %q not found in keys", data.CurrentKey)
-	}
-
-	return signingKeys, data.CurrentKey, nil
 }
