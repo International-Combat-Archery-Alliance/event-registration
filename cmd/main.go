@@ -31,10 +31,17 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
-	eventAPI, err := setupApi(logger)
+	eventAPI, traceShutdown, err := setupApi(logger)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := traceShutdown(shutdownCtx); err != nil {
+			logger.Error("failed to shutdown telemetry", "error", err)
+		}
+	}()
 
 	serverSettings := getServerSettingsFromEnv()
 
@@ -59,7 +66,7 @@ func run(logger *slog.Logger) error {
 	}
 }
 
-func setupApi(logger *slog.Logger) (*api.API, error) {
+func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -71,13 +78,14 @@ func setupApi(logger *slog.Logger) (*api.API, error) {
 
 	licenseKey, err := getNewRelicLicenseKey(ctx, env)
 	if err != nil {
-		return nil, fmt.Errorf("new relic license key: %w", err)
+		return nil, nil, fmt.Errorf("new relic license key: %w", err)
 	}
 
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
 		endpoint = "otlp.nr-data.net:4317"
 	}
+	logger.Info("endpoint", slog.String("endpoint", endpoint), slog.String("license", licenseKey))
 
 	traceShutdown, flushTraces, err := telemetry.Init(ctx, telemetry.Options{
 		ServiceName: "event-registration",
@@ -86,17 +94,10 @@ func setupApi(logger *slog.Logger) (*api.API, error) {
 		Lambda:      telemetry.LambdaInfoFromEnv(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("telemetry init: %w", err)
+		return nil, nil, fmt.Errorf("telemetry init: %w", err)
 	}
 
 	instrumentAWSConfig()
-	defer func() {
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shutdownCancel()
-		if err := traceShutdown(shutdownCtx); err != nil {
-			logger.Error("failed to shutdown telemetry", "error", err)
-		}
-	}()
 
 	ctx, startupSpan := tracer.Start(ctx, "startup")
 	defer startupSpan.End()
