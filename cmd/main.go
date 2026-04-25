@@ -72,15 +72,14 @@ func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error
 
 	env := getApiEnvironment()
 
-	traceShutdown := func(context.Context) error { return nil }
-
 	// -----------------------------------------------------------------------
 	// Phase 1: New Relic license key → telemetry init (sequential dependency)
 	// -----------------------------------------------------------------------
 
 	licenseKey, err := getNewRelicLicenseKey(ctx, env)
 	if err != nil {
-		return nil, traceShutdown, fmt.Errorf("new relic license key: %w", err)
+		// Still return a default shutdown func because the caller wants to always call shutdown
+		return nil, func(context.Context) error { return nil }, fmt.Errorf("new relic license key: %w", err)
 	}
 
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
