@@ -12,6 +12,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
 	"github.com/International-Combat-Archery-Alliance/event-registration/dynamo"
 	"github.com/International-Combat-Archery-Alliance/payments/stripe"
+	"github.com/International-Combat-Archery-Alliance/telemetry"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -38,6 +39,8 @@ func makeLocalDB(ctx context.Context) (api.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create local dynamo client: %w", err)
 	}
+
+	telemetry.InstrumentAWSConfig(&cfg)
 
 	dynamoClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
 		o.BaseEndpoint = aws.String("http://dynamodb:8000")
