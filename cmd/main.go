@@ -32,9 +32,6 @@ func main() {
 
 func run(logger *slog.Logger) error {
 	eventAPI, traceShutdown, err := setupApi(logger)
-	if err != nil {
-		return err
-	}
 	defer func() {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
@@ -42,6 +39,9 @@ func run(logger *slog.Logger) error {
 			logger.Error("failed to shutdown telemetry", "error", err)
 		}
 	}()
+	if err != nil {
+		return err
+	}
 
 	serverSettings := getServerSettingsFromEnv()
 
@@ -72,20 +72,21 @@ func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error
 
 	env := getApiEnvironment()
 
+	traceShutdown := func(context.Context) error { return nil }
+
 	// -----------------------------------------------------------------------
 	// Phase 1: New Relic license key → telemetry init (sequential dependency)
 	// -----------------------------------------------------------------------
 
 	licenseKey, err := getNewRelicLicenseKey(ctx, env)
 	if err != nil {
-		return nil, nil, fmt.Errorf("new relic license key: %w", err)
+		return nil, traceShutdown, fmt.Errorf("new relic license key: %w", err)
 	}
 
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
 		endpoint = "otlp.nr-data.net:4317"
 	}
-	logger.Info("endpoint", slog.String("endpoint", endpoint), slog.String("license", licenseKey))
 
 	traceShutdown, flushTraces, err := telemetry.Init(ctx, telemetry.Options{
 		ServiceName: "event-registration",
@@ -94,10 +95,8 @@ func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error
 		Lambda:      telemetry.LambdaInfoFromEnv(),
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("telemetry init: %w", err)
+		return nil, traceShutdown, fmt.Errorf("telemetry init: %w", err)
 	}
-
-	instrumentAWSConfig()
 
 	ctx, startupSpan := tracer.Start(ctx, "startup")
 	defer startupSpan.End()
@@ -140,7 +139,8 @@ func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error
 
 	if err := g.Wait(); err != nil {
 		startupSpan.RecordError(err)
-		return nil, err
+		startupSpan.End()
+		return nil, traceShutdown, err
 	}
 
 	// -----------------------------------------------------------------------
@@ -157,14 +157,15 @@ func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error
 	emailSender, err := createEmailSender(logger, env, cfg.GoogleServiceAccount)
 	if err != nil {
 		startupSpan.RecordError(err)
-		return nil, fmt.Errorf("email sender: %w", err)
+		startupSpan.End()
+		return nil, traceShutdown, fmt.Errorf("email sender: %w", err)
 	}
 
 	stripeClient := makeStripeClient(cfg.StripeSecretKey, cfg.StripeEndpointSecret, httpClient)
 
 	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, stripeClient, flushTraces)
 
-	return eventAPI, nil
+	return eventAPI, traceShutdown, nil
 }
 
 type ServerSettings struct {
