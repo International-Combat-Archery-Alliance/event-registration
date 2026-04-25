@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"go.opentelemetry.io/otel/codes"
 )
 
 const (
@@ -30,8 +31,13 @@ var (
 // loadAWSConfig loads the AWS config once and caches it. Safe for concurrent use.
 func loadAWSConfig(ctx context.Context) (aws.Config, error) {
 	awsCfgOnce.Do(func() {
+		ctx, span := tracer.Start(ctx, "load-aws-config")
+		defer span.End()
+
 		cfg, err := config.LoadDefaultConfig(ctx)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			awsCfgErr = fmt.Errorf("unable to load AWS SDK config: %w", err)
 			return
 		}

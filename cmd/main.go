@@ -18,6 +18,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var tracer = otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/cmd")
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
@@ -79,13 +81,12 @@ func run(logger *slog.Logger) error {
 	)
 
 	g, gCtx := errgroup.WithContext(ctx)
-
 	g.Go(func() error {
-		_, span := tracer.Start(gCtx, "init-config")
+		ctx, span := tracer.Start(gCtx, "init-config")
 		defer span.End()
 
 		var err error
-		cfg, err = fetchAppConfig(gCtx, env)
+		cfg, err = fetchAppConfig(ctx, env)
 		if err != nil {
 			span.RecordError(err)
 		}
@@ -93,11 +94,11 @@ func run(logger *slog.Logger) error {
 	})
 
 	g.Go(func() error {
-		_, span := tracer.Start(gCtx, "init-db")
+		ctx, span := tracer.Start(gCtx, "init-db")
 		defer span.End()
 
 		var err error
-		db, err = makeDB(gCtx)
+		db, err = makeDB(ctx)
 		if err != nil {
 			span.RecordError(err)
 		}
