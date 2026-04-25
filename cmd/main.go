@@ -23,6 +23,7 @@ var tracer = otel.Tracer("github.com/International-Combat-Archery-Alliance/event
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
+	logger.Info("starting up")
 	if err := run(logger); err != nil {
 		logger.Error("startup failed", "error", err)
 		os.Exit(1)
@@ -30,6 +31,35 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
+	eventAPI, err := setupApi(logger)
+	if err != nil {
+		return err
+	}
+
+	serverSettings := getServerSettingsFromEnv()
+
+	sigCtx, sigStop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer sigStop()
+
+	serverErrCh := make(chan error, 1)
+	go func() {
+		serverErrCh <- eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
+	}()
+
+	select {
+	case <-sigCtx.Done():
+		logger.Info("shutting down gracefully")
+		return nil
+	case err := <-serverErrCh:
+		if err != nil {
+			logger.Error("error running server", "error", err)
+			return err
+		}
+		return nil
+	}
+}
+
+func setupApi(logger *slog.Logger) (*api.API, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -41,7 +71,7 @@ func run(logger *slog.Logger) error {
 
 	licenseKey, err := getNewRelicLicenseKey(ctx, env)
 	if err != nil {
-		return fmt.Errorf("new relic license key: %w", err)
+		return nil, fmt.Errorf("new relic license key: %w", err)
 	}
 
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -56,7 +86,7 @@ func run(logger *slog.Logger) error {
 		Lambda:      telemetry.LambdaInfoFromEnv(),
 	})
 	if err != nil {
-		return fmt.Errorf("telemetry init: %w", err)
+		return nil, fmt.Errorf("telemetry init: %w", err)
 	}
 	defer func() {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -66,8 +96,8 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
-	tracer := otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/cmd")
 	ctx, startupSpan := tracer.Start(ctx, "startup")
+	defer startupSpan.End()
 
 	httpClient := telemetry.InstrumentedHTTPClient()
 
@@ -108,7 +138,7 @@ func run(logger *slog.Logger) error {
 	if err := g.Wait(); err != nil {
 		startupSpan.RecordError(err)
 		startupSpan.End()
-		return err
+		return nil, err
 	}
 
 	// -----------------------------------------------------------------------
@@ -126,40 +156,14 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		startupSpan.RecordError(err)
 		startupSpan.End()
-		return fmt.Errorf("email sender: %w", err)
+		return nil, fmt.Errorf("email sender: %w", err)
 	}
 
 	stripeClient := makeStripeClient(cfg.StripeSecretKey, cfg.StripeEndpointSecret, httpClient)
 
 	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, stripeClient, flushTraces)
 
-	startupSpan.End()
-
-	// -----------------------------------------------------------------------
-	// Start server with graceful shutdown
-	// -----------------------------------------------------------------------
-
-	serverSettings := getServerSettingsFromEnv()
-
-	sigCtx, sigStop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer sigStop()
-
-	serverErrCh := make(chan error, 1)
-	go func() {
-		serverErrCh <- eventAPI.ListenAndServe(serverSettings.Host, serverSettings.Port)
-	}()
-
-	select {
-	case <-sigCtx.Done():
-		logger.Info("shutting down gracefully")
-		return nil
-	case err := <-serverErrCh:
-		if err != nil {
-			logger.Error("error running server", "error", err)
-			return err
-		}
-		return nil
-	}
+	return eventAPI, nil
 }
 
 type ServerSettings struct {
