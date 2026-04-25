@@ -88,6 +88,8 @@ func setupApi(logger *slog.Logger) (*api.API, error) {
 	if err != nil {
 		return nil, fmt.Errorf("telemetry init: %w", err)
 	}
+
+	instrumentAWSConfig()
 	defer func() {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
@@ -137,7 +139,6 @@ func setupApi(logger *slog.Logger) (*api.API, error) {
 
 	if err := g.Wait(); err != nil {
 		startupSpan.RecordError(err)
-		startupSpan.End()
 		return nil, err
 	}
 
@@ -155,7 +156,6 @@ func setupApi(logger *slog.Logger) (*api.API, error) {
 	emailSender, err := createEmailSender(logger, env, cfg.GoogleServiceAccount)
 	if err != nil {
 		startupSpan.RecordError(err)
-		startupSpan.End()
 		return nil, fmt.Errorf("email sender: %w", err)
 	}
 
