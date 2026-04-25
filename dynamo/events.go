@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
@@ -16,6 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
 )
+
+var locationCache sync.Map
 
 var _ events.Repository = &DB{}
 
@@ -92,15 +95,22 @@ func newEventDynamo(event events.Event) eventDynamo {
 	}
 }
 
+func loadLocation(name string) *time.Location {
+	if cached, ok := locationCache.Load(name); ok {
+		return cached.(*time.Location)
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		loc = time.UTC
+	}
+	locationCache.Store(name, loc)
+	return loc
+}
+
 func eventFromEventDynamo(event eventDynamo) events.Event {
 	var timeZone *time.Location
 	if event.TimeZone != nil {
-		var err error
-		timeZone, err = time.LoadLocation(*event.TimeZone)
-		if err != nil {
-			// Fallback to UTC if timezone is invalid
-			timeZone = time.UTC
-		}
+		timeZone = loadLocation(*event.TimeZone)
 	} else {
 		timeZone = time.UTC
 	}
