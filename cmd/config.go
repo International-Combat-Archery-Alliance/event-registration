@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"go.opentelemetry.io/otel/codes"
 )
 
 const (
@@ -22,35 +23,28 @@ const (
 )
 
 var (
-	awsCfg     *aws.Config
+	awsCfg     aws.Config
 	awsCfgErr  error
 	awsCfgOnce sync.Once
 )
 
 // loadAWSConfig loads the AWS config once and caches it. Safe for concurrent use.
-// Telemetry instrumentation is deferred to instrumentAWSConfig so it happens after
-// the trace provider is initialized.
 func loadAWSConfig(ctx context.Context) (aws.Config, error) {
 	awsCfgOnce.Do(func() {
+		ctx, span := tracer.Start(ctx, "load-aws-config")
+		defer span.End()
+
 		cfg, err := config.LoadDefaultConfig(ctx)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			awsCfgErr = fmt.Errorf("unable to load AWS SDK config: %w", err)
 			return
 		}
-		awsCfg = &cfg
+		telemetry.InstrumentAWSConfig(&cfg)
+		awsCfg = cfg
 	})
-	if awsCfgErr != nil {
-		return aws.Config{}, awsCfgErr
-	}
-	return *awsCfg, nil
-}
-
-// instrumentAWSConfig applies OpenTelemetry instrumentation to the cached AWS config.
-// Must be called after telemetry.Init is complete.
-func instrumentAWSConfig() {
-	if awsCfg != nil {
-		telemetry.InstrumentAWSConfig(awsCfg)
-	}
+	return awsCfg, awsCfgErr
 }
 
 // getSSMParameter fetches a single parameter from AWS Parameter Store (for New Relic key,

@@ -37,6 +37,7 @@ Globals:
         DYNAMO_TABLE_NAME: !FindInMap [attributes, dynamo, tableName]
         STRIPE_SECRET_KEY: !Ref StripeSecretKey
         STRIPE_ENDPOINT_SECRET: !Ref StripeEndpointSecret
+        OTEL_EXPORTER_OTLP_ENDPOINT: ""
 
 Resources:
   EventRegistrationHttp:

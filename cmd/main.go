@@ -31,7 +31,14 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
-	eventAPI, err := setupApi(logger)
+	eventAPI, traceShutdown, err := setupApi(logger)
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := traceShutdown(shutdownCtx); err != nil {
+			logger.Error("failed to shutdown telemetry", "error", err)
+		}
+	}()
 	if err != nil {
 		return err
 	}
@@ -59,7 +66,7 @@ func run(logger *slog.Logger) error {
 	}
 }
 
-func setupApi(logger *slog.Logger) (*api.API, error) {
+func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -71,7 +78,8 @@ func setupApi(logger *slog.Logger) (*api.API, error) {
 
 	licenseKey, err := getNewRelicLicenseKey(ctx, env)
 	if err != nil {
-		return nil, fmt.Errorf("new relic license key: %w", err)
+		// Still return a default shutdown func because the caller wants to always call shutdown
+		return nil, func(context.Context) error { return nil }, fmt.Errorf("new relic license key: %w", err)
 	}
 
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -86,17 +94,8 @@ func setupApi(logger *slog.Logger) (*api.API, error) {
 		Lambda:      telemetry.LambdaInfoFromEnv(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("telemetry init: %w", err)
+		return nil, traceShutdown, fmt.Errorf("telemetry init: %w", err)
 	}
-
-	instrumentAWSConfig()
-	defer func() {
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shutdownCancel()
-		if err := traceShutdown(shutdownCtx); err != nil {
-			logger.Error("failed to shutdown telemetry", "error", err)
-		}
-	}()
 
 	ctx, startupSpan := tracer.Start(ctx, "startup")
 	defer startupSpan.End()
@@ -139,7 +138,8 @@ func setupApi(logger *slog.Logger) (*api.API, error) {
 
 	if err := g.Wait(); err != nil {
 		startupSpan.RecordError(err)
-		return nil, err
+		startupSpan.End()
+		return nil, traceShutdown, err
 	}
 
 	// -----------------------------------------------------------------------
@@ -156,14 +156,15 @@ func setupApi(logger *slog.Logger) (*api.API, error) {
 	emailSender, err := createEmailSender(logger, env, cfg.GoogleServiceAccount)
 	if err != nil {
 		startupSpan.RecordError(err)
-		return nil, fmt.Errorf("email sender: %w", err)
+		startupSpan.End()
+		return nil, traceShutdown, fmt.Errorf("email sender: %w", err)
 	}
 
 	stripeClient := makeStripeClient(cfg.StripeSecretKey, cfg.StripeEndpointSecret, httpClient)
 
 	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, stripeClient, flushTraces)
 
-	return eventAPI, nil
+	return eventAPI, traceShutdown, nil
 }
 
 type ServerSettings struct {
