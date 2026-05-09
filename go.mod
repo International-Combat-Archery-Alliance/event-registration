@@ -10,7 +10,7 @@ tool (
 require (
 	github.com/International-Combat-Archery-Alliance/auth v0.3.1
 	github.com/International-Combat-Archery-Alliance/captcha v0.1.0
-	github.com/International-Combat-Archery-Alliance/email v0.3.1
+	github.com/International-Combat-Archery-Alliance/email v0.4.0
 	github.com/International-Combat-Archery-Alliance/middleware v0.4.0
 	github.com/International-Combat-Archery-Alliance/payments v0.8.1
 	github.com/International-Combat-Archery-Alliance/telemetry v0.2.0
@@ -41,6 +41,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.4 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/google/go-querystring v1.2.0 // indirect
+	github.com/mailersend/mailersend-go v1.6.4 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/stripe/stripe-go/v85 v85.0.0 // indirect
 	github.com/testcontainers/testcontainers-go v0.40.0 // indirect
@@ -50,13 +52,11 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
 )
 
 require (
-	cloud.google.com/go/auth v0.18.0 // indirect
-	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
-	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -91,9 +91,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.22.4 // indirect
-	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.3.11 // indirect
-	github.com/googleapis/gax-go/v2 v2.16.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -133,12 +130,10 @@ require (
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
-	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
-	google.golang.org/api v0.260.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect

@@ -107,7 +107,7 @@ type AppConfig struct {
 	TurnstileSecretKey   string
 	StripeSecretKey      string
 	StripeEndpointSecret string
-	GoogleServiceAccount []byte
+	MailerSendAPIKey     string
 }
 
 // fetchAppConfig retrieves all application configuration.
@@ -141,7 +141,7 @@ func fetchProdAppConfig(ctx context.Context) (*AppConfig, error) {
 	ssmNames := []string{
 		"/jwtSigningKeys",
 		"/cfTurnstileSecretKey",
-		"/googleServiceAccount",
+		"/mailerSendApiKey",
 		"/stripeSecretKey",
 		"/stripeEndpointSecret",
 	}
@@ -170,10 +170,10 @@ func fetchProdAppConfig(ctx context.Context) (*AppConfig, error) {
 		return nil, fmt.Errorf("missing SSM parameter: /cfTurnstileSecretKey")
 	}
 
-	if v, ok := params["/googleServiceAccount"]; ok {
-		cfg.GoogleServiceAccount = []byte(v)
+	if v, ok := params["/mailerSendApiKey"]; ok {
+		cfg.MailerSendAPIKey = v
 	} else {
-		return nil, fmt.Errorf("missing SSM parameter: /googleServiceAccount")
+		return nil, fmt.Errorf("missing SSM parameter: /mailerSendApiKey")
 	}
 
 	if v, ok := params["/stripeSecretKey"]; ok {
