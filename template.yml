@@ -74,16 +74,11 @@ Resources:
               - ssm:GetParameters
             Resource:
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cfTurnstileSecretKey"
-              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/googleServiceAccount"
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/mailerSendApiKey"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jwtSigningKeys"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/newrelic-license-key"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stripeSecretKey"
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/stripeEndpointSecret"
-          - Effect: Allow
-            Action:
-              - ses:SendEmail
-              - ses:SendRawEmail
-            Resource: "*"
       Events:
         APIEvent:
           Type: HttpApi
