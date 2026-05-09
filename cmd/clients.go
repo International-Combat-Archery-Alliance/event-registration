@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/International-Combat-Archery-Alliance/email"
-	"github.com/International-Combat-Archery-Alliance/email/gmail"
+	"github.com/International-Combat-Archery-Alliance/email/mailersend"
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
 	"github.com/International-Combat-Archery-Alliance/event-registration/dynamo"
 	"github.com/International-Combat-Archery-Alliance/payments/stripe"
@@ -71,15 +71,15 @@ func (el *emailLogger) SendEmail(ctx context.Context, e email.Email) error {
 	return nil
 }
 
-func createEmailSender(logger *slog.Logger, env api.Environment, googleServiceAccount []byte) (email.Sender, error) {
+func createEmailSender(logger *slog.Logger, env api.Environment, mailerSendAPIKey string) (email.Sender, error) {
 	if env == api.LOCAL {
 		return &emailLogger{logger: logger}, nil
 	}
-	return createProdGmailSender(googleServiceAccount)
+	return createProdMailerSendSender(mailerSendAPIKey)
 }
 
-func createProdGmailSender(creds []byte) (email.Sender, error) {
-	return gmail.NewGmailSender(context.Background(), creds, "andrew.mellen@icaa.world")
+func createProdMailerSendSender(apiKey string) (email.Sender, error) {
+	return mailersend.NewMailerSendSender(apiKey), nil
 }
 
 

@@ -153,7 +153,7 @@ func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error
 
 	cfTurnstileValidator := cfturnstile.NewValidator(httpClient, cfg.TurnstileSecretKey)
 
-	emailSender, err := createEmailSender(logger, env, cfg.GoogleServiceAccount)
+	emailSender, err := createEmailSender(logger, env, cfg.MailerSendAPIKey)
 	if err != nil {
 		startupSpan.RecordError(err)
 		startupSpan.End()
