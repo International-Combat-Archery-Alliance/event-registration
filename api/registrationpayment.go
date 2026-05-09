@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
@@ -83,7 +84,7 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 			return
 		}
 
-		err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, "ICAA <info@icaa.world>", reg, event)
+		err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, email.Address{Name: "ICAA", Address: "info@icaa.world"}, reg, event)
 		if err != nil {
 			span.RecordError(err)
 			logger.Error("failed to send email to signed up player", slog.String("error", err.Error()), slog.String("email", reg.GetEmail()))

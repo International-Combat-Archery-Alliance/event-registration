@@ -14,7 +14,7 @@ import (
 //go:embed templates
 var templates embed.FS
 
-func SendRegistrationConfirmationEmail(ctx context.Context, emailSender email.Sender, fromAddress string, reg Registration, event events.Event) error {
+func SendRegistrationConfirmationEmail(ctx context.Context, emailSender email.Sender, from email.Address, reg Registration, event events.Event) error {
 	ctx, span := tracer.Start(ctx, "SendRegistrationConfirmationEmail")
 	defer span.End()
 
@@ -29,7 +29,7 @@ func SendRegistrationConfirmationEmail(ctx context.Context, emailSender email.Se
 	}
 
 	return emailSender.SendEmail(ctx, email.Email{
-		FromAddress: fromAddress,
+		From:        from,
 		ToAddresses: []string{reg.GetEmail()},
 		Subject:     fmt.Sprintf("Event signup confirmed - %q", event.Name),
 		HTMLBody:    htmlBody,

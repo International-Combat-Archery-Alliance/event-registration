@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
@@ -195,7 +196,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 		}, nil
 	}
 
-	err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, "ICAA <info@icaa.world>", signedUpReg, event)
+	err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, email.Address{Name: "ICAA", Address: "info@icaa.world"}, signedUpReg, event)
 	if err != nil {
 		span.RecordError(err)
 		logger.Error("failed to send email to signed up player", slog.String("error", err.Error()), slog.String("email", reg.GetEmail()))

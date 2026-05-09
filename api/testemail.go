@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
@@ -29,7 +30,7 @@ func (a *API) PostEventsV1AdminTestEmail(ctx context.Context, request PostEvents
 	event := newFakeEvent()
 	reg := newFakeRegistration(event.ID, targetEmail)
 
-	err := registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, "ICAA <info@icaa.world>", reg, event)
+	err := registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, email.Address{Name: "ICAA", Address: "info@icaa.world"}, reg, event)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -63,9 +64,9 @@ func newFakeEvent() events.Event {
 			},
 		},
 		TimeZone:              nyc,
-		StartTime:             now.Add(14 * 24 * time.Hour),
-		EndTime:               now.Add(14*24*time.Hour + 6*time.Hour),
-		RegistrationCloseTime: now.Add(13 * 24 * time.Hour),
+		StartTime:             now.Add(14 * 24 * time.Hour).In(nyc),
+		EndTime:               now.Add(14*24*time.Hour + 6*time.Hour).In(nyc),
+		RegistrationCloseTime: now.Add(13 * 24 * time.Hour).In(nyc),
 		RegistrationOptions: []events.EventRegistrationOption{
 			{
 				RegType: events.BY_INDIVIDUAL,
