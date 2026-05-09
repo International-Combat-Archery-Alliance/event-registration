@@ -403,6 +403,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /events/v1/admin/test-email:
+    post:
+      summary: Test email sending
+      description: Sends a test registration confirmation email to the specified address. Admin only.
+      security:
+        - icaaCookieAuth: [admin]
+        - icaaBearerAuth: [admin]
+      requestBody:
+        description: The email address to send a test email to
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: test@example.com
+      responses:
+        '200':
+          description: Test email was sent successfully
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to send test email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 components:
   securitySchemes:
