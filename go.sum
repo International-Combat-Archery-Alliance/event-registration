@@ -178,6 +178,8 @@ github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 h1:PwQumkgq4/acIi
 github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3/go.mod h1:autxFIvghDt3jPTLoqZ9OZ7s9qTGNAWmYCjVFWPX/zg=
 github.com/magiconair/properties v1.8.10 h1:s31yESBquKXCV9a/ScB3ESkOjUYYv+X0rg8SYxI99mE=
 github.com/magiconair/properties v1.8.10/go.mod h1:Dhd985XPs7jluiymwWYZ0G4Z61jb3vdS329zhj2hYo0=
+github.com/mailerlite/mailerlite-go v1.2.0 h1:mtYXDKaXgETUhzyrfkwgKRyK0C575Bs0oVpAS107erY=
+github.com/mailerlite/mailerlite-go v1.2.0/go.mod h1:nsL6Rr1J0Vw43Jzp08s2aF617ZVOtJbPw2YNyUjUPNo=
 github.com/mailersend/mailersend-go v1.6.4 h1:llNGfQR2HKv7hlLC6ofDsyq8zp4oN6RGV3GwOvKp6RY=
 github.com/mailersend/mailersend-go v1.6.4/go.mod h1:C5mkFogEC1DoA0EX1ror5oNlLCUU7W7+0arYlc5lkVI=
 github.com/mailru/easyjson v0.9.1 h1:LbtsOm5WAswyWbvTEOqhypdPeZzHavpZx96/n553mR8=

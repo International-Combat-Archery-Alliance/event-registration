@@ -9,7 +9,7 @@ import (
 )
 
 func TestPostEventsV1AdminTestEmail_Success(t *testing.T) {
-	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockCheckoutManager{}, func(context.Context) error { return nil })
+	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockSubscriberManager{}, &mockCheckoutManager{}, func(context.Context) error { return nil })
 
 	email := types.Email("test@example.com")
 	resp, err := api.PostEventsV1AdminTestEmail(context.Background(), PostEventsV1AdminTestEmailRequestObject{
@@ -32,7 +32,7 @@ func (m *mockFailingEmailSender) SendEmail(ctx context.Context, e email.Email) e
 }
 
 func TestPostEventsV1AdminTestEmail_SendFailure(t *testing.T) {
-	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockFailingEmailSender{}, &mockCheckoutManager{}, func(context.Context) error { return nil })
+	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockFailingEmailSender{}, &mockSubscriberManager{}, &mockCheckoutManager{}, func(context.Context) error { return nil })
 
 	email := types.Email("test@example.com")
 	resp, err := api.PostEventsV1AdminTestEmail(context.Background(), PostEventsV1AdminTestEmailRequestObject{

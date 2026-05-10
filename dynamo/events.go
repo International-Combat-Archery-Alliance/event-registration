@@ -42,6 +42,7 @@ type eventDynamo struct {
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
+	MailingListGroupID     *string
 }
 
 type eventRegistrationOptionDynamo struct {
@@ -92,6 +93,7 @@ func newEventDynamo(event events.Event) eventDynamo {
 		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
+		MailingListGroupID:    event.MailingListGroupID,
 	}
 }
 
@@ -134,6 +136,7 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
+		MailingListGroupID:    event.MailingListGroupID,
 	}
 }
 

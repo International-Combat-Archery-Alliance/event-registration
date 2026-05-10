@@ -206,6 +206,10 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 		// because they did actually sign up succesfully still...
 	}
 
+	if event.MailingListGroupID != nil {
+		registration.AddToMailingList(ctx, a.subscriberManager, signedUpReg, *event.MailingListGroupID, logger)
+	}
+
 	return PostEventsV1EventIdRegister200JSONResponse{Registration: respReg}, nil
 }
 

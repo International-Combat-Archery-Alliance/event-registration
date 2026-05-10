@@ -42,6 +42,7 @@ require (
 	github.com/go-openapi/swag/jsonname v0.25.4 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
+	github.com/mailerlite/mailerlite-go v1.2.0 // indirect
 	github.com/mailersend/mailersend-go v1.6.4 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/stripe/stripe-go/v85 v85.0.0 // indirect

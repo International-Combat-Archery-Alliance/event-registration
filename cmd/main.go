@@ -160,9 +160,16 @@ func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error
 		return nil, traceShutdown, fmt.Errorf("email sender: %w", err)
 	}
 
+	subscriberManager, err := createSubscriberManager(logger, env, cfg.MailerLiteAPIKey)
+	if err != nil {
+		startupSpan.RecordError(err)
+		startupSpan.End()
+		return nil, traceShutdown, fmt.Errorf("subscriber manager: %w", err)
+	}
+
 	stripeClient := makeStripeClient(cfg.StripeSecretKey, cfg.StripeEndpointSecret, httpClient)
 
-	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, stripeClient, flushTraces)
+	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, subscriberManager, stripeClient, flushTraces)
 
 	return eventAPI, traceShutdown, nil
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/International-Combat-Archery-Alliance/email"
+	"github.com/International-Combat-Archery-Alliance/email/mailerlite"
 	"github.com/International-Combat-Archery-Alliance/email/mailersend"
 	"github.com/International-Combat-Archery-Alliance/event-registration/api"
 	"github.com/International-Combat-Archery-Alliance/event-registration/dynamo"
@@ -80,6 +81,29 @@ func createEmailSender(logger *slog.Logger, env api.Environment, mailerSendAPIKe
 
 func createProdMailerSendSender(apiKey string) (email.Sender, error) {
 	return mailersend.NewMailerSendSender(apiKey), nil
+}
+
+var _ email.SubscriberManager = &subscriberLogger{}
+
+type subscriberLogger struct {
+	logger *slog.Logger
+}
+
+func (s *subscriberLogger) CreateGroup(ctx context.Context, name string) (string, error) {
+	s.logger.Info("mailerlite group that would be created", slog.String("name", name))
+	return "local-group-id", nil
+}
+
+func (s *subscriberLogger) AddSubscriberToGroup(ctx context.Context, email, name, groupID string) error {
+	s.logger.Info("mailerlite subscriber that would be added", slog.String("email", email), slog.String("name", name), slog.String("groupID", groupID))
+	return nil
+}
+
+func createSubscriberManager(logger *slog.Logger, env api.Environment, mailerLiteAPIKey string) (email.SubscriberManager, error) {
+	if env == api.LOCAL {
+		return &subscriberLogger{logger: logger}, nil
+	}
+	return mailerlite.NewMailerLiteManager(mailerLiteAPIKey), nil
 }
 
 

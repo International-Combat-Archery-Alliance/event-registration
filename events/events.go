@@ -29,6 +29,7 @@ type Event struct {
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
+	MailingListGroupID     *string
 }
 
 type EventRegistrationOption struct {
@@ -83,6 +84,7 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		NumTotalPlayers:       existingEvent.NumTotalPlayers,
 		RulesDocLink:          event.RulesDocLink,
 		ImageName:             event.ImageName,
+		MailingListGroupID:     existingEvent.MailingListGroupID,
 	}
 
 	err = repo.UpdateEvent(ctx, updatedEvent)

@@ -108,6 +108,7 @@ type AppConfig struct {
 	StripeSecretKey      string
 	StripeEndpointSecret string
 	MailerSendAPIKey     string
+	MailerLiteAPIKey     string
 }
 
 // fetchAppConfig retrieves all application configuration.
@@ -134,6 +135,7 @@ func localAppConfig() (*AppConfig, error) {
 		TurnstileSecretKey:   "1x0000000000000000000000000000000AA",
 		StripeSecretKey:      os.Getenv("STRIPE_SECRET_KEY"),
 		StripeEndpointSecret: os.Getenv("STRIPE_ENDPOINT_SECRET"),
+		MailerLiteAPIKey:     os.Getenv("MAILERLITE_API_KEY"),
 	}, nil
 }
 
@@ -142,6 +144,7 @@ func fetchProdAppConfig(ctx context.Context) (*AppConfig, error) {
 		"/jwtSigningKeys",
 		"/cfTurnstileSecretKey",
 		"/mailerSendApiKey",
+		"/mailerLiteApiKey",
 		"/stripeSecretKey",
 		"/stripeEndpointSecret",
 	}
@@ -174,6 +177,12 @@ func fetchProdAppConfig(ctx context.Context) (*AppConfig, error) {
 		cfg.MailerSendAPIKey = v
 	} else {
 		return nil, fmt.Errorf("missing SSM parameter: /mailerSendApiKey")
+	}
+
+	if v, ok := params["/mailerLiteApiKey"]; ok {
+		cfg.MailerLiteAPIKey = v
+	} else {
+		return nil, fmt.Errorf("missing SSM parameter: /mailerLiteApiKey")
 	}
 
 	if v, ok := params["/stripeSecretKey"]; ok {
