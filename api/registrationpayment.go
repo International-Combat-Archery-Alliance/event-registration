@@ -94,6 +94,10 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 			// because they did actually sign up succesfully still...
 		}
 
+		if event.MailingListGroupID != nil {
+			registration.AddToMailingList(ctx, a.subscriberManager, reg, *event.MailingListGroupID, logger)
+		}
+
 		w.WriteHeader(http.StatusOK)
 	})
 

@@ -38,11 +38,12 @@ type API struct {
 	env    Environment
 	tracer trace.Tracer
 
-	tokenService     *token.TokenService
-	captchaValidator captcha.Validator
-	emailSender      email.Sender
-	checkoutManager  payments.CheckoutManager
-	flushTraces      func(context.Context) error
+	tokenService      *token.TokenService
+	captchaValidator  captcha.Validator
+	emailSender       email.Sender
+	subscriberManager email.SubscriberManager
+	checkoutManager   payments.CheckoutManager
+	flushTraces       func(context.Context) error
 }
 
 var _ StrictServerInterface = (*API)(nil)
@@ -54,19 +55,21 @@ func NewAPI(
 	tokenService *token.TokenService,
 	captchaValidator captcha.Validator,
 	emailSender email.Sender,
+	subscriberManager email.SubscriberManager,
 	checkoutManager payments.CheckoutManager,
 	flushTraces func(context.Context) error,
 ) *API {
 	return &API{
-		db:               db,
-		logger:           logger,
-		env:              env,
-		tracer:           otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/api"),
-		tokenService:     tokenService,
-		captchaValidator: captchaValidator,
-		emailSender:      emailSender,
-		checkoutManager:  checkoutManager,
-		flushTraces:      flushTraces,
+		db:                db,
+		logger:            logger,
+		env:               env,
+		tracer:            otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/api"),
+		tokenService:      tokenService,
+		captchaValidator:  captchaValidator,
+		emailSender:       emailSender,
+		subscriberManager: subscriberManager,
+		checkoutManager:   checkoutManager,
+		flushTraces:       flushTraces,
 	}
 }
 

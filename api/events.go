@@ -100,6 +100,14 @@ func (a *API) PostEventsV1(ctx context.Context, request PostEventsV1RequestObjec
 		}, nil
 	}
 
+	groupID, err := a.subscriberManager.CreateGroup(ctx, event.Name)
+	if err != nil {
+		span.RecordError(err)
+		logger.Warn("Failed to create mailerlite group", slog.String("error", err.Error()))
+	} else {
+		event.MailingListGroupID = &groupID
+	}
+
 	err = a.db.CreateEvent(ctx, event)
 	if err != nil {
 		span.RecordError(err)

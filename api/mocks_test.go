@@ -61,6 +61,25 @@ func (m *mockEmailSender) SendEmail(ctx context.Context, e email.Email) error {
 	return nil
 }
 
+type mockSubscriberManager struct {
+	CreateGroupFunc          func(ctx context.Context, name string) (string, error)
+	AddSubscriberToGroupFunc func(ctx context.Context, email, name, groupID string) error
+}
+
+func (m *mockSubscriberManager) CreateGroup(ctx context.Context, name string) (string, error) {
+	if m.CreateGroupFunc != nil {
+		return m.CreateGroupFunc(ctx, name)
+	}
+	return "mock-group-id", nil
+}
+
+func (m *mockSubscriberManager) AddSubscriberToGroup(ctx context.Context, email, name, groupID string) error {
+	if m.AddSubscriberToGroupFunc != nil {
+		return m.AddSubscriberToGroupFunc(ctx, email, name, groupID)
+	}
+	return nil
+}
+
 type mockCheckoutManager struct {
 	CreateCheckoutFunc  func(ctx context.Context, params payments.CheckoutParams) (payments.CheckoutInfo, error)
 	ConfirmCheckoutFunc func(ctx context.Context, payload []byte, signature string) (map[string]string, error)
