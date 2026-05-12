@@ -63,12 +63,20 @@ func (m *mockEmailSender) SendEmail(ctx context.Context, e email.Email) error {
 
 type mockSubscriberManager struct {
 	CreateGroupFunc          func(ctx context.Context, name string) (string, error)
+	FindOrCreateGroupFunc    func(ctx context.Context, name string) (string, error)
 	AddSubscriberToGroupFunc func(ctx context.Context, email, name, groupID string) error
 }
 
 func (m *mockSubscriberManager) CreateGroup(ctx context.Context, name string) (string, error) {
 	if m.CreateGroupFunc != nil {
 		return m.CreateGroupFunc(ctx, name)
+	}
+	return "mock-group-id", nil
+}
+
+func (m *mockSubscriberManager) FindOrCreateGroup(ctx context.Context, name string) (string, error) {
+	if m.FindOrCreateGroupFunc != nil {
+		return m.FindOrCreateGroupFunc(ctx, name)
 	}
 	return "mock-group-id", nil
 }
