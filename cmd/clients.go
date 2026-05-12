@@ -94,6 +94,11 @@ func (s *subscriberLogger) CreateGroup(ctx context.Context, name string) (string
 	return "local-group-id", nil
 }
 
+func (s *subscriberLogger) FindOrCreateGroup(ctx context.Context, name string) (string, error) {
+	s.logger.Info("mailerlite group that would be found or created", slog.String("name", name))
+	return "local-group-id", nil
+}
+
 func (s *subscriberLogger) AddSubscriberToGroup(ctx context.Context, email, name, groupID string) error {
 	s.logger.Info("mailerlite subscriber that would be added", slog.String("email", email), slog.String("name", name), slog.String("groupID", groupID))
 	return nil
