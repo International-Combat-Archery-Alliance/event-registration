@@ -439,6 +439,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /events/v1/admin/test-mailerlite:
+    post:
+      summary: Test MailerLite integration
+      description: Creates a test group in MailerLite and adds the given emails to it. For ByIndividual, each email is added as an individual subscriber. For ByTeam, the first email is the captain and the rest are team players. Names are auto-generated from email prefixes. Admin only.
+      security:
+        - icaaCookieAuth: [admin]
+        - icaaBearerAuth: [admin]
+      requestBody:
+        description: Emails and registration type to test with
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - registrationType
+                - emails
+              properties:
+                groupName:
+                  type: string
+                  description: Name for the test group. Defaults to "MailerLite Test Group".
+                  example: "Test Group"
+                registrationType:
+                  $ref: '#/components/schemas/RegistrationType'
+                emails:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                    format: email
+                  example: ["jane.archer@example.com", "john.doe@example.com"]
+                teamName:
+                  type: string
+                  description: Team name required when registrationType is ByTeam.
+                  example: "The Archers"
+      responses:
+        '200':
+          description: Successfully signed up emails to the group
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groupId:
+                    type: string
+                    example: "123456789"
+                  groupName:
+                    type: string
+                    example: "Test Group"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to test mailerlite integration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 components:
   securitySchemes:
