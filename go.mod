@@ -11,7 +11,7 @@ require (
 	github.com/International-Combat-Archery-Alliance/auth v0.3.1
 	github.com/International-Combat-Archery-Alliance/captcha v0.1.0
 	github.com/International-Combat-Archery-Alliance/email v0.6.0
-	github.com/International-Combat-Archery-Alliance/middleware v0.4.0
+	github.com/International-Combat-Archery-Alliance/middleware v0.5.0
 	github.com/International-Combat-Archery-Alliance/payments v0.8.1
 	github.com/International-Combat-Archery-Alliance/telemetry v0.2.0
 	github.com/Rhymond/go-money v1.0.15
