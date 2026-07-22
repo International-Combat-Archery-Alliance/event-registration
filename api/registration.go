@@ -10,6 +10,7 @@ import (
 
 	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
 	"github.com/google/uuid"
@@ -26,7 +27,8 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	validatedData, err := a.captchaValidator.Validate(ctx, request.Params.CfTurnstileResponse, "")
+	clientIP, _ := middleware.GetClientIPFromCtx(ctx)
+	validatedData, err := a.captchaValidator.Validate(ctx, request.Params.CfTurnstileResponse, clientIP)
 	if err != nil {
 		span.RecordError(err)
 		logger.Warn("Invalid captcha", slog.String("error", err.Error()))
@@ -120,7 +122,8 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	validatedData, err := a.captchaValidator.Validate(ctx, request.Params.CfTurnstileResponse, "")
+	clientIP, _ := middleware.GetClientIPFromCtx(ctx)
+	validatedData, err := a.captchaValidator.Validate(ctx, request.Params.CfTurnstileResponse, clientIP)
 	if err != nil {
 		span.RecordError(err)
 		logger.Warn("Invalid captcha", slog.String("error", err.Error()))
