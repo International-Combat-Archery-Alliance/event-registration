@@ -10,7 +10,7 @@ import (
 
 func TestPostEventsV1AdminTestMailerlite_IndividualSuccess(t *testing.T) {
 	subMgr := &mockSubscriberManager{}
-	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
+	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
 
 	emails := []types.Email{types.Email("jane.archer@example.com"), types.Email("john.doe@example.com")}
 
@@ -37,7 +37,7 @@ func TestPostEventsV1AdminTestMailerlite_IndividualSuccess(t *testing.T) {
 
 func TestPostEventsV1AdminTestMailerlite_CustomGroupName(t *testing.T) {
 	subMgr := &mockSubscriberManager{}
-	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
+	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
 
 	customName := "My Custom Group"
 	emails := []types.Email{types.Email("test@example.com")}
@@ -63,7 +63,7 @@ func TestPostEventsV1AdminTestMailerlite_CustomGroupName(t *testing.T) {
 
 func TestPostEventsV1AdminTestMailerlite_TeamSuccess(t *testing.T) {
 	subMgr := &mockSubscriberManager{}
-	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
+	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
 
 	teamName := "Test Team"
 	emails := []types.Email{
@@ -89,7 +89,7 @@ func TestPostEventsV1AdminTestMailerlite_TeamSuccess(t *testing.T) {
 
 func TestPostEventsV1AdminTestMailerlite_TeamMissingTeamName(t *testing.T) {
 	subMgr := &mockSubscriberManager{}
-	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
+	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
 
 	emails := []types.Email{types.Email("captain@example.com")}
 
@@ -113,7 +113,7 @@ func TestPostEventsV1AdminTestMailerlite_CreateGroupFailure(t *testing.T) {
 			return "", email.NewServiceError("api error", nil)
 		},
 	}
-	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenService(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
+	api := NewAPI(&mockDB{}, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, subMgr, &mockCheckoutManager{}, func(context.Context) error { return nil })
 
 	emails := []types.Email{types.Email("test@example.com")}
 
