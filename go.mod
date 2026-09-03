@@ -8,7 +8,7 @@ tool (
 )
 
 require (
-	github.com/International-Combat-Archery-Alliance/auth v0.4.1-0.20260903015020-191fdcaf55f9
+	github.com/International-Combat-Archery-Alliance/auth v0.5.0
 	github.com/International-Combat-Archery-Alliance/captcha v0.1.0
 	github.com/International-Combat-Archery-Alliance/email v0.6.0
 	github.com/International-Combat-Archery-Alliance/middleware v0.5.0
