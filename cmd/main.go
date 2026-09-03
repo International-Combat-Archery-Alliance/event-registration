@@ -146,10 +146,10 @@ func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error
 	// Phase 3: Wire up services (all instant after config is loaded)
 	// -----------------------------------------------------------------------
 
-	tokenService := token.NewTokenService(
-		cfg.JWTSigningKeys[cfg.JWTCurrentKeyID],
-		token.WithSigningKeys(cfg.JWTSigningKeys, cfg.JWTCurrentKeyID),
-	)
+	validator := token.NewKeyCache(cfg.JWKSURL)
+	if err := validator.StartupFetch(ctx); err != nil {
+		logger.Warn("jwks startup fetch failed (non-fatal); user token verification will fail closed until keys are fetched", "error", err)
+	}
 
 	cfTurnstileValidator := cfturnstile.NewValidator(httpClient, cfg.TurnstileSecretKey)
 
@@ -169,7 +169,7 @@ func setupApi(logger *slog.Logger) (*api.API, func(context.Context) error, error
 
 	stripeClient := makeStripeClient(cfg.StripeSecretKey, cfg.StripeEndpointSecret, httpClient)
 
-	eventAPI := api.NewAPI(db, logger, env, tokenService, cfTurnstileValidator, emailSender, subscriberManager, stripeClient, flushTraces)
+	eventAPI := api.NewAPI(db, logger, env, validator, cfTurnstileValidator, emailSender, subscriberManager, stripeClient, flushTraces)
 
 	return eventAPI, traceShutdown, nil
 }

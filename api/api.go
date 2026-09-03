@@ -38,12 +38,17 @@ type API struct {
 	env    Environment
 	tracer trace.Tracer
 
-	tokenService      *token.TokenService
+	tokenValidator    UserTokenValidator
 	captchaValidator  captcha.Validator
 	emailSender       email.Sender
 	subscriberManager email.SubscriberManager
 	checkoutManager   payments.CheckoutManager
 	flushTraces       func(context.Context) error
+}
+
+// UserTokenValidator verifies user access tokens against the login JWKS endpoint.
+type UserTokenValidator interface {
+	ValidateUserAccessToken(ctx context.Context, tokenString string) (*token.ICAAClaims, error)
 }
 
 var _ StrictServerInterface = (*API)(nil)
@@ -52,7 +57,7 @@ func NewAPI(
 	db DB,
 	logger *slog.Logger,
 	env Environment,
-	tokenService *token.TokenService,
+	tokenValidator UserTokenValidator,
 	captchaValidator captcha.Validator,
 	emailSender email.Sender,
 	subscriberManager email.SubscriberManager,
@@ -64,7 +69,7 @@ func NewAPI(
 		logger:            logger,
 		env:               env,
 		tracer:            otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/api"),
-		tokenService:      tokenService,
+		tokenValidator:    tokenValidator,
 		captchaValidator:  captchaValidator,
 		emailSender:       emailSender,
 		subscriberManager: subscriberManager,
