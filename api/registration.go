@@ -316,6 +316,85 @@ func (a *API) PostEventsV1AdminRegistrationsEventIdEmailConfirm(ctx context.Cont
 	}, nil
 }
 
+func (a *API) PostEventsV1AdminRegistrationsEventIdEmailNotify(ctx context.Context, request PostEventsV1AdminRegistrationsEventIdEmailNotifyRequestObject) (PostEventsV1AdminRegistrationsEventIdEmailNotifyResponseObject, error) {
+	ctx, span := a.tracer.Start(ctx, "PostEventsV1AdminRegistrationsEventIdEmailNotify")
+	defer span.End()
+
+	logger := a.getLoggerOrBaseLogger(ctx)
+
+	// Same fan-out budget as the confirm handler: one email plus one
+	// mailing-list call per player.
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+
+	emailAddr := strings.ToLower(string(request.Email))
+
+	reg, err := a.db.GetRegistration(ctx, request.EventId, emailAddr)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		logger.Error("Failed to fetch registration for notifications", "error", err, "eventId", request.EventId, "email", emailAddr)
+
+		var registrationErr *registration.Error
+		if errors.As(err, &registrationErr) && registrationErr.Reason == registration.REASON_REGISTRATION_DOES_NOT_EXIST {
+			return PostEventsV1AdminRegistrationsEventIdEmailNotify404JSONResponse{
+				Code:    NotFound,
+				Message: "Registration not found",
+			}, nil
+		}
+		return PostEventsV1AdminRegistrationsEventIdEmailNotify500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to resend notifications",
+		}, nil
+	}
+
+	if !reg.IsPaid() {
+		return PostEventsV1AdminRegistrationsEventIdEmailNotify409JSONResponse{
+			Code:    RegistrationUnpaid,
+			Message: "Registration is not paid",
+		}, nil
+	}
+
+	event, err := a.db.GetEvent(ctx, request.EventId)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		logger.Error("Failed to get event for notifications", "error", err, "eventId", request.EventId)
+
+		return PostEventsV1AdminRegistrationsEventIdEmailNotify500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to resend notifications",
+		}, nil
+	}
+
+	if err := registration.SendRegistrationNotifications(ctx, a.emailSender, a.subscriberManager, reg, event, logger); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		logger.Error("Failed to resend registration notifications", slog.String("error", err.Error()), slog.String("email", reg.GetEmail()))
+
+		return PostEventsV1AdminRegistrationsEventIdEmailNotify500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to resend notifications",
+		}, nil
+	}
+
+	respReg, err := registrationToApiRegistration(reg)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		logger.Error("Failed to convert registration to api registration", "error", err)
+
+		return PostEventsV1AdminRegistrationsEventIdEmailNotify500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to resend notifications",
+		}, nil
+	}
+
+	return PostEventsV1AdminRegistrationsEventIdEmailNotify200JSONResponse{
+		Registration: respReg,
+	}, nil
+}
+
 func apiRegistrationToRegistration(apiReg Registration, eventId uuid.UUID) (registration.Registration, error) {
 	discrim, err := apiReg.Discriminator()
 	if err != nil {

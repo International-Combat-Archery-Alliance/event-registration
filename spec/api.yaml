@@ -462,6 +462,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /events/v1/admin/registrations/{eventId}/{email}/notify:
+    post:
+      summary: Resend registration notifications
+      description: "Admin endpoint to resend the confirmation email and mailing-list signup for a paid registration, e.g. when the original send failed. Only paid registrations can be notified; 200 means the email was sent."
+      security:
+        - icaaCookieAuth: [admin]
+        - icaaBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+        - name: email
+          in: path
+          description: Email of the registration (captain email for teams)
+          required: true
+          schema:
+            type: string
+            format: email
+            example: jane.doe@example.com
+      responses:
+        '200':
+          description: Notifications were sent.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - registration
+                properties:
+                  registration:
+                    $ref: '#/components/schemas/Registration'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Registration not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Registration is not paid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /events/v1/admin/test-email:
     post:
       summary: Test email sending
@@ -931,6 +991,7 @@ components:
         - InvalidBody
         - AlreadyExists
         - RegistrationClosed
+        - RegistrationUnpaid
         - InputValidationError
         - AuthError
         - CaptchaInvalid

@@ -43,6 +43,7 @@ const (
 	LimitOutOfBounds     ErrorCode = "LimitOutOfBounds"
 	NotFound             ErrorCode = "NotFound"
 	RegistrationClosed   ErrorCode = "RegistrationClosed"
+	RegistrationUnpaid   ErrorCode = "RegistrationUnpaid"
 )
 
 // Defines values for ExperienceLevel.
@@ -357,6 +358,9 @@ type ServerInterface interface {
 	// Manually confirm a registration as paid
 	// (POST /events/v1/admin/registrations/{eventId}/{email}/confirm)
 	PostEventsV1AdminRegistrationsEventIdEmailConfirm(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, email openapi_types.Email)
+	// Resend registration notifications
+	// (POST /events/v1/admin/registrations/{eventId}/{email}/notify)
+	PostEventsV1AdminRegistrationsEventIdEmailNotify(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, email openapi_types.Email)
 	// Test email sending
 	// (POST /events/v1/admin/test-email)
 	PostEventsV1AdminTestEmail(w http.ResponseWriter, r *http.Request)
@@ -479,6 +483,48 @@ func (siw *ServerInterfaceWrapper) PostEventsV1AdminRegistrationsEventIdEmailCon
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostEventsV1AdminRegistrationsEventIdEmailConfirm(w, r, eventId, email)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostEventsV1AdminRegistrationsEventIdEmailNotify operation middleware
+func (siw *ServerInterfaceWrapper) PostEventsV1AdminRegistrationsEventIdEmailNotify(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", r.PathValue("eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "email" -------------
+	var email openapi_types.Email
+
+	err = runtime.BindStyledParameterWithOptions("simple", "email", r.PathValue("email"), &email, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "email", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, IcaaCookieAuthScopes, []string{"admin"})
+
+	ctx = context.WithValue(ctx, IcaaBearerAuthScopes, []string{"admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostEventsV1AdminRegistrationsEventIdEmailNotify(w, r, eventId, email)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -871,6 +917,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/events/v1", wrapper.GetEventsV1)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1", wrapper.PostEventsV1)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/admin/registrations/{eventId}/{email}/confirm", wrapper.PostEventsV1AdminRegistrationsEventIdEmailConfirm)
+	m.HandleFunc("POST "+options.BaseURL+"/events/v1/admin/registrations/{eventId}/{email}/notify", wrapper.PostEventsV1AdminRegistrationsEventIdEmailNotify)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/admin/test-email", wrapper.PostEventsV1AdminTestEmail)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/admin/test-mailerlite", wrapper.PostEventsV1AdminTestMailerlite)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/{eventId}/register", wrapper.PostEventsV1EventIdRegister)
@@ -999,6 +1046,62 @@ func (response PostEventsV1AdminRegistrationsEventIdEmailConfirm404JSONResponse)
 type PostEventsV1AdminRegistrationsEventIdEmailConfirm500JSONResponse Error
 
 func (response PostEventsV1AdminRegistrationsEventIdEmailConfirm500JSONResponse) VisitPostEventsV1AdminRegistrationsEventIdEmailConfirmResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1AdminRegistrationsEventIdEmailNotifyRequestObject struct {
+	EventId openapi_types.UUID  `json:"eventId"`
+	Email   openapi_types.Email `json:"email"`
+}
+
+type PostEventsV1AdminRegistrationsEventIdEmailNotifyResponseObject interface {
+	VisitPostEventsV1AdminRegistrationsEventIdEmailNotifyResponse(w http.ResponseWriter) error
+}
+
+type PostEventsV1AdminRegistrationsEventIdEmailNotify200JSONResponse struct {
+	Registration Registration `json:"registration"`
+}
+
+func (response PostEventsV1AdminRegistrationsEventIdEmailNotify200JSONResponse) VisitPostEventsV1AdminRegistrationsEventIdEmailNotifyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1AdminRegistrationsEventIdEmailNotify400JSONResponse Error
+
+func (response PostEventsV1AdminRegistrationsEventIdEmailNotify400JSONResponse) VisitPostEventsV1AdminRegistrationsEventIdEmailNotifyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1AdminRegistrationsEventIdEmailNotify404JSONResponse Error
+
+func (response PostEventsV1AdminRegistrationsEventIdEmailNotify404JSONResponse) VisitPostEventsV1AdminRegistrationsEventIdEmailNotifyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1AdminRegistrationsEventIdEmailNotify409JSONResponse Error
+
+func (response PostEventsV1AdminRegistrationsEventIdEmailNotify409JSONResponse) VisitPostEventsV1AdminRegistrationsEventIdEmailNotifyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1AdminRegistrationsEventIdEmailNotify500JSONResponse Error
+
+func (response PostEventsV1AdminRegistrationsEventIdEmailNotify500JSONResponse) VisitPostEventsV1AdminRegistrationsEventIdEmailNotifyResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1353,6 +1456,9 @@ type StrictServerInterface interface {
 	// Manually confirm a registration as paid
 	// (POST /events/v1/admin/registrations/{eventId}/{email}/confirm)
 	PostEventsV1AdminRegistrationsEventIdEmailConfirm(ctx context.Context, request PostEventsV1AdminRegistrationsEventIdEmailConfirmRequestObject) (PostEventsV1AdminRegistrationsEventIdEmailConfirmResponseObject, error)
+	// Resend registration notifications
+	// (POST /events/v1/admin/registrations/{eventId}/{email}/notify)
+	PostEventsV1AdminRegistrationsEventIdEmailNotify(ctx context.Context, request PostEventsV1AdminRegistrationsEventIdEmailNotifyRequestObject) (PostEventsV1AdminRegistrationsEventIdEmailNotifyResponseObject, error)
 	// Test email sending
 	// (POST /events/v1/admin/test-email)
 	PostEventsV1AdminTestEmail(ctx context.Context, request PostEventsV1AdminTestEmailRequestObject) (PostEventsV1AdminTestEmailResponseObject, error)
@@ -1482,6 +1588,33 @@ func (sh *strictHandler) PostEventsV1AdminRegistrationsEventIdEmailConfirm(w htt
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PostEventsV1AdminRegistrationsEventIdEmailConfirmResponseObject); ok {
 		if err := validResponse.VisitPostEventsV1AdminRegistrationsEventIdEmailConfirmResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostEventsV1AdminRegistrationsEventIdEmailNotify operation middleware
+func (sh *strictHandler) PostEventsV1AdminRegistrationsEventIdEmailNotify(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, email openapi_types.Email) {
+	var request PostEventsV1AdminRegistrationsEventIdEmailNotifyRequestObject
+
+	request.EventId = eventId
+	request.Email = email
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostEventsV1AdminRegistrationsEventIdEmailNotify(ctx, request.(PostEventsV1AdminRegistrationsEventIdEmailNotifyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostEventsV1AdminRegistrationsEventIdEmailNotify")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostEventsV1AdminRegistrationsEventIdEmailNotifyResponseObject); ok {
+		if err := validResponse.VisitPostEventsV1AdminRegistrationsEventIdEmailNotifyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1708,65 +1841,67 @@ func (sh *strictHandler) PatchEventsV1Id(w http.ResponseWriter, r *http.Request,
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"6e/5vt/F74n+/wCvEpKn9k0AAA==",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
