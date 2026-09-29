@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
@@ -199,7 +198,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 		}, nil
 	}
 
-	err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, email.Address{Name: "ICAA", Address: "info@icaa.world"}, signedUpReg, event)
+	err = registration.SendRegistrationNotifications(ctx, a.emailSender, a.subscriberManager, signedUpReg, event, logger)
 	if err != nil {
 		span.RecordError(err)
 		logger.Error("failed to send email to signed up player", slog.String("error", err.Error()), slog.String("email", reg.GetEmail()))
@@ -207,10 +206,6 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 		// TODO: Is there other error handling we should do here?
 		// I don't want to send a failed status code to the user
 		// because they did actually sign up succesfully still...
-	}
-
-	if event.MailingListGroupID != nil {
-		registration.AddToMailingList(ctx, a.subscriberManager, signedUpReg, *event.MailingListGroupID, logger)
 	}
 
 	return PostEventsV1EventIdRegister200JSONResponse{Registration: respReg}, nil
@@ -270,6 +265,54 @@ func (a *API) GetEventsV1EventIdRegistrations(ctx context.Context, request GetEv
 		Data:        respRegs,
 		Cursor:      result.Cursor,
 		HasNextPage: result.HasNextPage,
+	}, nil
+}
+
+func (a *API) PostEventsV1AdminRegistrationsEventIdEmailConfirm(ctx context.Context, request PostEventsV1AdminRegistrationsEventIdEmailConfirmRequestObject) (PostEventsV1AdminRegistrationsEventIdEmailConfirmResponseObject, error) {
+	ctx, span := a.tracer.Start(ctx, "PostEventsV1AdminRegistrationsEventIdEmailConfirm")
+	defer span.End()
+
+	logger := a.getLoggerOrBaseLogger(ctx)
+
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	emailAddr := strings.ToLower(string(request.Email))
+
+	reg, alreadyPaid, err := registration.ConfirmPaidRegistration(ctx, request.EventId, emailAddr, a.db, a.db, a.emailSender, a.subscriberManager, logger)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		logger.Error("Failed to confirm registration as paid", "error", err, "eventId", request.EventId, "email", emailAddr)
+
+		var registrationErr *registration.Error
+		if errors.As(err, &registrationErr) && registrationErr.Reason == registration.REASON_REGISTRATION_DOES_NOT_EXIST {
+			return PostEventsV1AdminRegistrationsEventIdEmailConfirm404JSONResponse{
+				Code:    NotFound,
+				Message: "Registration not found",
+			}, nil
+		}
+		return PostEventsV1AdminRegistrationsEventIdEmailConfirm500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to confirm registration",
+		}, nil
+	}
+
+	respReg, err := registrationToApiRegistration(reg)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		logger.Error("Failed to convert registration to api registration", "error", err)
+
+		return PostEventsV1AdminRegistrationsEventIdEmailConfirm500JSONResponse{
+			Code:    InternalError,
+			Message: "Failed to confirm registration",
+		}, nil
+	}
+
+	return PostEventsV1AdminRegistrationsEventIdEmailConfirm200JSONResponse{
+		Registration: respReg,
+		AlreadyPaid:  alreadyPaid,
 	}, nil
 }
 

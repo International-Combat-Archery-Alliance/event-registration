@@ -324,6 +324,43 @@ func setRegistrationToPaid(ctx context.Context, registrationRepo Repository, eve
 	return reg, err
 }
 
+func MarkRegistrationAsPaid(ctx context.Context, eventId uuid.UUID, email string, registrationRepo Repository) (Registration, bool, error) {
+	ctx, span := tracer.Start(ctx, "MarkRegistrationAsPaid")
+	defer span.End()
+
+	reg, err := registrationRepo.GetRegistration(ctx, eventId, email)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, false, err
+	}
+
+	if registrationIsPaid(reg) {
+		return reg, true, nil
+	}
+
+	reg.BumpVersion()
+	reg.SetToPaid()
+
+	if err := registrationRepo.UpdateRegistrationToPaid(ctx, reg); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, false, err
+	}
+	return reg, false, nil
+}
+
+func registrationIsPaid(reg Registration) bool {
+	switch r := reg.(type) {
+	case *IndividualRegistration:
+		return r.Paid
+	case *TeamRegistration:
+		return r.Paid
+	default:
+		return false
+	}
+}
+
 func deleteExpiredRegistration(ctx context.Context, registrationRepo Repository, eventRepo events.Repository, eventId uuid.UUID, email string) (Registration, error) {
 	reg, getRegErr := registrationRepo.GetRegistration(ctx, eventId, email)
 	regIntent, getRegIntentErr := registrationRepo.GetRegistrationIntent(ctx, eventId, email)

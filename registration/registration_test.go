@@ -934,3 +934,133 @@ func TestConfirmRegistrationPayment(t *testing.T) {
 		assert.Nil(t, result)
 	})
 }
+
+func TestMarkRegistrationAsPaid(t *testing.T) {
+	t.Run("unpaid individual registration is marked paid", func(t *testing.T) {
+		eventID := uuid.New()
+		reg := &IndividualRegistration{
+			ID:         uuid.New(),
+			Version:    1,
+			EventID:    eventID,
+			Email:      "test@test.com",
+			Paid:       false,
+			Experience: NOVICE,
+		}
+		var updatedReg Registration
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				assert.Equal(t, eventID, eventId)
+				assert.Equal(t, "test@test.com", regEmail)
+				return reg, nil
+			},
+			UpdateRegistrationToPaidFunc: func(ctx context.Context, registration Registration) error {
+				updatedReg = registration
+				return nil
+			},
+		}
+
+		result, alreadyPaid, err := MarkRegistrationAsPaid(context.Background(), eventID, "test@test.com", registrationRepo)
+		assert.NoError(t, err)
+		assert.False(t, alreadyPaid)
+		assert.NotNil(t, updatedReg)
+		assert.Equal(t, 2, result.(*IndividualRegistration).Version)
+		assert.True(t, result.(*IndividualRegistration).Paid)
+	})
+
+	t.Run("unpaid team registration is marked paid", func(t *testing.T) {
+		eventID := uuid.New()
+		reg := &TeamRegistration{
+			ID:           uuid.New(),
+			Version:      3,
+			EventID:      eventID,
+			CaptainEmail: "captain@test.com",
+			Paid:         false,
+		}
+		updateCalled := false
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				return reg, nil
+			},
+			UpdateRegistrationToPaidFunc: func(ctx context.Context, registration Registration) error {
+				updateCalled = true
+				return nil
+			},
+		}
+
+		result, alreadyPaid, err := MarkRegistrationAsPaid(context.Background(), eventID, "captain@test.com", registrationRepo)
+		assert.NoError(t, err)
+		assert.False(t, alreadyPaid)
+		assert.True(t, updateCalled)
+		assert.Equal(t, 4, result.(*TeamRegistration).Version)
+		assert.True(t, result.(*TeamRegistration).Paid)
+	})
+
+	t.Run("already paid registration is idempotent", func(t *testing.T) {
+		eventID := uuid.New()
+		reg := &IndividualRegistration{
+			ID:         uuid.New(),
+			Version:    2,
+			EventID:    eventID,
+			Email:      "paid@test.com",
+			Paid:       true,
+			Experience: NOVICE,
+		}
+		updateCalled := false
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				return reg, nil
+			},
+			UpdateRegistrationToPaidFunc: func(ctx context.Context, registration Registration) error {
+				updateCalled = true
+				return nil
+			},
+		}
+
+		result, alreadyPaid, err := MarkRegistrationAsPaid(context.Background(), eventID, "paid@test.com", registrationRepo)
+		assert.NoError(t, err)
+		assert.True(t, alreadyPaid)
+		assert.False(t, updateCalled)
+		assert.Equal(t, 2, result.(*IndividualRegistration).Version)
+	})
+
+	t.Run("registration does not exist", func(t *testing.T) {
+		eventID := uuid.New()
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				return nil, NewRegistrationDoesNotExistsError("not found", nil)
+			},
+		}
+
+		_, _, err := MarkRegistrationAsPaid(context.Background(), eventID, "missing@test.com", registrationRepo)
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_REGISTRATION_DOES_NOT_EXIST, registrationErr.Reason)
+	})
+
+	t.Run("update failure propagates", func(t *testing.T) {
+		eventID := uuid.New()
+		reg := &IndividualRegistration{
+			ID:         uuid.New(),
+			Version:    1,
+			EventID:    eventID,
+			Email:      "test@test.com",
+			Paid:       false,
+			Experience: NOVICE,
+		}
+		registrationRepo := &mockRegistrationRepository{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (Registration, error) {
+				return reg, nil
+			},
+			UpdateRegistrationToPaidFunc: func(ctx context.Context, registration Registration) error {
+				return NewFailedToWriteError("version conflict", errors.New("conflict"))
+			},
+		}
+
+		_, _, err := MarkRegistrationAsPaid(context.Background(), eventID, "test@test.com", registrationRepo)
+		assert.Error(t, err)
+		var registrationErr *Error
+		assert.True(t, errors.As(err, &registrationErr))
+		assert.Equal(t, REASON_FAILED_TO_WRITE, registrationErr.Reason)
+	})
+}
