@@ -406,7 +406,7 @@ paths:
   /events/v1/admin/registrations/{eventId}/{email}/confirm:
     post:
       summary: Manually confirm a registration as paid
-      description: Admin endpoint to mark an unpaid registration as paid when the Stripe webhook failed or can no longer be replayed. Sends the confirmation email on first confirm; repeat calls are idempotent.
+      description: "Admin endpoint to mark an unpaid payment-flow registration as paid when the Stripe webhook failed or can no longer be replayed. Sends the confirmation email on first confirm; repeat calls are idempotent. Notifications are best-effort: a 200 response guarantees the registration is paid, not that the email was delivered."
       security:
         - icaaCookieAuth: [admin]
         - icaaBearerAuth: [admin]

@@ -87,9 +87,19 @@
         "iam:GetRolePolicy",
         "iam:ListRolePolicies",
         "iam:ListAttachedRolePolicies",
-        "iam:PassRole"
+        "iam:PassRole",
+        "iam:UpdateAssumeRolePolicy"
       ],
       "Resource": "arn:aws:iam::197461532156:role/event-registration-*"
+    },
+    {
+      "Sid": "LogGroupReads",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups",
+        "logs:ListTagsLogGroup"
+      ],
+      "Resource": "*"
     },
     {
       "Sid": "LogGroup",
@@ -97,11 +107,9 @@
       "Action": [
         "logs:CreateLogGroup",
         "logs:DeleteLogGroup",
-        "logs:DescribeLogGroups",
         "logs:PutRetentionPolicy",
         "logs:TagLogGroup",
-        "logs:UntagLogGroup",
-        "logs:ListTagsLogGroup"
+        "logs:UntagLogGroup"
       ],
       "Resource": "arn:aws:logs:us-east-1:197461532156:log-group:/aws/lambda/event-registration-*"
     }

@@ -9,6 +9,11 @@ permissions:
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
 
 env:
   AWS_REGION: us-east-1

@@ -28,7 +28,8 @@ func (s *stubEmailSender) SendEmail(ctx context.Context, e email.Email) error {
 }
 
 type stubSubscriberManager struct {
-	added [][3]string
+	added  [][3]string
+	addErr error
 }
 
 func (s *stubSubscriberManager) CreateGroup(ctx context.Context, name string) (string, error) {
@@ -41,7 +42,7 @@ func (s *stubSubscriberManager) FindOrCreateGroup(ctx context.Context, name stri
 
 func (s *stubSubscriberManager) AddSubscriberToGroup(ctx context.Context, email, name, groupID string) error {
 	s.added = append(s.added, [3]string{email, name, groupID})
-	return nil
+	return s.addErr
 }
 
 func TestSendRegistrationNotifications(t *testing.T) {
@@ -280,6 +281,32 @@ func TestConfirmPaidRegistration(t *testing.T) {
 		_, alreadyPaid, err := ConfirmPaidRegistration(context.Background(), eventID, "test@test.com", registrationRepo, newEventRepo(nil, nil), sender, subscribers, noopRegistrationLogger())
 		assert.NoError(t, err)
 		assert.False(t, alreadyPaid)
+		assert.Len(t, subscribers.added, 1)
+	})
+}
+
+func TestSendRegistrationNotificationsSubscriberFailure(t *testing.T) {
+	t.Run("mailing list failure does not fail notifications", func(t *testing.T) {
+		sender := &stubEmailSender{}
+		subscribers := &stubSubscriberManager{addErr: errors.New("mailerlite down")}
+		reg := &IndividualRegistration{
+			ID:         uuid.New(),
+			Version:    2,
+			EventID:    uuid.New(),
+			Email:      "test@test.com",
+			Paid:       true,
+			Experience: NOVICE,
+			PlayerInfo: PlayerInfo{FirstName: "first", LastName: "last"},
+		}
+		event := events.Event{
+			ID:                 reg.EventID,
+			Name:               "Test Event",
+			MailingListGroupID: ptr.String("group-id"),
+		}
+
+		err := SendRegistrationNotifications(context.Background(), sender, subscribers, reg, event, noopRegistrationLogger())
+		assert.NoError(t, err)
+		assert.Len(t, sender.sent, 1)
 		assert.Len(t, subscribers.added, 1)
 	})
 }

@@ -594,6 +594,7 @@ type mockRegistration struct {
 	GetEventIDFunc  func() uuid.UUID
 	GetEmailFunc    func() string
 	TypeFunc        func() events.RegistrationType
+	IsPaidFunc      func() bool
 	SetToPaidFunc   func()
 	BumpVersionFunc func()
 }
@@ -608,6 +609,13 @@ func (m *mockRegistration) GetEmail() string {
 
 func (m *mockRegistration) Type() events.RegistrationType {
 	return m.TypeFunc()
+}
+
+func (m *mockRegistration) IsPaid() bool {
+	if m.IsPaidFunc != nil {
+		return m.IsPaidFunc()
+	}
+	return false
 }
 
 func (m *mockRegistration) SetToPaid() {

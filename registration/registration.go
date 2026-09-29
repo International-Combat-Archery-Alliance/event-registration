@@ -38,6 +38,7 @@ type Registration interface {
 	GetEventID() uuid.UUID
 	GetEmail() string
 	Type() events.RegistrationType
+	IsPaid() bool
 	SetToPaid()
 	BumpVersion()
 }
@@ -66,6 +67,10 @@ func (r IndividualRegistration) GetEmail() string {
 
 func (r IndividualRegistration) Type() events.RegistrationType {
 	return events.BY_INDIVIDUAL
+}
+
+func (r IndividualRegistration) IsPaid() bool {
+	return r.Paid
 }
 
 func (r *IndividualRegistration) SetToPaid() {
@@ -100,6 +105,10 @@ func (r TeamRegistration) GetEmail() string {
 
 func (r TeamRegistration) Type() events.RegistrationType {
 	return events.BY_TEAM
+}
+
+func (r TeamRegistration) IsPaid() bool {
+	return r.Paid
 }
 
 func (r *TeamRegistration) SetToPaid() {
@@ -335,30 +344,18 @@ func MarkRegistrationAsPaid(ctx context.Context, eventId uuid.UUID, email string
 		return nil, false, err
 	}
 
-	if registrationIsPaid(reg) {
-		return reg, true, nil
-	}
+	if !reg.IsPaid() {
+		reg.BumpVersion()
+		reg.SetToPaid()
 
-	reg.BumpVersion()
-	reg.SetToPaid()
-
-	if err := registrationRepo.UpdateRegistrationToPaid(ctx, reg); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return nil, false, err
+		if err := registrationRepo.UpdateRegistrationToPaid(ctx, reg); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return nil, false, err
+		}
+		return reg, false, nil
 	}
-	return reg, false, nil
-}
-
-func registrationIsPaid(reg Registration) bool {
-	switch r := reg.(type) {
-	case *IndividualRegistration:
-		return r.Paid
-	case *TeamRegistration:
-		return r.Paid
-	default:
-		return false
-	}
+	return reg, true, nil
 }
 
 func deleteExpiredRegistration(ctx context.Context, registrationRepo Repository, eventRepo events.Repository, eventId uuid.UUID, email string) (Registration, error) {

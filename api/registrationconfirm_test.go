@@ -241,3 +241,54 @@ func TestPostEventsV1AdminRegistrationsEventIdEmailConfirm(t *testing.T) {
 		}
 	})
 }
+
+func TestPostEventsV1AdminRegistrationsEventIdEmailConfirmTeam(t *testing.T) {
+	t.Run("team registration is confirmed via captain email", func(t *testing.T) {
+		eventID := uuid.New()
+		reg := &registration.TeamRegistration{
+			ID:           uuid.New(),
+			Version:      1,
+			EventID:      eventID,
+			TeamName:     "Test Team",
+			HomeCity:     "test city",
+			CaptainEmail: "captain@test.com",
+			Paid:         false,
+			Players: []registration.PlayerInfo{
+				{FirstName: "Player1", LastName: "One"},
+			},
+			RegisteredAt: time.Now(),
+		}
+		var lookedUpEmail string
+		mock := &mockDB{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (registration.Registration, error) {
+				lookedUpEmail = regEmail
+				return reg, nil
+			},
+			UpdateRegistrationToPaidFunc: func(ctx context.Context, r registration.Registration) error {
+				return nil
+			},
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{ID: eventID, Name: "Test Event"}, nil
+			},
+		}
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockSubscriberManager{}, &mockCheckoutManagerReg{}, func(context.Context) error { return nil })
+
+		resp, err := api.PostEventsV1AdminRegistrationsEventIdEmailConfirm(ctxWithLogger(context.Background(), noopLogger), PostEventsV1AdminRegistrationsEventIdEmailConfirmRequestObject{
+			EventId: eventID,
+			Email:   "CAPTAIN@test.com",
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "captain@test.com", lookedUpEmail)
+
+		switch r := resp.(type) {
+		case PostEventsV1AdminRegistrationsEventIdEmailConfirm200JSONResponse:
+			assert.False(t, r.AlreadyPaid)
+			teamReg, err := r.Registration.AsTeamRegistration()
+			require.NoError(t, err)
+			require.NotNil(t, teamReg.Paid)
+			assert.True(t, *teamReg.Paid)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+}

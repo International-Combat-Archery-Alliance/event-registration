@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
-	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
+	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/google/uuid"
 	"github.com/oapi-codegen/runtime/types"
 	"go.opentelemetry.io/otel/codes"
