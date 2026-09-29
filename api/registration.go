@@ -118,7 +118,9 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 
 	logger := a.getLoggerOrBaseLogger(ctx)
 
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	// Notifications fan out to one email plus one mailing-list call per
+	// player, so this needs a larger budget than the Dynamo-only handlers.
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 
 	clientIP, _ := middleware.GetClientIPFromCtx(ctx)
@@ -274,7 +276,9 @@ func (a *API) PostEventsV1AdminRegistrationsEventIdEmailConfirm(ctx context.Cont
 
 	logger := a.getLoggerOrBaseLogger(ctx)
 
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	// Same fan-out budget as above: confirm sends one email plus one
+	// mailing-list call per player after marking the registration paid.
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 
 	emailAddr := strings.ToLower(string(request.Email))
