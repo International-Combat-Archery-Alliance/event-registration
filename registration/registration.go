@@ -38,6 +38,7 @@ type Registration interface {
 	GetEventID() uuid.UUID
 	GetEmail() string
 	Type() events.RegistrationType
+	IsPaid() bool
 	SetToPaid()
 	BumpVersion()
 }
@@ -66,6 +67,10 @@ func (r IndividualRegistration) GetEmail() string {
 
 func (r IndividualRegistration) Type() events.RegistrationType {
 	return events.BY_INDIVIDUAL
+}
+
+func (r IndividualRegistration) IsPaid() bool {
+	return r.Paid
 }
 
 func (r *IndividualRegistration) SetToPaid() {
@@ -100,6 +105,10 @@ func (r TeamRegistration) GetEmail() string {
 
 func (r TeamRegistration) Type() events.RegistrationType {
 	return events.BY_TEAM
+}
+
+func (r TeamRegistration) IsPaid() bool {
+	return r.Paid
 }
 
 func (r *TeamRegistration) SetToPaid() {
@@ -322,6 +331,31 @@ func setRegistrationToPaid(ctx context.Context, registrationRepo Repository, eve
 
 	err = registrationRepo.UpdateRegistrationToPaid(ctx, reg)
 	return reg, err
+}
+
+func MarkRegistrationAsPaid(ctx context.Context, eventId uuid.UUID, email string, registrationRepo Repository) (Registration, bool, error) {
+	ctx, span := tracer.Start(ctx, "MarkRegistrationAsPaid")
+	defer span.End()
+
+	reg, err := registrationRepo.GetRegistration(ctx, eventId, email)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, false, err
+	}
+
+	if !reg.IsPaid() {
+		reg.BumpVersion()
+		reg.SetToPaid()
+
+		if err := registrationRepo.UpdateRegistrationToPaid(ctx, reg); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return nil, false, err
+		}
+		return reg, false, nil
+	}
+	return reg, true, nil
 }
 
 func deleteExpiredRegistration(ctx context.Context, registrationRepo Repository, eventRepo events.Repository, eventId uuid.UUID, email string) (Registration, error) {

@@ -72,9 +72,14 @@ func (m *mockCaptchaValidator) Validate(ctx context.Context, token string, remot
 	return &mockCaptchaValidatedData{}, nil
 }
 
-type mockEmailSender struct{}
+type mockEmailSender struct {
+	SendEmailFunc func(ctx context.Context, e email.Email) error
+}
 
 func (m *mockEmailSender) SendEmail(ctx context.Context, e email.Email) error {
+	if m.SendEmailFunc != nil {
+		return m.SendEmailFunc(ctx, e)
+	}
 	return nil
 }
 

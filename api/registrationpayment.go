@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
@@ -74,29 +73,7 @@ func (a *API) stripeRegistrationPaymentWebhookMiddleware(path string) middleware
 			return
 		}
 
-		event, err := a.db.GetEvent(ctx, reg.GetEventID())
-		if err != nil {
-			span.RecordError(err)
-			logger.Error("Failed to get event ID to send email with", slog.String("error", err.Error()))
-
-			// TODO: Probably want better error handling here
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		err = registration.SendRegistrationConfirmationEmail(ctx, a.emailSender, email.Address{Name: "ICAA", Address: "info@icaa.world"}, reg, event)
-		if err != nil {
-			span.RecordError(err)
-			logger.Error("failed to send email to signed up player", slog.String("error", err.Error()), slog.String("email", reg.GetEmail()))
-
-			// TODO: Is there other error handling we should do here?
-			// I don't want to send a failed status code to the user
-			// because they did actually sign up succesfully still...
-		}
-
-		if event.MailingListGroupID != nil {
-			registration.AddToMailingList(ctx, a.subscriberManager, reg, *event.MailingListGroupID, logger)
-		}
+		registration.NotifyRegistration(ctx, a.db, a.emailSender, a.subscriberManager, reg, logger)
 
 		w.WriteHeader(http.StatusOK)
 	})

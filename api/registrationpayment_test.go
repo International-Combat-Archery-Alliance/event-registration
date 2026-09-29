@@ -7,7 +7,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	mail "github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/payments"
@@ -167,12 +169,12 @@ func TestStripeRegistrationPaymentWebhookMiddleware(t *testing.T) {
 		mockCheckout := &mockCheckoutManager{
 			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
 				return map[string]string{
-						"EMAIL":    email,
-						"EVENT_ID": eventID.String(),
-					}, &registration.Error{
-						Reason:  registration.REASON_REGISTRATION_EXPIRED,
-						Message: "Registration expired",
-					}
+					"EMAIL":    email,
+					"EVENT_ID": eventID.String(),
+				}, &registration.Error{
+					Reason:  registration.REASON_REGISTRATION_EXPIRED,
+					Message: "Registration expired",
+				}
 			},
 		}
 
@@ -190,5 +192,131 @@ func TestStripeRegistrationPaymentWebhookMiddleware(t *testing.T) {
 		handler.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code) // Should return OK for expired registrations
+	})
+}
+
+func TestStripeRegistrationPaymentWebhookNotifications(t *testing.T) {
+	t.Run("successful payment sends confirmation email", func(t *testing.T) {
+		eventID := uuid.New()
+		email := "webhook@example.com"
+
+		reg := &registration.IndividualRegistration{
+			ID:           uuid.New(),
+			EventID:      eventID,
+			Email:        email,
+			Version:      1,
+			Paid:         false,
+			HomeCity:     "test city",
+			Experience:   registration.NOVICE,
+			PlayerInfo:   registration.PlayerInfo{FirstName: "first", LastName: "last"},
+			RegisteredAt: time.Now(),
+		}
+
+		mockDB := &mockDB{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (registration.Registration, error) {
+				return reg, nil
+			},
+			UpdateRegistrationToPaidFunc: func(ctx context.Context, registration registration.Registration) error {
+				return nil
+			},
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{ID: eventID, Name: "Test Event"}, nil
+			},
+		}
+
+		mockCheckout := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				return map[string]string{
+					"EMAIL":     email,
+					"EVENT_ID":  eventID.String(),
+					"ITEM_TYPE": "event_registration",
+				}, nil
+			},
+		}
+
+		emailSent := false
+		emailSender := &mockEmailSender{
+			SendEmailFunc: func(ctx context.Context, e mail.Email) error {
+				emailSent = true
+				assert.Equal(t, []string{email}, e.ToAddresses)
+				return nil
+			},
+		}
+
+		api := NewAPI(mockDB, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, emailSender, &mockSubscriberManager{}, mockCheckout, func(context.Context) error { return nil })
+
+		middleware := api.stripeRegistrationPaymentWebhookMiddleware("/test/webhook")
+		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+
+		req := httptest.NewRequest("POST", "/test/webhook", strings.NewReader("test_payload"))
+		req.Header.Set("Stripe-Signature", "test_signature")
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, emailSent)
+	})
+
+	t.Run("event fetch failure still returns OK without email", func(t *testing.T) {
+		eventID := uuid.New()
+		email := "webhook@example.com"
+
+		reg := &registration.IndividualRegistration{
+			ID:         uuid.New(),
+			EventID:    eventID,
+			Email:      email,
+			Version:    1,
+			Paid:       false,
+			Experience: registration.NOVICE,
+		}
+
+		mockDB := &mockDB{
+			GetRegistrationFunc: func(ctx context.Context, eventId uuid.UUID, regEmail string) (registration.Registration, error) {
+				return reg, nil
+			},
+			UpdateRegistrationToPaidFunc: func(ctx context.Context, registration registration.Registration) error {
+				return nil
+			},
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{}, errors.New("some error")
+			},
+		}
+
+		mockCheckout := &mockCheckoutManager{
+			ConfirmCheckoutFunc: func(ctx context.Context, payload []byte, signature string) (map[string]string, error) {
+				return map[string]string{
+					"EMAIL":     email,
+					"EVENT_ID":  eventID.String(),
+					"ITEM_TYPE": "event_registration",
+				}, nil
+			},
+		}
+
+		emailSent := false
+		emailSender := &mockEmailSender{
+			SendEmailFunc: func(ctx context.Context, e mail.Email) error {
+				emailSent = true
+				return nil
+			},
+		}
+
+		api := NewAPI(mockDB, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, emailSender, &mockSubscriberManager{}, mockCheckout, func(context.Context) error { return nil })
+
+		middleware := api.stripeRegistrationPaymentWebhookMiddleware("/test/webhook")
+		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+
+		req := httptest.NewRequest("POST", "/test/webhook", strings.NewReader("test_payload"))
+		req.Header.Set("Stripe-Signature", "test_signature")
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.False(t, emailSent)
 	})
 }

@@ -403,6 +403,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /events/v1/admin/registrations/{eventId}/{email}/confirm:
+    post:
+      summary: Manually confirm a registration as paid
+      description: "Admin endpoint to mark an unpaid payment-flow registration as paid when the Stripe webhook failed or can no longer be replayed. Sends the confirmation email on first confirm; repeat calls are idempotent. Notifications are best-effort: a 200 response guarantees the registration is paid, not that the email was delivered."
+      security:
+        - icaaCookieAuth: [admin]
+        - icaaBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+        - name: email
+          in: path
+          description: Email of the registration (captain email for teams)
+          required: true
+          schema:
+            type: string
+            format: email
+            example: jane.doe@example.com
+      responses:
+        '200':
+          description: The confirmed registration.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - registration
+                  - alreadyPaid
+                properties:
+                  registration:
+                    $ref: '#/components/schemas/Registration'
+                  alreadyPaid:
+                    type: boolean
+                    description: True if the registration was already paid before this call.
+                    example: false
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Registration not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /events/v1/admin/test-email:
     post:
       summary: Test email sending
