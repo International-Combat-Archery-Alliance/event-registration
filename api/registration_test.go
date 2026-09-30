@@ -629,3 +629,25 @@ func (m *mockRegistration) BumpVersion() {
 		m.BumpVersionFunc()
 	}
 }
+
+func TestIsAllowedCaptchaHostname(t *testing.T) {
+	tests := []struct {
+		hostname string
+		allowed  bool
+	}{
+		{"icaa.world", true},
+		{"www.icaa.world", true},
+		{"WWW.ICAA.WORLD", true},
+		{"events.icaa.world", true},
+		{"evil.com", false},
+		{"www.icaa.world.evil.com", false},
+		{"icaa.world.evil.com", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.hostname, func(t *testing.T) {
+			assert.Equal(t, tt.allowed, isAllowedCaptchaHostname(tt.hostname))
+		})
+	}
+}

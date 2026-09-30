@@ -37,7 +37,7 @@ func (a *API) PostEventsV1EventIdRegistrations(ctx context.Context, request Post
 			Message: "Invalid captcha",
 		}, nil
 	}
-	if a.env == PROD && validatedData.Hostname() != "icaa.world" {
+	if a.env == PROD && !isAllowedCaptchaHostname(validatedData.Hostname()) {
 		logger.Warn("Invalid captcha hostname", slog.String("givenHostname", validatedData.Hostname()))
 
 		return PostEventsV1EventIdRegistrations400JSONResponse{
@@ -134,7 +134,7 @@ func (a *API) PostEventsV1EventIdRegister(ctx context.Context, request PostEvent
 			Message: "Invalid captcha",
 		}, nil
 	}
-	if a.env == PROD && validatedData.Hostname() != "icaa.world" {
+	if a.env == PROD && !isAllowedCaptchaHostname(validatedData.Hostname()) {
 		logger.Warn("Invalid captcha hostname", slog.String("givenHostname", validatedData.Hostname()))
 
 		return PostEventsV1EventIdRegister400JSONResponse{
@@ -397,6 +397,11 @@ func (a *API) PostEventsV1AdminRegistrationsEventIdEmailNotify(ctx context.Conte
 	return PostEventsV1AdminRegistrationsEventIdEmailNotify200JSONResponse{
 		Registration: respReg,
 	}, nil
+}
+
+func isAllowedCaptchaHostname(hostname string) bool {
+	hostname = strings.ToLower(hostname)
+	return hostname == "icaa.world" || strings.HasSuffix(hostname, ".icaa.world")
 }
 
 func apiRegistrationToRegistration(apiReg Registration, eventId uuid.UUID) (registration.Registration, error) {
