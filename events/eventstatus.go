@@ -6,8 +6,7 @@ package events
 // running (schedules can be generated). FINALIZED means results are locked
 // (game edits must go through unfinalize → edit → finalize).
 //
-// Registration close stays time-based (registrationCloseTime); moving an
-// event to IN_PROGRESS does NOT auto-close registration (D8).
+// Registration close is solely time-based via registrationCloseTime (D8).
 type EventStatus string
 
 const (
