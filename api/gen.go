@@ -35,6 +35,7 @@ const (
 	AlreadyExists        ErrorCode = "AlreadyExists"
 	AuthError            ErrorCode = "AuthError"
 	CaptchaInvalid       ErrorCode = "CaptchaInvalid"
+	Conflict             ErrorCode = "Conflict"
 	EmptyBody            ErrorCode = "EmptyBody"
 	InputValidationError ErrorCode = "InputValidationError"
 	InternalError        ErrorCode = "InternalError"
@@ -60,12 +61,46 @@ const (
 	Novice       ExperienceLevel = "Novice"
 )
 
+// Defines values for GameForfeitSide.
+const (
+	GameForfeitSideA GameForfeitSide = "A"
+	GameForfeitSideB GameForfeitSide = "B"
+)
+
+// Defines values for GameFormat.
+const (
+	ROUNDROBIN GameFormat = "ROUND_ROBIN"
+	SWISS      GameFormat = "SWISS"
+)
+
+// Defines values for GamePhase.
+const (
+	PLAYOFF    GamePhase = "PLAYOFF"
+	QUALIFYING GamePhase = "QUALIFYING"
+)
+
+// Defines values for GameStatus.
+const (
+	BYE           GameStatus = "BYE"
+	CANCELLED     GameStatus = "CANCELLED"
+	COMPLETED     GameStatus = "COMPLETED"
+	DOUBLEFORFEIT GameStatus = "DOUBLE_FORFEIT"
+	FORFEIT       GameStatus = "FORFEIT"
+	SCHEDULED     GameStatus = "SCHEDULED"
+)
+
 // Defines values for ParticipationStatus.
 const (
 	CONFIRMED  ParticipationStatus = "CONFIRMED"
 	DNS        ParticipationStatus = "DNS"
 	REGISTERED ParticipationStatus = "REGISTERED"
 	WITHDRAWN  ParticipationStatus = "WITHDRAWN"
+)
+
+// Defines values for PutGameRequestForfeitSide.
+const (
+	PutGameRequestForfeitSideA PutGameRequestForfeitSide = "A"
+	PutGameRequestForfeitSideB PutGameRequestForfeitSide = "B"
 )
 
 // Defines values for RegistrationType.
@@ -143,6 +178,55 @@ type EventStatus string
 // ExperienceLevel defines model for ExperienceLevel.
 type ExperienceLevel string
 
+// Game defines model for Game.
+type Game struct {
+	EventId     *openapi_types.UUID `json:"eventId,omitempty"`
+	ForfeitSide *GameForfeitSide    `json:"forfeitSide"`
+	Id          *openapi_types.UUID `json:"id,omitempty"`
+	Phase       GamePhase           `json:"phase"`
+	Round       int                 `json:"round"`
+	ScoreA      *int                `json:"scoreA"`
+	ScoreB      *int                `json:"scoreB"`
+	Seq         int                 `json:"seq"`
+	SideA       GameSide            `json:"sideA"`
+	SideB       GameSide            `json:"sideB"`
+	Status      GameStatus          `json:"status"`
+	Version     *int                `json:"version,omitempty"`
+}
+
+// GameForfeitSide defines model for Game.ForfeitSide.
+type GameForfeitSide string
+
+// GameFormat defines model for GameFormat.
+type GameFormat string
+
+// GamePhase defines model for GamePhase.
+type GamePhase string
+
+// GameSide defines model for GameSide.
+type GameSide struct {
+	IsBye    *bool               `json:"isBye,omitempty"`
+	TeamId   *openapi_types.UUID `json:"teamId"`
+	TeamName *string             `json:"teamName"`
+}
+
+// GameStatus defines model for GameStatus.
+type GameStatus string
+
+// GenerateRequest defines model for GenerateRequest.
+type GenerateRequest struct {
+	Format GameFormat `json:"format"`
+
+	// Mirror Double round robin with swapped sides (ROUND_ROBIN only).
+	Mirror *bool `json:"mirror,omitempty"`
+
+	// Replace Delete unplayed games before regenerating (ROUND_ROBIN only; Swiss rounds append). Refused when any game holds a result.
+	Replace *bool `json:"replace,omitempty"`
+
+	// Round Swiss round to generate; defaults to the next unplayed round.
+	Round *int `json:"round,omitempty"`
+}
+
 // IndividualRegistration defines model for IndividualRegistration.
 type IndividualRegistration struct {
 	Email            openapi_types.Email `json:"email"`
@@ -195,6 +279,20 @@ type PlayerInfo struct {
 	LastName  string               `json:"lastName"`
 }
 
+// PutGameRequest defines model for PutGameRequest.
+type PutGameRequest struct {
+	ForfeitSide *PutGameRequestForfeitSide `json:"forfeitSide"`
+	ScoreA      *int                       `json:"scoreA"`
+	ScoreB      *int                       `json:"scoreB"`
+	Status      GameStatus                 `json:"status"`
+
+	// Version Expected game version for optimistic concurrency.
+	Version int `json:"version"`
+}
+
+// PutGameRequestForfeitSide defines model for PutGameRequest.ForfeitSide.
+type PutGameRequestForfeitSide string
+
 // Range defines model for Range.
 type Range struct {
 	Max int `json:"max"`
@@ -221,6 +319,22 @@ type SignUpStats struct {
 	NumRosteredPlayers int `json:"numRosteredPlayers"`
 	NumTeams           int `json:"numTeams"`
 	NumTotalPlayers    int `json:"numTotalPlayers"`
+}
+
+// Standing defines model for Standing.
+type Standing struct {
+	Dns    bool `json:"dns"`
+	Gp     int  `json:"gp"`
+	Losses int  `json:"losses"`
+	Net    int  `json:"net"`
+	Pa     int  `json:"pa"`
+	Pf     int  `json:"pf"`
+
+	// Rank 1-based qualifying order; zero when DNS.
+	Rank     int                `json:"rank"`
+	TeamId   openapi_types.UUID `json:"teamId"`
+	TeamName string             `json:"teamName"`
+	Wins     int                `json:"wins"`
 }
 
 // Team defines model for Team.
@@ -313,6 +427,12 @@ type PostEventsV1AdminTestMailerliteJSONRequestBody PostEventsV1AdminTestMailerl
 
 // PostEventsV1TeamsJSONRequestBody defines body for PostEventsV1Teams for application/json ContentType.
 type PostEventsV1TeamsJSONRequestBody = Team
+
+// PostEventsV1EventIdGamesGenerateJSONRequestBody defines body for PostEventsV1EventIdGamesGenerate for application/json ContentType.
+type PostEventsV1EventIdGamesGenerateJSONRequestBody = GenerateRequest
+
+// PutEventsV1EventIdGamesGameIdJSONRequestBody defines body for PutEventsV1EventIdGamesGameId for application/json ContentType.
+type PutEventsV1EventIdGamesGameIdJSONRequestBody = PutGameRequest
 
 // PostEventsV1EventIdRegisterJSONRequestBody defines body for PostEventsV1EventIdRegister for application/json ContentType.
 type PostEventsV1EventIdRegisterJSONRequestBody = Registration
@@ -438,6 +558,15 @@ type ServerInterface interface {
 	// Get a team
 	// (GET /events/v1/teams/{teamId})
 	GetEventsV1TeamsTeamId(w http.ResponseWriter, r *http.Request, teamId openapi_types.UUID)
+	// Get an event schedule
+	// (GET /events/v1/{eventId}/games)
+	GetEventsV1EventIdGames(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID)
+	// Generate a schedule from CONFIRMED teams
+	// (POST /events/v1/{eventId}/games/generate)
+	PostEventsV1EventIdGamesGenerate(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID)
+	// Enter a game score/status
+	// (PUT /events/v1/{eventId}/games/{gameId})
+	PutEventsV1EventIdGamesGameId(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, gameId openapi_types.UUID)
 	// Sign up for an event
 	// (POST /events/v1/{eventId}/register)
 	PostEventsV1EventIdRegister(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, params PostEventsV1EventIdRegisterParams)
@@ -447,6 +576,9 @@ type ServerInterface interface {
 	// Sign up for an event
 	// (POST /events/v1/{eventId}/registrations)
 	PostEventsV1EventIdRegistrations(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, params PostEventsV1EventIdRegistrationsParams)
+	// Get derived standings
+	// (GET /events/v1/{eventId}/standings)
+	GetEventsV1EventIdStandings(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID)
 	// Seed a CONFIRMED participation (MVP admin bypass)
 	// (POST /events/v1/{eventId}/teams/{teamId}/seed)
 	PostEventsV1EventIdTeamsTeamIdSeed(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, teamId openapi_types.UUID)
@@ -699,6 +831,106 @@ func (siw *ServerInterfaceWrapper) GetEventsV1TeamsTeamId(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// GetEventsV1EventIdGames operation middleware
+func (siw *ServerInterfaceWrapper) GetEventsV1EventIdGames(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", r.PathValue("eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEventsV1EventIdGames(w, r, eventId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostEventsV1EventIdGamesGenerate operation middleware
+func (siw *ServerInterfaceWrapper) PostEventsV1EventIdGamesGenerate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", r.PathValue("eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, IcaaCookieAuthScopes, []string{"admin"})
+
+	ctx = context.WithValue(ctx, IcaaBearerAuthScopes, []string{"admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostEventsV1EventIdGamesGenerate(w, r, eventId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutEventsV1EventIdGamesGameId operation middleware
+func (siw *ServerInterfaceWrapper) PutEventsV1EventIdGamesGameId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", r.PathValue("eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "gameId" -------------
+	var gameId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "gameId", r.PathValue("gameId"), &gameId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "gameId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, IcaaCookieAuthScopes, []string{"admin"})
+
+	ctx = context.WithValue(ctx, IcaaBearerAuthScopes, []string{"admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutEventsV1EventIdGamesGameId(w, r, eventId, gameId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostEventsV1EventIdRegister operation middleware
 func (siw *ServerInterfaceWrapper) PostEventsV1EventIdRegister(w http.ResponseWriter, r *http.Request) {
 
@@ -848,6 +1080,31 @@ func (siw *ServerInterfaceWrapper) PostEventsV1EventIdRegistrations(w http.Respo
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostEventsV1EventIdRegistrations(w, r, eventId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEventsV1EventIdStandings operation middleware
+func (siw *ServerInterfaceWrapper) GetEventsV1EventIdStandings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", r.PathValue("eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEventsV1EventIdStandings(w, r, eventId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1085,9 +1342,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/admin/test-mailerlite", wrapper.PostEventsV1AdminTestMailerlite)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/teams", wrapper.PostEventsV1Teams)
 	m.HandleFunc("GET "+options.BaseURL+"/events/v1/teams/{teamId}", wrapper.GetEventsV1TeamsTeamId)
+	m.HandleFunc("GET "+options.BaseURL+"/events/v1/{eventId}/games", wrapper.GetEventsV1EventIdGames)
+	m.HandleFunc("POST "+options.BaseURL+"/events/v1/{eventId}/games/generate", wrapper.PostEventsV1EventIdGamesGenerate)
+	m.HandleFunc("PUT "+options.BaseURL+"/events/v1/{eventId}/games/{gameId}", wrapper.PutEventsV1EventIdGamesGameId)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/{eventId}/register", wrapper.PostEventsV1EventIdRegister)
 	m.HandleFunc("GET "+options.BaseURL+"/events/v1/{eventId}/registrations", wrapper.GetEventsV1EventIdRegistrations)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/{eventId}/registrations", wrapper.PostEventsV1EventIdRegistrations)
+	m.HandleFunc("GET "+options.BaseURL+"/events/v1/{eventId}/standings", wrapper.GetEventsV1EventIdStandings)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/{eventId}/teams/{teamId}/seed", wrapper.PostEventsV1EventIdTeamsTeamIdSeed)
 	m.HandleFunc("GET "+options.BaseURL+"/events/v1/{id}", wrapper.GetEventsV1Id)
 	m.HandleFunc("PATCH "+options.BaseURL+"/events/v1/{id}", wrapper.PatchEventsV1Id)
@@ -1436,6 +1697,165 @@ func (response GetEventsV1TeamsTeamId500JSONResponse) VisitGetEventsV1TeamsTeamI
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetEventsV1EventIdGamesRequestObject struct {
+	EventId openapi_types.UUID `json:"eventId"`
+}
+
+type GetEventsV1EventIdGamesResponseObject interface {
+	VisitGetEventsV1EventIdGamesResponse(w http.ResponseWriter) error
+}
+
+type GetEventsV1EventIdGames200JSONResponse struct {
+	Games []Game `json:"games"`
+}
+
+func (response GetEventsV1EventIdGames200JSONResponse) VisitGetEventsV1EventIdGamesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdGames400JSONResponse Error
+
+func (response GetEventsV1EventIdGames400JSONResponse) VisitGetEventsV1EventIdGamesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdGames404JSONResponse Error
+
+func (response GetEventsV1EventIdGames404JSONResponse) VisitGetEventsV1EventIdGamesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdGames500JSONResponse Error
+
+func (response GetEventsV1EventIdGames500JSONResponse) VisitGetEventsV1EventIdGamesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdGamesGenerateRequestObject struct {
+	EventId openapi_types.UUID `json:"eventId"`
+	Body    *PostEventsV1EventIdGamesGenerateJSONRequestBody
+}
+
+type PostEventsV1EventIdGamesGenerateResponseObject interface {
+	VisitPostEventsV1EventIdGamesGenerateResponse(w http.ResponseWriter) error
+}
+
+type PostEventsV1EventIdGamesGenerate200JSONResponse struct {
+	Games []Game `json:"games"`
+}
+
+func (response PostEventsV1EventIdGamesGenerate200JSONResponse) VisitPostEventsV1EventIdGamesGenerateResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdGamesGenerate400JSONResponse Error
+
+func (response PostEventsV1EventIdGamesGenerate400JSONResponse) VisitPostEventsV1EventIdGamesGenerateResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdGamesGenerate404JSONResponse Error
+
+func (response PostEventsV1EventIdGamesGenerate404JSONResponse) VisitPostEventsV1EventIdGamesGenerateResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdGamesGenerate409JSONResponse Error
+
+func (response PostEventsV1EventIdGamesGenerate409JSONResponse) VisitPostEventsV1EventIdGamesGenerateResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1EventIdGamesGenerate500JSONResponse Error
+
+func (response PostEventsV1EventIdGamesGenerate500JSONResponse) VisitPostEventsV1EventIdGamesGenerateResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutEventsV1EventIdGamesGameIdRequestObject struct {
+	EventId openapi_types.UUID `json:"eventId"`
+	GameId  openapi_types.UUID `json:"gameId"`
+	Body    *PutEventsV1EventIdGamesGameIdJSONRequestBody
+}
+
+type PutEventsV1EventIdGamesGameIdResponseObject interface {
+	VisitPutEventsV1EventIdGamesGameIdResponse(w http.ResponseWriter) error
+}
+
+type PutEventsV1EventIdGamesGameId200JSONResponse struct {
+	Game Game `json:"game"`
+}
+
+func (response PutEventsV1EventIdGamesGameId200JSONResponse) VisitPutEventsV1EventIdGamesGameIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutEventsV1EventIdGamesGameId400JSONResponse Error
+
+func (response PutEventsV1EventIdGamesGameId400JSONResponse) VisitPutEventsV1EventIdGamesGameIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutEventsV1EventIdGamesGameId404JSONResponse Error
+
+func (response PutEventsV1EventIdGamesGameId404JSONResponse) VisitPutEventsV1EventIdGamesGameIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutEventsV1EventIdGamesGameId409JSONResponse Error
+
+func (response PutEventsV1EventIdGamesGameId409JSONResponse) VisitPutEventsV1EventIdGamesGameIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutEventsV1EventIdGamesGameId500JSONResponse Error
+
+func (response PutEventsV1EventIdGamesGameId500JSONResponse) VisitPutEventsV1EventIdGamesGameIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type PostEventsV1EventIdRegisterRequestObject struct {
 	EventId openapi_types.UUID `json:"eventId"`
 	Params  PostEventsV1EventIdRegisterParams
@@ -1602,6 +2022,52 @@ func (response PostEventsV1EventIdRegistrations409JSONResponse) VisitPostEventsV
 type PostEventsV1EventIdRegistrations500JSONResponse Error
 
 func (response PostEventsV1EventIdRegistrations500JSONResponse) VisitPostEventsV1EventIdRegistrationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdStandingsRequestObject struct {
+	EventId openapi_types.UUID `json:"eventId"`
+}
+
+type GetEventsV1EventIdStandingsResponseObject interface {
+	VisitGetEventsV1EventIdStandingsResponse(w http.ResponseWriter) error
+}
+
+type GetEventsV1EventIdStandings200JSONResponse struct {
+	Standings []Standing `json:"standings"`
+}
+
+func (response GetEventsV1EventIdStandings200JSONResponse) VisitGetEventsV1EventIdStandingsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdStandings400JSONResponse Error
+
+func (response GetEventsV1EventIdStandings400JSONResponse) VisitGetEventsV1EventIdStandingsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdStandings404JSONResponse Error
+
+func (response GetEventsV1EventIdStandings404JSONResponse) VisitGetEventsV1EventIdStandingsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1EventIdStandings500JSONResponse Error
+
+func (response GetEventsV1EventIdStandings500JSONResponse) VisitGetEventsV1EventIdStandingsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1783,6 +2249,15 @@ type StrictServerInterface interface {
 	// Get a team
 	// (GET /events/v1/teams/{teamId})
 	GetEventsV1TeamsTeamId(ctx context.Context, request GetEventsV1TeamsTeamIdRequestObject) (GetEventsV1TeamsTeamIdResponseObject, error)
+	// Get an event schedule
+	// (GET /events/v1/{eventId}/games)
+	GetEventsV1EventIdGames(ctx context.Context, request GetEventsV1EventIdGamesRequestObject) (GetEventsV1EventIdGamesResponseObject, error)
+	// Generate a schedule from CONFIRMED teams
+	// (POST /events/v1/{eventId}/games/generate)
+	PostEventsV1EventIdGamesGenerate(ctx context.Context, request PostEventsV1EventIdGamesGenerateRequestObject) (PostEventsV1EventIdGamesGenerateResponseObject, error)
+	// Enter a game score/status
+	// (PUT /events/v1/{eventId}/games/{gameId})
+	PutEventsV1EventIdGamesGameId(ctx context.Context, request PutEventsV1EventIdGamesGameIdRequestObject) (PutEventsV1EventIdGamesGameIdResponseObject, error)
 	// Sign up for an event
 	// (POST /events/v1/{eventId}/register)
 	PostEventsV1EventIdRegister(ctx context.Context, request PostEventsV1EventIdRegisterRequestObject) (PostEventsV1EventIdRegisterResponseObject, error)
@@ -1792,6 +2267,9 @@ type StrictServerInterface interface {
 	// Sign up for an event
 	// (POST /events/v1/{eventId}/registrations)
 	PostEventsV1EventIdRegistrations(ctx context.Context, request PostEventsV1EventIdRegistrationsRequestObject) (PostEventsV1EventIdRegistrationsResponseObject, error)
+	// Get derived standings
+	// (GET /events/v1/{eventId}/standings)
+	GetEventsV1EventIdStandings(ctx context.Context, request GetEventsV1EventIdStandingsRequestObject) (GetEventsV1EventIdStandingsResponseObject, error)
 	// Seed a CONFIRMED participation (MVP admin bypass)
 	// (POST /events/v1/{eventId}/teams/{teamId}/seed)
 	PostEventsV1EventIdTeamsTeamIdSeed(ctx context.Context, request PostEventsV1EventIdTeamsTeamIdSeedRequestObject) (PostEventsV1EventIdTeamsTeamIdSeedResponseObject, error)
@@ -2062,6 +2540,99 @@ func (sh *strictHandler) GetEventsV1TeamsTeamId(w http.ResponseWriter, r *http.R
 	}
 }
 
+// GetEventsV1EventIdGames operation middleware
+func (sh *strictHandler) GetEventsV1EventIdGames(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID) {
+	var request GetEventsV1EventIdGamesRequestObject
+
+	request.EventId = eventId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEventsV1EventIdGames(ctx, request.(GetEventsV1EventIdGamesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEventsV1EventIdGames")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEventsV1EventIdGamesResponseObject); ok {
+		if err := validResponse.VisitGetEventsV1EventIdGamesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostEventsV1EventIdGamesGenerate operation middleware
+func (sh *strictHandler) PostEventsV1EventIdGamesGenerate(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID) {
+	var request PostEventsV1EventIdGamesGenerateRequestObject
+
+	request.EventId = eventId
+
+	var body PostEventsV1EventIdGamesGenerateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostEventsV1EventIdGamesGenerate(ctx, request.(PostEventsV1EventIdGamesGenerateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostEventsV1EventIdGamesGenerate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostEventsV1EventIdGamesGenerateResponseObject); ok {
+		if err := validResponse.VisitPostEventsV1EventIdGamesGenerateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutEventsV1EventIdGamesGameId operation middleware
+func (sh *strictHandler) PutEventsV1EventIdGamesGameId(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, gameId openapi_types.UUID) {
+	var request PutEventsV1EventIdGamesGameIdRequestObject
+
+	request.EventId = eventId
+	request.GameId = gameId
+
+	var body PutEventsV1EventIdGamesGameIdJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutEventsV1EventIdGamesGameId(ctx, request.(PutEventsV1EventIdGamesGameIdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutEventsV1EventIdGamesGameId")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutEventsV1EventIdGamesGameIdResponseObject); ok {
+		if err := validResponse.VisitPutEventsV1EventIdGamesGameIdResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // PostEventsV1EventIdRegister operation middleware
 func (sh *strictHandler) PostEventsV1EventIdRegister(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, params PostEventsV1EventIdRegisterParams) {
 	var request PostEventsV1EventIdRegisterRequestObject
@@ -2150,6 +2721,32 @@ func (sh *strictHandler) PostEventsV1EventIdRegistrations(w http.ResponseWriter,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PostEventsV1EventIdRegistrationsResponseObject); ok {
 		if err := validResponse.VisitPostEventsV1EventIdRegistrationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEventsV1EventIdStandings operation middleware
+func (sh *strictHandler) GetEventsV1EventIdStandings(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID) {
+	var request GetEventsV1EventIdStandingsRequestObject
+
+	request.EventId = eventId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEventsV1EventIdStandings(ctx, request.(GetEventsV1EventIdStandingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEventsV1EventIdStandings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEventsV1EventIdStandingsResponseObject); ok {
+		if err := validResponse.VisitGetEventsV1EventIdStandingsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2246,80 +2843,99 @@ func (sh *strictHandler) PatchEventsV1Id(w http.ResponseWriter, r *http.Request,
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"i3MdHLvR+cJVfLlTnbVkFQ51TJnGF4wH7yEeyxGf5alYTd8Df/jnStqKQF0z2x/tFynLtWUXeNgquHOx",
-	"LheEhTX9KpRaGPU6zz5y2TFrZahrzPKsPpe5x5zV7WZ9tKty3kFBy06DdkXoO4V2dn8fcjbHau9Xmm+v",
-	"Vyc0alyeBc+q88qGMZEQUJ0LeZmSo9V7DM4mdC5kpkDu5NY4Q6ZWKxJXPrliUWSPYGMxt71MXJXqVMLm",
-	"WMfloM8yMh9OAnoQiTScRCZoTCVXmkVABv3T88Ev/YzuVS2fozyY7K3a7mXYsOM6fv/9999bRxfHx3+0",
-	"THFeCx+sQ53bd0kqieTNScq7dVG+lmx40e354geXds6Du5/zRGjiLjixh2lWs+8PwG1tE1M5iBfpsAHs",
-	"fbmCYxGD4CVHMI8jUx6CtOfyLov31ZqacYb3Qq5uYNlmdNwp40Z/D4vrSq3LM2zw/0qGI5vqAVmP264U",
-	"NvmTm5f/ljfngVYBHz452O9+dmlv9Qvdr6vCt7SR34sqbyv43QHE1lYNj1Gh1aphyane3Wl+gNj33XP+",
-	"KjxntsNVUes++K99L4oPP8dpNn7bKv7E4b670d/d6AftRpfzpm0FEK4/3zh+fbqHR8vEmCmCuG71CL+q",
-	"o4VrdpLiLT5Wqyh3hx32/IMod0cQSaJUEaaVSTLtzZjSQmKrK99d0YOD2zJ9OgUyWOlnlH2h2SJnMGeK",
-	"ocpmrXbKCBXyu3hT0AMyb3+PdHRSvfVs5/u3arajPNSuRkTZ+6VKnR94IaKFbFfP+iUqEU3uPP/4IOM8",
-	"uOuxmSp80/XQIgFEqQ1A+wjvNTMdHXQ+rgE/2+FwzDTffjo2uh3AZN80BEF2weEuXyI23KO3e71jFuc9",
-	"dGj5do7FisE31UHD7QcX9i4Iyjfq1Cl2fgha9YU+Lna3Gt1xpHpvmu6W813jH4bNrmCAt9w+S/PwdlxD",
-	"cBMsnEoRpgH+cKvyfC+VUeH/VYImrIWjtq6EjMK2Vw8b8ELoiIQwbxqi125H+H4mlO4ddDqdNt7H+P8D",
-	"AMANuP0QagAA",
+	"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",
+	"jd8E+r8BAMn8kSRcigAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

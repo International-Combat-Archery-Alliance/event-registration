@@ -74,4 +74,7 @@ type Repository interface {
 	// team-history row in one transaction (MVP admin seed, INT-51).
 	SeedParticipation(ctx context.Context, participation Participation, history TeamHistory) error
 	GetParticipation(ctx context.Context, eventID, teamID uuid.UUID) (Participation, error)
+	// ListParticipationsForEvent returns every participation row for an
+	// event (any status); callers filter to CONFIRMED.
+	ListParticipationsForEvent(ctx context.Context, eventID uuid.UUID) ([]Participation, error)
 }

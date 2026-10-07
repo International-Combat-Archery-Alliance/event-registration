@@ -406,3 +406,66 @@ func (d *DB) DeleteGames(ctx context.Context, eventID uuid.UUID, gameIDs []uuid.
 
 	return d.batchWriteGameRequests(ctx, requests)
 }
+
+func (d *DB) UpdateGameChecked(ctx context.Context, eventID uuid.UUID, game games.Game) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	dynamoItem := newGameDynamo(game)
+	item, err := attributevalue.MarshalMap(dynamoItem)
+	if err != nil {
+		return games.NewFailedToTranslateToDBModelError("Failed to convert Game to gameDynamo", err)
+	}
+
+	checkExpr := exprMustBuild(expression.NewBuilder().WithCondition(
+		expression.Name("Status").AttributeNotExists().
+			Or(expression.Name("Status").NotEqual(expression.Value("FINALIZED"))),
+	))
+	putExpr := exprMustBuild(expression.NewBuilder().
+		WithCondition(existingEntityVersionConditional(dynamoItem.Version)))
+
+	_, err = d.dynamoClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{
+			{
+				ConditionCheck: &types.ConditionCheck{
+					TableName: aws.String(d.tableName),
+					Key: map[string]types.AttributeValue{
+						"PK": &types.AttributeValueMemberS{Value: eventPK(eventID)},
+						"SK": &types.AttributeValueMemberS{Value: eventSK(eventID)},
+					},
+					ConditionExpression:       checkExpr.Condition(),
+					ExpressionAttributeNames:  checkExpr.Names(),
+					ExpressionAttributeValues: checkExpr.Values(),
+				},
+			},
+			{
+				Put: &types.Put{
+					TableName:                 aws.String(d.tableName),
+					Item:                      item,
+					ConditionExpression:       putExpr.Condition(),
+					ExpressionAttributeNames:  putExpr.Names(),
+					ExpressionAttributeValues: putExpr.Values(),
+				},
+			},
+		},
+	})
+	if err != nil {
+		var transactionFailedErr *types.TransactionCanceledException
+		if errors.As(err, &transactionFailedErr) {
+			reasons := transactionFailedErr.CancellationReasons
+			if len(reasons) > 0 && reasons[0].Code != nil && *reasons[0].Code == "ConditionalCheckFailed" {
+				return games.NewEventFinalizedError(fmt.Sprintf("Event %q is FINALIZED", eventID), err)
+			}
+			if len(reasons) > 1 && reasons[1].Code != nil && *reasons[1].Code == "ConditionalCheckFailed" {
+				return games.NewGameDoesNotExistError(fmt.Sprintf("Game with ID %q does not exist", game.ID), err)
+			}
+			return games.NewFailedToWriteError("Game checked-update transaction failed", err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			return games.NewTimeoutError("UpdateGameChecked timed out")
+		} else {
+			return games.NewFailedToWriteError("Failed TransactWriteItems call", err)
+		}
+	}
+
+	return nil
+}
