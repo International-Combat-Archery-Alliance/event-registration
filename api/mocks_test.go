@@ -11,6 +11,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/captcha"
 	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/games"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
 	"github.com/International-Combat-Archery-Alliance/event-registration/teams"
 	"github.com/International-Combat-Archery-Alliance/middleware"
@@ -152,6 +153,12 @@ type mockDB struct {
 	GetTeamFunc                       func(ctx context.Context, id uuid.UUID) (teams.Team, error)
 	SeedParticipationFunc             func(ctx context.Context, participation teams.Participation, history teams.TeamHistory) error
 	GetParticipationFunc              func(ctx context.Context, eventID, teamID uuid.UUID) (teams.Participation, error)
+	ListParticipationsForEventFunc    func(ctx context.Context, eventID uuid.UUID) ([]teams.Participation, error)
+	GetGameFunc                       func(ctx context.Context, eventID, gameID uuid.UUID) (games.Game, error)
+	ListGamesForEventFunc             func(ctx context.Context, eventID uuid.UUID) ([]games.Game, error)
+	CreateGamesFunc                   func(ctx context.Context, gameList []games.Game) error
+	UpdateGameCheckedFunc             func(ctx context.Context, eventID uuid.UUID, game games.Game) error
+	DeleteGamesFunc                   func(ctx context.Context, eventID uuid.UUID, gameIDs []uuid.UUID) error
 }
 
 func (m *mockDB) DeleteExpiredRegistration(ctx context.Context, registration registration.Registration, intent registration.RegistrationIntent, event events.Event) error {
@@ -221,4 +228,32 @@ func (m *mockDB) SeedParticipation(ctx context.Context, participation teams.Part
 
 func (m *mockDB) GetParticipation(ctx context.Context, eventID, teamID uuid.UUID) (teams.Participation, error) {
 	return m.GetParticipationFunc(ctx, eventID, teamID)
+}
+
+func (m *mockDB) ListParticipationsForEvent(ctx context.Context, eventID uuid.UUID) ([]teams.Participation, error) {
+	return m.ListParticipationsForEventFunc(ctx, eventID)
+}
+
+func (m *mockDB) GetGame(ctx context.Context, eventID, gameID uuid.UUID) (games.Game, error) {
+	return m.GetGameFunc(ctx, eventID, gameID)
+}
+
+func (m *mockDB) ListGamesForEvent(ctx context.Context, eventID uuid.UUID) ([]games.Game, error) {
+	return m.ListGamesForEventFunc(ctx, eventID)
+}
+
+func (m *mockDB) CreateGames(ctx context.Context, gameList []games.Game) error {
+	return m.CreateGamesFunc(ctx, gameList)
+}
+
+func (m *mockDB) UpdateGame(ctx context.Context, game games.Game) error {
+	panic("UpdateGameChecked covers guarded writes in handlers")
+}
+
+func (m *mockDB) UpdateGameChecked(ctx context.Context, eventID uuid.UUID, game games.Game) error {
+	return m.UpdateGameCheckedFunc(ctx, eventID, game)
+}
+
+func (m *mockDB) DeleteGames(ctx context.Context, eventID uuid.UUID, gameIDs []uuid.UUID) error {
+	return m.DeleteGamesFunc(ctx, eventID, gameIDs)
 }

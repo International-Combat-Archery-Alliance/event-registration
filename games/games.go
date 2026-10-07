@@ -112,6 +112,10 @@ type Repository interface {
 	CreateGames(ctx context.Context, games []Game) error
 	UpdateGame(ctx context.Context, game Game) error
 	DeleteGames(ctx context.Context, eventID uuid.UUID, gameIDs []uuid.UUID) error
+	// UpdateGameChecked writes the game only when its event is not
+	// FINALIZED, atomically: the transaction carries a ConditionCheck on
+	// the EVENT item, so post-finalize edits are structurally impossible.
+	UpdateGameChecked(ctx context.Context, eventID uuid.UUID, game Game) error
 }
 
 // Validate checks the game's structural invariants and status-specific

@@ -343,3 +343,70 @@ func TestGamesDoNotPolluteEventsListing(t *testing.T) {
 func ptrInt(i int) *int {
 	return &i
 }
+
+func TestUpdateGameChecked(t *testing.T) {
+	ctx := context.Background()
+
+	newOpenEvent := func() events.Event {
+		return events.Event{
+			ID:                    uuid.New(),
+			Name:                  "Checked Event",
+			TimeZone:              time.UTC,
+			StartTime:             time.Now().UTC(),
+			EndTime:               time.Now().Add(time.Hour).UTC(),
+			RegistrationCloseTime: time.Now().Add(-time.Hour).UTC(),
+			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_TEAM, Price: money.New(1000, "USD")}},
+			Version:               1,
+			Status:                events.EventStatusInProgress,
+		}
+	}
+
+	t.Run("writes when event not finalized", func(t *testing.T) {
+		resetTable(ctx)
+		event := newOpenEvent()
+		require.NoError(t, db.CreateEvent(ctx, event))
+		game := testGame(event.ID, games.GamePhaseQualifying, 1, 1)
+		require.NoError(t, db.CreateGames(ctx, []games.Game{game}))
+
+		game.Status = games.GameStatusCancelled
+		game.Version++
+		require.NoError(t, db.UpdateGameChecked(ctx, event.ID, game))
+
+		got, err := db.GetGame(ctx, event.ID, game.ID)
+		require.NoError(t, err)
+		assert.Equal(t, games.GameStatusCancelled, got.Status)
+	})
+
+	t.Run("refuses when event finalized", func(t *testing.T) {
+		resetTable(ctx)
+		event := newOpenEvent()
+		event.Status = events.EventStatusFinalized
+		require.NoError(t, db.CreateEvent(ctx, event))
+		game := testGame(event.ID, games.GamePhaseQualifying, 1, 1)
+		require.NoError(t, db.CreateGames(ctx, []games.Game{game}))
+
+		game.Status = games.GameStatusCancelled
+		game.Version++
+		err := db.UpdateGameChecked(ctx, event.ID, game)
+		require.Error(t, err)
+		var gameErr *games.Error
+		require.ErrorAs(t, err, &gameErr)
+		assert.Equal(t, games.REASON_EVENT_FINALIZED, gameErr.Reason)
+	})
+
+	t.Run("version conflict surfaces as not-exist", func(t *testing.T) {
+		resetTable(ctx)
+		event := newOpenEvent()
+		require.NoError(t, db.CreateEvent(ctx, event))
+		game := testGame(event.ID, games.GamePhaseQualifying, 1, 1)
+		require.NoError(t, db.CreateGames(ctx, []games.Game{game}))
+
+		game.Status = games.GameStatusCancelled
+		game.Version = 99
+		err := db.UpdateGameChecked(ctx, event.ID, game)
+		require.Error(t, err)
+		var gameErr *games.Error
+		require.ErrorAs(t, err, &gameErr)
+		assert.Equal(t, games.REASON_GAME_DOES_NOT_EXIST, gameErr.Reason)
+	})
+}

@@ -234,3 +234,52 @@ func (d *DB) GetParticipation(ctx context.Context, eventID, teamID uuid.UUID) (t
 	}
 	return participation, nil
 }
+
+func (d *DB) ListParticipationsForEvent(ctx context.Context, eventID uuid.UUID) ([]teams.Participation, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	expr, err := expression.NewBuilder().
+		WithKeyCondition(
+			expression.Key("PK").Equal(expression.Value(participationPK(eventID))).
+				And(expression.Key("SK").BeginsWith(teamEntityName)),
+		).Build()
+	if err != nil {
+		return nil, teams.NewFailedToFetchError("Failed to build participation query", err)
+	}
+
+	var result []teams.Participation
+	var startKey map[string]types.AttributeValue
+	for {
+		out, err := d.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+			TableName:                 aws.String(d.tableName),
+			KeyConditionExpression:    expr.KeyCondition(),
+			ExpressionAttributeNames:  expr.Names(),
+			ExpressionAttributeValues: expr.Values(),
+			ExclusiveStartKey:         startKey,
+		})
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return nil, teams.NewTimeoutError("ListParticipationsForEvent timed out")
+			}
+			return nil, teams.NewFailedToFetchError("Failed to fetch participations", err)
+		}
+
+		var page []participationDynamo
+		if err := attributevalue.UnmarshalListOfMaps(out.Items, &page); err != nil {
+			return nil, teams.NewFailedToFetchError("Failed to parse participations from DB", err)
+		}
+		for _, item := range page {
+			participation, err := participationFromDynamo(item)
+			if err != nil {
+				return nil, teams.NewFailedToFetchError("Failed to parse participations from DB", err)
+			}
+			result = append(result, participation)
+		}
+
+		if len(out.LastEvaluatedKey) == 0 {
+			return result, nil
+		}
+		startKey = out.LastEvaluatedKey
+	}
+}

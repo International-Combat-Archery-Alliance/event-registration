@@ -112,3 +112,22 @@ func TestSeedAndGetParticipation(t *testing.T) {
 		}
 	})
 }
+
+func TestListParticipationsForEvent(t *testing.T) {
+	ctx := context.Background()
+	resetTable(ctx)
+
+	eventID, otherEventID := uuid.New(), uuid.New()
+	teamA, teamB := uuid.New(), uuid.New()
+	partA, histA := testParticipation(eventID, teamA)
+	partB, histB := testParticipation(eventID, teamB)
+	partB.Status = teams.ParticipationStatusWithdrawn
+	other, otherHist := testParticipation(otherEventID, teamA)
+	require.NoError(t, db.SeedParticipation(ctx, partA, histA))
+	require.NoError(t, db.SeedParticipation(ctx, partB, histB))
+	require.NoError(t, db.SeedParticipation(ctx, other, otherHist))
+
+	got, err := db.ListParticipationsForEvent(ctx, eventID)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+}

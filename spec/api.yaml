@@ -340,6 +340,226 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /events/v1/{eventId}/games:
+    get:
+      summary: Get an event schedule
+      description: Public schedule, QUALIFYING before PLAYOFF with team names joined. Empty until an admin generates it.
+      security: []
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+      responses:
+        '200':
+          description: The schedule.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - games
+                properties:
+                  games:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Game'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /events/v1/{eventId}/games/generate:
+    post:
+      summary: Generate a schedule from CONFIRMED teams
+      description: Admin-only generate-then-edit start. Round robin emits the whole schedule; Swiss appends one round (defaults to the next unplayed round). Refuses when games exist unless replace is true and no game holds a result.
+      security:
+        - icaaCookieAuth: [admin]
+        - icaaBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+      requestBody:
+        description: Generation request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateRequest'
+      responses:
+        '200':
+          description: The generated games.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - games
+                properties:
+                  games:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Game'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Generation refused by event or schedule state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /events/v1/{eventId}/games/{gameId}:
+    put:
+      summary: Enter a game score/status
+      description: Admin score entry. Blocked once the event is FINALIZED (unfinalize first).
+      security:
+        - icaaCookieAuth: [admin]
+        - icaaBearerAuth: [admin]
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+        - name: gameId
+          in: path
+          description: ID of the game
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+      requestBody:
+        description: Score/status update with the expected version
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutGameRequest'
+      responses:
+        '200':
+          description: The updated game.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - game
+                properties:
+                  game:
+                    $ref: '#/components/schemas/Game'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event or game not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Event FINALIZED or version conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /events/v1/{eventId}/standings:
+    get:
+      summary: Get derived standings
+      description: Public standings derived at read time from COMPLETED/FORFEIT qualifying games. DNS teams trail unranked.
+      security: []
+      parameters:
+        - name: eventId
+          in: path
+          description: ID of the event
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+      responses:
+        '200':
+          description: The standings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - standings
+                properties:
+                  standings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Standing'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /events/v1/{eventId}/register:
     post:
@@ -970,6 +1190,198 @@ components:
           type: integer
           readOnly: true
           example: 1
+    GamePhase:
+      type: string
+      enum:
+        - QUALIFYING
+        - PLAYOFF
+      example: QUALIFYING
+    GameStatus:
+      type: string
+      enum:
+        - SCHEDULED
+        - COMPLETED
+        - FORFEIT
+        - DOUBLE_FORFEIT
+        - CANCELLED
+        - BYE
+      example: SCHEDULED
+    GameFormat:
+      type: string
+      enum:
+        - ROUND_ROBIN
+        - SWISS
+      example: ROUND_ROBIN
+    GameSide:
+      type: object
+      properties:
+        teamId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 00000000-0000-0000-0000-000000000000
+        teamName:
+          type: string
+          nullable: true
+          example: Boston Renegades
+        isBye:
+          type: boolean
+          example: false
+    Game:
+      type: object
+      required:
+        - id
+        - eventId
+        - phase
+        - round
+        - seq
+        - status
+        - sideA
+        - sideB
+        - version
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        eventId:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        phase:
+          $ref: '#/components/schemas/GamePhase'
+        round:
+          type: integer
+          minimum: 1
+          example: 1
+        seq:
+          type: integer
+          minimum: 1
+          example: 1
+        status:
+          $ref: '#/components/schemas/GameStatus'
+        sideA:
+          $ref: '#/components/schemas/GameSide'
+        sideB:
+          $ref: '#/components/schemas/GameSide'
+        scoreA:
+          type: integer
+          minimum: 0
+          nullable: true
+          example: 10
+        scoreB:
+          type: integer
+          minimum: 0
+          nullable: true
+          example: 5
+        forfeitSide:
+          type: string
+          nullable: true
+          enum:
+            - A
+            - B
+          example: A
+        version:
+          type: integer
+          readOnly: true
+          example: 1
+    GenerateRequest:
+      type: object
+      required:
+        - format
+      properties:
+        format:
+          $ref: '#/components/schemas/GameFormat'
+        mirror:
+          type: boolean
+          description: Double round robin with swapped sides (ROUND_ROBIN only).
+          example: false
+        round:
+          type: integer
+          minimum: 1
+          description: Swiss round to generate; defaults to the next unplayed round.
+          example: 2
+        replace:
+          type: boolean
+          description: Delete unplayed games before regenerating (ROUND_ROBIN only; Swiss rounds append). Refused when any game holds a result.
+          example: false
+    PutGameRequest:
+      type: object
+      required:
+        - status
+        - version
+      properties:
+        status:
+          $ref: '#/components/schemas/GameStatus'
+        scoreA:
+          type: integer
+          minimum: 0
+          nullable: true
+          example: 10
+        scoreB:
+          type: integer
+          minimum: 0
+          nullable: true
+          example: 5
+        forfeitSide:
+          type: string
+          nullable: true
+          enum:
+            - A
+            - B
+          example: A
+        version:
+          type: integer
+          description: Expected game version for optimistic concurrency.
+          example: 1
+    Standing:
+      type: object
+      required:
+        - teamId
+        - teamName
+        - gp
+        - wins
+        - losses
+        - pf
+        - pa
+        - net
+        - rank
+        - dns
+      properties:
+        teamId:
+          type: string
+          format: uuid
+          example: 00000000-0000-0000-0000-000000000000
+        teamName:
+          type: string
+          example: Boston Renegades
+        gp:
+          type: integer
+          example: 5
+        wins:
+          type: integer
+          example: 4
+        losses:
+          type: integer
+          example: 1
+        pf:
+          type: integer
+          example: 50
+        pa:
+          type: integer
+          example: 30
+        net:
+          type: integer
+          example: 20
+        rank:
+          type: integer
+          description: 1-based qualifying order; zero when DNS.
+          example: 1
+        dns:
+          type: boolean
+          example: false
     Registration:
       oneOf:
         - $ref: '#/components/schemas/IndividualRegistration'
@@ -1243,6 +1655,7 @@ components:
         - EmptyBody
         - InvalidBody
         - AlreadyExists
+        - Conflict
         - RegistrationClosed
         - RegistrationUnpaid
         - InputValidationError
