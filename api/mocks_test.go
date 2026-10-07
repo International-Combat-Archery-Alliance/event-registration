@@ -150,6 +150,8 @@ type mockDB struct {
 	GetRegistrationIntentFunc         func(ctx context.Context, eventId uuid.UUID, email string) (registration.RegistrationIntent, error)
 	CreateTeamFunc                    func(ctx context.Context, team teams.Team) error
 	GetTeamFunc                       func(ctx context.Context, id uuid.UUID) (teams.Team, error)
+	SeedParticipationFunc             func(ctx context.Context, participation teams.Participation, history teams.TeamHistory) error
+	GetParticipationFunc              func(ctx context.Context, eventID, teamID uuid.UUID) (teams.Participation, error)
 }
 
 func (m *mockDB) DeleteExpiredRegistration(ctx context.Context, registration registration.Registration, intent registration.RegistrationIntent, event events.Event) error {
@@ -211,4 +213,12 @@ func (m *mockDB) CreateTeam(ctx context.Context, team teams.Team) error {
 
 func (m *mockDB) GetTeam(ctx context.Context, id uuid.UUID) (teams.Team, error) {
 	return m.GetTeamFunc(ctx, id)
+}
+
+func (m *mockDB) SeedParticipation(ctx context.Context, participation teams.Participation, history teams.TeamHistory) error {
+	return m.SeedParticipationFunc(ctx, participation, history)
+}
+
+func (m *mockDB) GetParticipation(ctx context.Context, eventID, teamID uuid.UUID) (teams.Participation, error) {
+	return m.GetParticipationFunc(ctx, eventID, teamID)
 }

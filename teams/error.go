@@ -9,6 +9,8 @@ const (
 	REASON_FAILED_TO_WRITE                 ErrorReason = "FAILED_TO_WRITE"
 	REASON_TEAM_DOES_NOT_EXIST             ErrorReason = "TEAM_DOES_NOT_EXIST"
 	REASON_TEAM_NAME_TAKEN                 ErrorReason = "TEAM_NAME_TAKEN"
+	REASON_PARTICIPATION_ALREADY_EXISTS    ErrorReason = "PARTICIPATION_ALREADY_EXISTS"
+	REASON_PARTICIPATION_DOES_NOT_EXIST    ErrorReason = "PARTICIPATION_DOES_NOT_EXIST"
 	REASON_FAILED_TO_FETCH                 ErrorReason = "FAILED_TO_FETCH"
 	REASON_INVALID_TEAM                    ErrorReason = "INVALID_TEAM"
 	REASON_TIMEOUT                         ErrorReason = "TIMEOUT"
@@ -54,6 +56,14 @@ func NewTeamDoesNotExistError(message string, cause error) *Error {
 
 func NewTeamNameTakenError(message string, cause error) *Error {
 	return newTeamError(REASON_TEAM_NAME_TAKEN, message, cause)
+}
+
+func NewParticipationAlreadyExistsError(message string, cause error) *Error {
+	return newTeamError(REASON_PARTICIPATION_ALREADY_EXISTS, message, cause)
+}
+
+func NewParticipationDoesNotExistError(message string, cause error) *Error {
+	return newTeamError(REASON_PARTICIPATION_DOES_NOT_EXIST, message, cause)
 }
 
 func NewFailedToFetchError(message string, cause error) *Error {
