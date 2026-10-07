@@ -70,4 +70,8 @@ func (t Team) Validate() error {
 type Repository interface {
 	CreateTeam(ctx context.Context, team Team) error
 	GetTeam(ctx context.Context, id uuid.UUID) (Team, error)
+	// SeedParticipation creates a CONFIRMED participation row plus its
+	// team-history row in one transaction (MVP admin seed, INT-51).
+	SeedParticipation(ctx context.Context, participation Participation, history TeamHistory) error
+	GetParticipation(ctx context.Context, eventID, teamID uuid.UUID) (Participation, error)
 }
