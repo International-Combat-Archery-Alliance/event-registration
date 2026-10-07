@@ -12,6 +12,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"github.com/International-Combat-Archery-Alliance/event-registration/teams"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
 	"github.com/google/uuid"
@@ -147,6 +148,8 @@ type mockDB struct {
 	UpdateRegistrationToPaidFunc      func(ctx context.Context, reg registration.Registration) error
 	DeleteExpiredRegistrationFunc     func(ctx context.Context, registration registration.Registration, intent registration.RegistrationIntent, event events.Event) error
 	GetRegistrationIntentFunc         func(ctx context.Context, eventId uuid.UUID, email string) (registration.RegistrationIntent, error)
+	CreateTeamFunc                    func(ctx context.Context, team teams.Team) error
+	GetTeamFunc                       func(ctx context.Context, id uuid.UUID) (teams.Team, error)
 }
 
 func (m *mockDB) DeleteExpiredRegistration(ctx context.Context, registration registration.Registration, intent registration.RegistrationIntent, event events.Event) error {
@@ -200,4 +203,12 @@ func (m *mockDB) UpdateRegistrationToPaid(ctx context.Context, reg registration.
 		return m.UpdateRegistrationToPaidFunc(ctx, reg)
 	}
 	return nil
+}
+
+func (m *mockDB) CreateTeam(ctx context.Context, team teams.Team) error {
+	return m.CreateTeamFunc(ctx, team)
+}
+
+func (m *mockDB) GetTeam(ctx context.Context, id uuid.UUID) (teams.Team, error) {
+	return m.GetTeamFunc(ctx, id)
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"github.com/International-Combat-Archery-Alliance/event-registration/teams"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
 	"go.opentelemetry.io/otel"
@@ -30,6 +31,7 @@ const (
 type DB interface {
 	events.Repository
 	registration.Repository
+	teams.Repository
 }
 
 type API struct {

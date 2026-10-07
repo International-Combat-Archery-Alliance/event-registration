@@ -66,6 +66,12 @@ const (
 	ByTeam       RegistrationType = "ByTeam"
 )
 
+// Defines values for TeamStatus.
+const (
+	ACTIVE   TeamStatus = "ACTIVE"
+	ARCHIVED TeamStatus = "ARCHIVED"
+)
+
 // Address defines model for Address.
 type Address struct {
 	// City City or town
@@ -192,6 +198,21 @@ type SignUpStats struct {
 	NumTotalPlayers    int `json:"numTotalPlayers"`
 }
 
+// Team defines model for Team.
+type Team struct {
+	// CaptainPlayerId Player UUID of the captain. Nullable in the MVP; unverified until player-profiles lands.
+	CaptainPlayerId *openapi_types.UUID `json:"captainPlayerId"`
+	CreatedAt       *time.Time          `json:"createdAt,omitempty"`
+	HomeCity        string              `json:"homeCity"`
+	Id              *openapi_types.UUID `json:"id,omitempty"`
+	Name            string              `json:"name"`
+
+	// Status Lifecycle state of a team. Set server-side on create; no update endpoint yet.
+	Status    TeamStatus `json:"status"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	Version   *int       `json:"version,omitempty"`
+}
+
 // TeamRegistration defines model for TeamRegistration.
 type TeamRegistration struct {
 	CaptainEmail     openapi_types.Email `json:"captainEmail"`
@@ -205,6 +226,9 @@ type TeamRegistration struct {
 	TeamName         string              `json:"teamName"`
 	Version          *int                `json:"version,omitempty"`
 }
+
+// TeamStatus Lifecycle state of a team. Set server-side on create; no update endpoint yet.
+type TeamStatus string
 
 // GetEventsV1Params defines parameters for GetEventsV1.
 type GetEventsV1Params struct {
@@ -261,6 +285,9 @@ type PostEventsV1AdminTestEmailJSONRequestBody PostEventsV1AdminTestEmailJSONBod
 
 // PostEventsV1AdminTestMailerliteJSONRequestBody defines body for PostEventsV1AdminTestMailerlite for application/json ContentType.
 type PostEventsV1AdminTestMailerliteJSONRequestBody PostEventsV1AdminTestMailerliteJSONBody
+
+// PostEventsV1TeamsJSONRequestBody defines body for PostEventsV1Teams for application/json ContentType.
+type PostEventsV1TeamsJSONRequestBody = Team
 
 // PostEventsV1EventIdRegisterJSONRequestBody defines body for PostEventsV1EventIdRegister for application/json ContentType.
 type PostEventsV1EventIdRegisterJSONRequestBody = Registration
@@ -380,6 +407,12 @@ type ServerInterface interface {
 	// Test MailerLite integration
 	// (POST /events/v1/admin/test-mailerlite)
 	PostEventsV1AdminTestMailerlite(w http.ResponseWriter, r *http.Request)
+	// Create a new team
+	// (POST /events/v1/teams)
+	PostEventsV1Teams(w http.ResponseWriter, r *http.Request)
+	// Get a team
+	// (GET /events/v1/teams/{teamId})
+	GetEventsV1TeamsTeamId(w http.ResponseWriter, r *http.Request, teamId openapi_types.UUID)
 	// Sign up for an event
 	// (POST /events/v1/{eventId}/register)
 	PostEventsV1EventIdRegister(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, params PostEventsV1EventIdRegisterParams)
@@ -582,6 +615,53 @@ func (siw *ServerInterfaceWrapper) PostEventsV1AdminTestMailerlite(w http.Respon
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostEventsV1AdminTestMailerlite(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostEventsV1Teams operation middleware
+func (siw *ServerInterfaceWrapper) PostEventsV1Teams(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, IcaaCookieAuthScopes, []string{"admin"})
+
+	ctx = context.WithValue(ctx, IcaaBearerAuthScopes, []string{"admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostEventsV1Teams(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEventsV1TeamsTeamId operation middleware
+func (siw *ServerInterfaceWrapper) GetEventsV1TeamsTeamId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "teamId" -------------
+	var teamId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "teamId", r.PathValue("teamId"), &teamId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teamId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEventsV1TeamsTeamId(w, r, teamId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -933,6 +1013,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/admin/registrations/{eventId}/{email}/notify", wrapper.PostEventsV1AdminRegistrationsEventIdEmailNotify)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/admin/test-email", wrapper.PostEventsV1AdminTestEmail)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/admin/test-mailerlite", wrapper.PostEventsV1AdminTestMailerlite)
+	m.HandleFunc("POST "+options.BaseURL+"/events/v1/teams", wrapper.PostEventsV1Teams)
+	m.HandleFunc("GET "+options.BaseURL+"/events/v1/teams/{teamId}", wrapper.GetEventsV1TeamsTeamId)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/{eventId}/register", wrapper.PostEventsV1EventIdRegister)
 	m.HandleFunc("GET "+options.BaseURL+"/events/v1/{eventId}/registrations", wrapper.GetEventsV1EventIdRegistrations)
 	m.HandleFunc("POST "+options.BaseURL+"/events/v1/{eventId}/registrations", wrapper.PostEventsV1EventIdRegistrations)
@@ -1187,6 +1269,96 @@ func (response PostEventsV1AdminTestMailerlite400JSONResponse) VisitPostEventsV1
 type PostEventsV1AdminTestMailerlite500JSONResponse Error
 
 func (response PostEventsV1AdminTestMailerlite500JSONResponse) VisitPostEventsV1AdminTestMailerliteResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1TeamsRequestObject struct {
+	Body *PostEventsV1TeamsJSONRequestBody
+}
+
+type PostEventsV1TeamsResponseObject interface {
+	VisitPostEventsV1TeamsResponse(w http.ResponseWriter) error
+}
+
+type PostEventsV1Teams200JSONResponse Team
+
+func (response PostEventsV1Teams200JSONResponse) VisitPostEventsV1TeamsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1Teams400JSONResponse Error
+
+func (response PostEventsV1Teams400JSONResponse) VisitPostEventsV1TeamsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1Teams409JSONResponse Error
+
+func (response PostEventsV1Teams409JSONResponse) VisitPostEventsV1TeamsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEventsV1Teams500JSONResponse Error
+
+func (response PostEventsV1Teams500JSONResponse) VisitPostEventsV1TeamsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1TeamsTeamIdRequestObject struct {
+	TeamId openapi_types.UUID `json:"teamId"`
+}
+
+type GetEventsV1TeamsTeamIdResponseObject interface {
+	VisitGetEventsV1TeamsTeamIdResponse(w http.ResponseWriter) error
+}
+
+type GetEventsV1TeamsTeamId200JSONResponse struct {
+	Team Team `json:"team"`
+}
+
+func (response GetEventsV1TeamsTeamId200JSONResponse) VisitGetEventsV1TeamsTeamIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1TeamsTeamId400JSONResponse Error
+
+func (response GetEventsV1TeamsTeamId400JSONResponse) VisitGetEventsV1TeamsTeamIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1TeamsTeamId404JSONResponse Error
+
+func (response GetEventsV1TeamsTeamId404JSONResponse) VisitGetEventsV1TeamsTeamIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEventsV1TeamsTeamId500JSONResponse Error
+
+func (response GetEventsV1TeamsTeamId500JSONResponse) VisitGetEventsV1TeamsTeamIdResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1478,6 +1650,12 @@ type StrictServerInterface interface {
 	// Test MailerLite integration
 	// (POST /events/v1/admin/test-mailerlite)
 	PostEventsV1AdminTestMailerlite(ctx context.Context, request PostEventsV1AdminTestMailerliteRequestObject) (PostEventsV1AdminTestMailerliteResponseObject, error)
+	// Create a new team
+	// (POST /events/v1/teams)
+	PostEventsV1Teams(ctx context.Context, request PostEventsV1TeamsRequestObject) (PostEventsV1TeamsResponseObject, error)
+	// Get a team
+	// (GET /events/v1/teams/{teamId})
+	GetEventsV1TeamsTeamId(ctx context.Context, request GetEventsV1TeamsTeamIdRequestObject) (GetEventsV1TeamsTeamIdResponseObject, error)
 	// Sign up for an event
 	// (POST /events/v1/{eventId}/register)
 	PostEventsV1EventIdRegister(ctx context.Context, request PostEventsV1EventIdRegisterRequestObject) (PostEventsV1EventIdRegisterResponseObject, error)
@@ -1697,6 +1875,63 @@ func (sh *strictHandler) PostEventsV1AdminTestMailerlite(w http.ResponseWriter, 
 	}
 }
 
+// PostEventsV1Teams operation middleware
+func (sh *strictHandler) PostEventsV1Teams(w http.ResponseWriter, r *http.Request) {
+	var request PostEventsV1TeamsRequestObject
+
+	var body PostEventsV1TeamsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostEventsV1Teams(ctx, request.(PostEventsV1TeamsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostEventsV1Teams")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostEventsV1TeamsResponseObject); ok {
+		if err := validResponse.VisitPostEventsV1TeamsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEventsV1TeamsTeamId operation middleware
+func (sh *strictHandler) GetEventsV1TeamsTeamId(w http.ResponseWriter, r *http.Request, teamId openapi_types.UUID) {
+	var request GetEventsV1TeamsTeamIdRequestObject
+
+	request.TeamId = teamId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEventsV1TeamsTeamId(ctx, request.(GetEventsV1TeamsTeamIdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEventsV1TeamsTeamId")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEventsV1TeamsTeamIdResponseObject); ok {
+		if err := validResponse.VisitGetEventsV1TeamsTeamIdResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // PostEventsV1EventIdRegister operation middleware
 func (sh *strictHandler) PostEventsV1EventIdRegister(w http.ResponseWriter, r *http.Request, eventId openapi_types.UUID, params PostEventsV1EventIdRegisterParams) {
 	var request PostEventsV1EventIdRegisterRequestObject
@@ -1854,69 +2089,74 @@ func (sh *strictHandler) PatchEventsV1Id(w http.ResponseWriter, r *http.Request,
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"/pJXNBZK97Y9z2vjrwn8dwCydgkLNlUAAA==",
+	"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",
+	"QbeLP4kbT4XSg71er9fFn+X6vwEAw3HNlH9gAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -197,6 +197,90 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /events/v1/teams:
+    post:
+      summary: Create a new team
+      description: Admin endpoint to create a new team (rosters stay empty until player-profiles lands)
+      security:
+        - icaaCookieAuth: [admin]
+        - icaaBearerAuth: [admin]
+      requestBody:
+        description: Team to be created
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Team'
+      responses:
+        '200':
+          description: The created team.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Team name is already taken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /events/v1/teams/{teamId}:
+    get:
+      summary: Get a team
+      description: Get one team by id
+      security: []
+      parameters:
+        - name: teamId
+          in: path
+          description: ID of the team
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 00000000-0000-0000-0000-000000000000
+      responses:
+        '200':
+          description: The team
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - team
+                properties:
+                  team:
+                    $ref: '#/components/schemas/Team'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error' 
+        '404':
+          description: Team not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error' 
+        '500':
+          description: Unknown server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /events/v1/{eventId}/register:
     post:
       summary: Sign up for an event
@@ -727,6 +811,59 @@ components:
         - IN_PROGRESS
         - FINALIZED
       example: OPENED
+    TeamStatus:
+      type: string
+      description: Lifecycle state of a team. Set server-side on create; no update endpoint yet.
+      enum:
+        - ACTIVE
+        - ARCHIVED
+      example: ACTIVE
+    Team:
+      type: object
+      required:
+        - id
+        - version
+        - name
+        - homeCity
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          example: 00000000-0000-0000-0000-000000000000
+        version:
+          type: integer
+          readOnly: true
+          example: 1
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: The Fighting Mongooses
+        homeCity:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: Anytown, USA
+        status:
+          $ref: '#/components/schemas/TeamStatus'
+        captainPlayerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Player UUID of the captain. Nullable in the MVP; unverified until player-profiles lands.
+          example: 00000000-0000-0000-0000-000000000000
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2025-08-19T18:46:53.185Z"
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2025-08-19T18:46:53.185Z"
     Registration:
       oneOf:
         - $ref: '#/components/schemas/IndividualRegistration'
