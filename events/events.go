@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Rhymond/go-money"
@@ -29,7 +30,8 @@ type Event struct {
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
-	MailingListGroupID     *string
+	MailingListGroupID    *string
+	Status                EventStatus
 }
 
 type EventRegistrationOption struct {
@@ -68,6 +70,43 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		return Event{}, err
 	}
 
+	existingStatus := existingEvent.Status.NormalizeDefault()
+	if !existingStatus.Valid() {
+		err := NewInvalidEventStatusError("invalid existing event status", nil)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return Event{}, err
+	}
+	nextStatus := event.Status
+	if nextStatus == "" {
+		// Status is optional in the API (old clients / pre-status rows):
+		// preserve the existing status.
+		nextStatus = existingStatus
+	} else {
+		if !nextStatus.Valid() {
+			err := NewInvalidEventStatusError("invalid event status", nil)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return Event{}, err
+		}
+		if nextStatus == EventStatusFinalized && existingStatus != EventStatusFinalized {
+			// The finalize trio (lock/stamp/recompute/unfinalize) is
+			// deferred post-MVP (D32): entering FINALIZED via PATCH
+			// would lock scoring with no recovery path, so it is
+			// refused until unfinalize exists. Re-enable with 49b.
+			err := NewInvalidStatusTransitionError("finalize is not available in MVP", nil)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return Event{}, err
+		}
+		if !AllowedTransition(existingStatus, nextStatus) {
+			err := NewInvalidStatusTransitionError("invalid event status transition", nil)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return Event{}, err
+		}
+	}
+
 	updatedEvent := Event{
 		ID:                    id,
 		Version:               existingEvent.Version + 1,
@@ -84,13 +123,21 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		NumTotalPlayers:       existingEvent.NumTotalPlayers,
 		RulesDocLink:          event.RulesDocLink,
 		ImageName:             event.ImageName,
-		MailingListGroupID:     existingEvent.MailingListGroupID,
+		MailingListGroupID:    existingEvent.MailingListGroupID,
+		Status:                nextStatus,
 	}
 
 	err = repo.UpdateEvent(ctx, updatedEvent)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		var eventErr *Error
+		if errors.As(err, &eventErr) && eventErr.Reason == REASON_EVENT_DOES_NOT_EXIST {
+			// The event existed at read time above, so a conditional
+			// failure here is a concurrent write (or a replace that
+			// deleted under us), not a missing event.
+			return Event{}, NewVersionConflictError("event changed concurrently; refetch and retry", err)
+		}
 		return Event{}, err
 	}
 
