@@ -688,6 +688,8 @@ components:
           $ref: '#/components/schemas/Range'
         signUpStats:
           $ref: '#/components/schemas/SignUpStats'
+        status:
+          $ref: '#/components/schemas/EventStatus'
         rulesDocLink:
           type: string
           maxLength: 500
@@ -717,6 +719,14 @@ components:
           type: integer
           example: 55
           minimum: 0
+    EventStatus:
+      type: string
+      description: Lifecycle state of an event (RFC-0002 §3). Optional in the API; defaults server-side to OPENED.
+      enum:
+        - OPENED
+        - IN_PROGRESS
+        - FINALIZED
+      example: OPENED
     Registration:
       oneOf:
         - $ref: '#/components/schemas/IndividualRegistration'

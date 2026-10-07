@@ -42,7 +42,8 @@ type eventDynamo struct {
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
-	MailingListGroupID     *string
+	MailingListGroupID    *string
+	Status                string
 }
 
 type eventRegistrationOptionDynamo struct {
@@ -93,7 +94,8 @@ func newEventDynamo(event events.Event) eventDynamo {
 		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
-		MailingListGroupID:    event.MailingListGroupID,
+		MailingListGroupID:   event.MailingListGroupID,
+		Status:               string(event.Status.NormalizeDefault()),
 	}
 }
 
@@ -136,7 +138,9 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
-		MailingListGroupID:    event.MailingListGroupID,
+		MailingListGroupID:   event.MailingListGroupID,
+		// Pre-status rows have no Status attribute; default to OPENED.
+		Status: events.EventStatus(event.Status).NormalizeDefault(),
 	}
 }
 

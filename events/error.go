@@ -12,6 +12,8 @@ const (
 	REASON_FAILED_TO_FETCH                 ErrorReason = "FAILED_TO_FETCH"
 	REASON_INVALID_CURSOR                  ErrorReason = "INVALID_CURSOR"
 	REASON_TIMEOUT                         ErrorReason = "TIMEOUT"
+	REASON_INVALID_EVENT_STATUS            ErrorReason = "INVALID_EVENT_STATUS"
+	REASON_INVALID_STATUS_TRANSITION       ErrorReason = "INVALID_STATUS_TRANSITION"
 )
 
 type Error struct {
@@ -66,4 +68,12 @@ func NewInvalidCursorError(message string, cause error) *Error {
 
 func NewTimeoutError(message string) *Error {
 	return newEventError(REASON_TIMEOUT, message, nil)
+}
+
+func NewInvalidEventStatusError(message string, cause error) *Error {
+	return newEventError(REASON_INVALID_EVENT_STATUS, message, cause)
+}
+
+func NewInvalidStatusTransitionError(message string, cause error) *Error {
+	return newEventError(REASON_INVALID_STATUS_TRANSITION, message, cause)
 }

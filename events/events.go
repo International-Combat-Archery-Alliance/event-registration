@@ -29,7 +29,8 @@ type Event struct {
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
-	MailingListGroupID     *string
+	MailingListGroupID    *string
+	Status                EventStatus
 }
 
 type EventRegistrationOption struct {
@@ -68,6 +69,33 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		return Event{}, err
 	}
 
+	existingStatus := existingEvent.Status.NormalizeDefault()
+	if !existingStatus.Valid() {
+		err := NewInvalidEventStatusError("invalid existing event status", nil)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return Event{}, err
+	}
+	nextStatus := event.Status
+	if nextStatus == "" {
+		// Status is optional in the API (old clients / pre-status rows):
+		// preserve the existing status.
+		nextStatus = existingStatus
+	} else {
+		if !nextStatus.Valid() {
+			err := NewInvalidEventStatusError("invalid event status", nil)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return Event{}, err
+		}
+		if !AllowedTransition(existingStatus, nextStatus) {
+			err := NewInvalidStatusTransitionError("invalid event status transition", nil)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return Event{}, err
+		}
+	}
+
 	updatedEvent := Event{
 		ID:                    id,
 		Version:               existingEvent.Version + 1,
@@ -84,7 +112,8 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		NumTotalPlayers:       existingEvent.NumTotalPlayers,
 		RulesDocLink:          event.RulesDocLink,
 		ImageName:             event.ImageName,
-		MailingListGroupID:     existingEvent.MailingListGroupID,
+		MailingListGroupID:    existingEvent.MailingListGroupID,
+		Status:                nextStatus,
 	}
 
 	err = repo.UpdateEvent(ctx, updatedEvent)
