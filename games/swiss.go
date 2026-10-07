@@ -66,7 +66,7 @@ func GenerateSwissRound(eventID uuid.UUID, teamIDs []uuid.UUID, names map[string
 			// rematches left errors instead of emitting an illegal
 			// schedule. The admin resolves it (score corrections change
 			// the order) and regenerates.
-			return nil, NewInvalidScheduleError("no valid pairing without rematch", nil)
+			return nil, NewNoValidPairingError("no valid pairing without rematch", nil)
 		}
 		y := ordered[partner].TeamID
 		result = append(result, Game{

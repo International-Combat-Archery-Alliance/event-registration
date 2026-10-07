@@ -260,11 +260,27 @@ func (a *API) PostEventsV1EventIdGamesGenerate(ctx context.Context, request Post
 	}
 
 	var generated []games.Game
+	names := map[string]string{}
 	switch request.Body.Format {
 	case ROUNDROBIN:
+		if request.Body.Round != nil {
+			return PostEventsV1EventIdGamesGenerate400JSONResponse{
+				Code:    InvalidBody,
+				Message: "Round applies to Swiss only",
+			}, nil
+		}
 		generated, err = a.generateRoundRobin(ctx, request, existing, confirmed)
 	case SWISS:
-		generated, err = a.generateSwiss(ctx, request, existing, confirmed)
+		if request.Body.Mirror != nil && *request.Body.Mirror {
+			return PostEventsV1EventIdGamesGenerate400JSONResponse{
+				Code:    InvalidBody,
+				Message: "Mirror applies to round robin only",
+			}, nil
+		}
+		names, err = a.teamNames(ctx, confirmed)
+		if err == nil {
+			generated, err = a.generateSwiss(ctx, request, existing, confirmed, names)
+		}
 	default:
 		return PostEventsV1EventIdGamesGenerate400JSONResponse{
 			Code:    InvalidBody,
@@ -281,10 +297,27 @@ func (a *API) PostEventsV1EventIdGamesGenerate(ctx context.Context, request Post
 		}
 		var gameErr *games.Error
 		if errors.As(err, &gameErr) {
-			return PostEventsV1EventIdGamesGenerate400JSONResponse{
-				Code:    InvalidBody,
-				Message: "Invalid schedule",
-			}, nil
+			switch gameErr.Reason {
+			case games.REASON_NO_VALID_PAIRING:
+				return PostEventsV1EventIdGamesGenerate409JSONResponse{
+					Code:    Conflict,
+					Message: "No valid pairing without rematch",
+				}, nil
+			case games.REASON_TIMEOUT, games.REASON_FAILED_TO_WRITE, games.REASON_FAILED_TO_FETCH:
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				logger.Error("Failed to generate schedule", "error", err)
+
+				return PostEventsV1EventIdGamesGenerate500JSONResponse{
+					Code:    InternalError,
+					Message: "Failed to generate schedule",
+				}, nil
+			default:
+				return PostEventsV1EventIdGamesGenerate400JSONResponse{
+					Code:    InvalidBody,
+					Message: "Invalid schedule",
+				}, nil
+			}
 		}
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -296,16 +329,18 @@ func (a *API) PostEventsV1EventIdGamesGenerate(ctx context.Context, request Post
 		}, nil
 	}
 
-	names, err := a.teamNames(ctx, confirmed)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		logger.Error("Failed to join team names", "error", err)
+	if len(names) == 0 {
+		names, err = a.teamNames(ctx, confirmed)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			logger.Error("Failed to join team names", "error", err)
 
-		return PostEventsV1EventIdGamesGenerate500JSONResponse{
-			Code:    InternalError,
-			Message: "Failed to generate schedule",
-		}, nil
+			return PostEventsV1EventIdGamesGenerate500JSONResponse{
+				Code:    InternalError,
+				Message: "Failed to generate schedule",
+			}, nil
+		}
 	}
 
 	resp := make([]Game, 0, len(generated))
@@ -340,6 +375,8 @@ func replaceRequested(body GenerateRequest) bool {
 }
 
 func (a *API) generateRoundRobin(ctx context.Context, request PostEventsV1EventIdGamesGenerateRequestObject, existing []games.Game, confirmed []uuid.UUID) ([]games.Game, error) {
+	// Round robin owns the whole qualifying schedule: replace resets it
+	// entirely (any format's unplayed rows included), never results.
 	if hasResults(existing) {
 		return nil, &conflictError{msg: "Results exist; replace must not destroy them"}
 	}
@@ -371,7 +408,7 @@ func (a *API) generateRoundRobin(ctx context.Context, request PostEventsV1EventI
 	return generated, nil
 }
 
-func (a *API) generateSwiss(ctx context.Context, request PostEventsV1EventIdGamesGenerateRequestObject, existing []games.Game, confirmed []uuid.UUID) ([]games.Game, error) {
+func (a *API) generateSwiss(ctx context.Context, request PostEventsV1EventIdGamesGenerateRequestObject, existing []games.Game, confirmed []uuid.UUID, names map[string]string) ([]games.Game, error) {
 	round := nextSwissRound(existing)
 	if request.Body.Round != nil {
 		if *request.Body.Round <= maxRound(existing) {
@@ -380,9 +417,11 @@ func (a *API) generateSwiss(ctx context.Context, request PostEventsV1EventIdGame
 		round = *request.Body.Round
 	}
 
-	names, err := a.teamNames(ctx, confirmed)
-	if err != nil {
-		return nil, err
+	if replaceRequested(*request.Body) {
+		if err := a.replaceSwissRound(ctx, request.EventId, existing, round); err != nil {
+			return nil, err
+		}
+		existing = removeRound(existing, round)
 	}
 
 	generated, err := games.GenerateSwissRound(request.EventId, confirmed, names, existing, round)
@@ -393,6 +432,37 @@ func (a *API) generateSwiss(ctx context.Context, request PostEventsV1EventIdGame
 		return nil, err
 	}
 	return generated, nil
+}
+
+// replaceSwissRound deletes the target round's unplayed games so the round
+// can be regenerated; any result in the round blocks the replace.
+func (a *API) replaceSwissRound(ctx context.Context, eventID uuid.UUID, existing []games.Game, round int) error {
+	var ids []uuid.UUID
+	for _, g := range existing {
+		if g.Round != round {
+			continue
+		}
+		switch g.Status {
+		case games.GameStatusCompleted, games.GameStatusForfeit, games.GameStatusDoubleForfeit:
+			return &conflictError{msg: "Round holds results; replace must not destroy them"}
+		default:
+			ids = append(ids, g.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return a.db.DeleteGames(ctx, eventID, ids)
+}
+
+func removeRound(existing []games.Game, round int) []games.Game {
+	out := existing[:0]
+	for _, g := range existing {
+		if g.Round != round {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 func hasResults(existing []games.Game) bool {
@@ -483,7 +553,7 @@ func (a *API) PutEventsV1EventIdGamesGameId(ctx context.Context, request PutEven
 			case games.REASON_EVENT_FINALIZED:
 				return PutEventsV1EventIdGamesGameId409JSONResponse{
 					Code:    Conflict,
-					Message: "Event is FINALIZED; unfinalize first",
+					Message: "Event is FINALIZED; scoring locked",
 				}, nil
 			case games.REASON_GAME_DOES_NOT_EXIST:
 				// The game existed at read time, so this is a concurrent

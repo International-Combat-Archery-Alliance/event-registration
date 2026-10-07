@@ -450,7 +450,7 @@ paths:
   /events/v1/{eventId}/games/{gameId}:
     put:
       summary: Enter a game score/status
-      description: Admin score entry. Blocked once the event is FINALIZED (unfinalize first).
+      description: Admin score entry. Blocked once the event is FINALIZED.
       security:
         - icaaCookieAuth: [admin]
         - icaaBearerAuth: [admin]

@@ -424,3 +424,140 @@ func TestGetStandingsHandler(t *testing.T) {
 		}
 	})
 }
+
+func TestGenerateCrossFormatRejected(t *testing.T) {
+	eventID := uuid.New()
+	confirmedOf := func(n int) []teams.Participation {
+		out := make([]teams.Participation, n)
+		for i := range out {
+			out[i] = teams.Participation{EventID: eventID, TeamID: uuid.New(), Status: teams.ParticipationStatusConfirmed, Version: 1}
+		}
+		return out
+	}
+	newMock := func(confirmed []teams.Participation) *mockDB {
+		return &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return gamesTestEvent(eventID, events.EventStatusInProgress, -time.Hour), nil
+			},
+			ListParticipationsForEventFunc: func(ctx context.Context, eventID uuid.UUID) ([]teams.Participation, error) {
+				return confirmed, nil
+			},
+			ListGamesForEventFunc: func(ctx context.Context, eventID uuid.UUID) ([]games.Game, error) {
+				return nil, nil
+			},
+		}
+	}
+
+	t.Run("round robin rejects explicit round", func(t *testing.T) {
+		format, round := ROUNDROBIN, 2
+		resp, err := gamesTestAPI(newMock(confirmedOf(6))).PostEventsV1EventIdGamesGenerate(gamesCtx(),
+			PostEventsV1EventIdGamesGenerateRequestObject{EventId: eventID, Body: &GenerateRequest{Format: format, Round: &round}})
+		require.NoError(t, err)
+		switch r := resp.(type) {
+		case PostEventsV1EventIdGamesGenerate400JSONResponse:
+			assert.Equal(t, InvalidBody, r.Code)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
+	t.Run("swiss rejects mirror", func(t *testing.T) {
+		format, mirror := SWISS, true
+		resp, err := gamesTestAPI(newMock(confirmedOf(6))).PostEventsV1EventIdGamesGenerate(gamesCtx(),
+			PostEventsV1EventIdGamesGenerateRequestObject{EventId: eventID, Body: &GenerateRequest{Format: format, Mirror: &mirror}})
+		require.NoError(t, err)
+		switch r := resp.(type) {
+		case PostEventsV1EventIdGamesGenerate400JSONResponse:
+			assert.Equal(t, InvalidBody, r.Code)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+}
+
+func TestGenerateSwissReplace(t *testing.T) {
+	t.Run("replace regenerates the target round", func(t *testing.T) {
+		eventID := uuid.New()
+		ids := []uuid.UUID{uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+		confirmed := make([]teams.Participation, len(ids))
+		for i, id := range ids {
+			confirmed[i] = teams.Participation{EventID: eventID, TeamID: id, Status: teams.ParticipationStatusConfirmed, Version: 1}
+		}
+		a, b := ids[0], ids[1]
+		round1 := games.Game{
+			ID: eventID, EventID: eventID, Phase: games.GamePhaseQualifying,
+			Round: 1, Seq: 1, Status: games.GameStatusScheduled,
+			SideA: games.Side{TeamID: &a}, SideB: games.Side{TeamID: &b}, Version: 1,
+		}
+		var deleted []uuid.UUID
+		var created int
+		replace := true
+		format := SWISS
+		round := 1
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return gamesTestEvent(eventID, events.EventStatusInProgress, -time.Hour), nil
+			},
+			ListParticipationsForEventFunc: func(ctx context.Context, eventID uuid.UUID) ([]teams.Participation, error) {
+				return confirmed, nil
+			},
+			ListGamesForEventFunc: func(ctx context.Context, eventID uuid.UUID) ([]games.Game, error) {
+				return []games.Game{round1}, nil
+			},
+			DeleteGamesFunc: func(ctx context.Context, eventID uuid.UUID, gameIDs []uuid.UUID) error {
+				deleted = gameIDs
+				return nil
+			},
+			CreateGamesFunc: func(ctx context.Context, gameList []games.Game) error {
+				created = len(gameList)
+				return nil
+			},
+			GetTeamFunc: func(ctx context.Context, id uuid.UUID) (teams.Team, error) {
+				return teams.Team{ID: id, Name: "T", Status: teams.TeamStatusActive}, nil
+			},
+		}
+		resp, err := gamesTestAPI(mock).PostEventsV1EventIdGamesGenerate(gamesCtx(),
+			PostEventsV1EventIdGamesGenerateRequestObject{EventId: eventID, Body: &GenerateRequest{Format: format, Round: &round, Replace: &replace}})
+		require.NoError(t, err)
+		switch r := resp.(type) {
+		case PostEventsV1EventIdGamesGenerate200JSONResponse:
+			assert.NotEmpty(t, r.Games)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+		assert.Equal(t, []uuid.UUID{round1.ID}, deleted)
+		assert.Greater(t, created, 0)
+	})
+}
+
+func TestGenerateInfraFailureIs500(t *testing.T) {
+	eventID := uuid.New()
+	confirmed := []teams.Participation{}
+	for i := 0; i < 6; i++ {
+		confirmed = append(confirmed, teams.Participation{EventID: eventID, TeamID: uuid.New(), Status: teams.ParticipationStatusConfirmed, Version: 1})
+	}
+	mock := &mockDB{
+		GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+			return gamesTestEvent(eventID, events.EventStatusInProgress, -time.Hour), nil
+		},
+		ListParticipationsForEventFunc: func(ctx context.Context, eventID uuid.UUID) ([]teams.Participation, error) {
+			return confirmed, nil
+		},
+		ListGamesForEventFunc: func(ctx context.Context, eventID uuid.UUID) ([]games.Game, error) {
+			return nil, nil
+		},
+		CreateGamesFunc: func(ctx context.Context, gameList []games.Game) error {
+			return games.NewTimeoutError("write timed out")
+		},
+	}
+	format := ROUNDROBIN
+	resp, err := gamesTestAPI(mock).PostEventsV1EventIdGamesGenerate(gamesCtx(),
+		PostEventsV1EventIdGamesGenerateRequestObject{EventId: eventID, Body: &GenerateRequest{Format: format}})
+	require.NoError(t, err)
+	switch r := resp.(type) {
+	case PostEventsV1EventIdGamesGenerate500JSONResponse:
+		assert.Equal(t, InternalError, r.Code)
+	default:
+		t.Fatalf("unexpected response type: %T", resp)
+	}
+}

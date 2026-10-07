@@ -147,3 +147,36 @@ func TestSeedParticipation(t *testing.T) {
 		}
 	})
 }
+
+func TestSeedIntoFinalizedRefused(t *testing.T) {
+	eventID, teamID := uuid.New(), uuid.New()
+	event := seedEvent(eventID)
+	event.Status = events.EventStatusFinalized
+	team := seedTeam(teamID)
+	var writes int
+	mock := &mockDB{
+		GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+			return event, nil
+		},
+		GetTeamFunc: func(ctx context.Context, id uuid.UUID) (teams.Team, error) {
+			return team, nil
+		},
+		SeedParticipationFunc: func(ctx context.Context, participation teams.Participation, history teams.TeamHistory) error {
+			writes++
+			return nil
+		},
+	}
+	api := NewAPI(mock, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockSubscriberManager{}, &mockCheckoutManager{}, func(context.Context) error { return nil })
+
+	resp, err := api.PostEventsV1EventIdTeamsTeamIdSeed(
+		ctxWithLogger(context.Background(), noopLogger),
+		PostEventsV1EventIdTeamsTeamIdSeedRequestObject{EventId: eventID, TeamId: teamID})
+	require.NoError(t, err)
+	switch r := resp.(type) {
+	case PostEventsV1EventIdTeamsTeamIdSeed409JSONResponse:
+		assert.Equal(t, Conflict, r.Code)
+	default:
+		t.Fatalf("unexpected response type: %T", resp)
+	}
+	assert.Equal(t, 0, writes, "refused seed must not write")
+}

@@ -40,6 +40,13 @@ func (a *API) PostEventsV1EventIdTeamsTeamIdSeed(ctx context.Context, request Po
 		}, nil
 	}
 
+	if event.Status.NormalizeDefault() == events.EventStatusFinalized {
+		return PostEventsV1EventIdTeamsTeamIdSeed409JSONResponse{
+			Code:    Conflict,
+			Message: "Event is FINALIZED; standings locked",
+		}, nil
+	}
+
 	if _, err := a.db.GetTeam(ctx, request.TeamId); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())

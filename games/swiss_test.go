@@ -213,6 +213,9 @@ func TestSwissGuards(t *testing.T) {
 		}
 		_, err := GenerateSwissRound(eventID, ids, names, priors, 3)
 		require.Error(t, err, "E has only met F among the remainder")
+		var gameErr *Error
+		require.ErrorAs(t, err, &gameErr)
+		assert.Equal(t, REASON_NO_VALID_PAIRING, gameErr.Reason)
 	})
 }
 

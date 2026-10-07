@@ -14,6 +14,7 @@ const (
 	REASON_INVALID_GAME_STATUS             ErrorReason = "INVALID_GAME_STATUS"
 	REASON_INVALID_GAME_RESULT             ErrorReason = "INVALID_GAME_RESULT"
 	REASON_INVALID_SCHEDULE                ErrorReason = "INVALID_SCHEDULE"
+	REASON_NO_VALID_PAIRING                ErrorReason = "NO_VALID_PAIRING"
 	REASON_EVENT_FINALIZED                 ErrorReason = "EVENT_FINALIZED"
 	REASON_TIMEOUT                         ErrorReason = "TIMEOUT"
 )
@@ -82,6 +83,10 @@ func NewTimeoutError(message string) *Error {
 
 func NewInvalidScheduleError(message string, cause error) *Error {
 	return newGameError(REASON_INVALID_SCHEDULE, message, cause)
+}
+
+func NewNoValidPairingError(message string, cause error) *Error {
+	return newGameError(REASON_NO_VALID_PAIRING, message, cause)
 }
 
 func NewEventFinalizedError(message string, cause error) *Error {

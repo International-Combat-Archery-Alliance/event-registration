@@ -242,7 +242,7 @@ func (d *DB) ListParticipationsForEvent(ctx context.Context, eventID uuid.UUID) 
 	expr, err := expression.NewBuilder().
 		WithKeyCondition(
 			expression.Key("PK").Equal(expression.Value(participationPK(eventID))).
-				And(expression.Key("SK").BeginsWith(teamEntityName)),
+				And(expression.Key("SK").BeginsWith(teamEntityName + "#")),
 		).Build()
 	if err != nil {
 		return nil, teams.NewFailedToFetchError("Failed to build participation query", err)
@@ -273,6 +273,9 @@ func (d *DB) ListParticipationsForEvent(ctx context.Context, eventID uuid.UUID) 
 			participation, err := participationFromDynamo(item)
 			if err != nil {
 				return nil, teams.NewFailedToFetchError("Failed to parse participations from DB", err)
+			}
+			if err := participation.Validate(); err != nil {
+				return nil, teams.NewFailedToFetchError("Stored participation is invalid", err)
 			}
 			result = append(result, participation)
 		}
