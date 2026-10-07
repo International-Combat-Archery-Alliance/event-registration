@@ -13,6 +13,7 @@ const (
 	REASON_INVALID_GAME_PHASE              ErrorReason = "INVALID_GAME_PHASE"
 	REASON_INVALID_GAME_STATUS             ErrorReason = "INVALID_GAME_STATUS"
 	REASON_INVALID_GAME_RESULT             ErrorReason = "INVALID_GAME_RESULT"
+	REASON_INVALID_SCHEDULE                ErrorReason = "INVALID_SCHEDULE"
 	REASON_TIMEOUT                         ErrorReason = "TIMEOUT"
 )
 
@@ -76,4 +77,8 @@ func NewInvalidGameResultError(message string, cause error) *Error {
 
 func NewTimeoutError(message string) *Error {
 	return newGameError(REASON_TIMEOUT, message, nil)
+}
+
+func NewInvalidScheduleError(message string, cause error) *Error {
+	return newGameError(REASON_INVALID_SCHEDULE, message, cause)
 }
