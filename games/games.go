@@ -150,6 +150,9 @@ func (g Game) Validate() error {
 		if g.ForfeitSide != nil {
 			return NewInvalidGameResultError("scheduled game must not carry a forfeit side", nil)
 		}
+		if g.SideA.Real() && g.SideB.Real() && *g.SideA.TeamID == *g.SideB.TeamID {
+			return NewInvalidGameResultError("game sides must be distinct teams", nil)
+		}
 	case GameStatusCompleted:
 		if err := requireContestedSides(g); err != nil {
 			return err

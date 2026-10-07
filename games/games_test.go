@@ -258,3 +258,23 @@ func TestGameStatusResolved(t *testing.T) {
 	}
 	assert.False(t, GameStatus("BOGUS").Resolved())
 }
+
+func TestGameValidateScheduledSides(t *testing.T) {
+	t.Run("same real team both sides rejected", func(t *testing.T) {
+		a := uuid.New()
+		g := validScheduledGame()
+		g.SideA, g.SideB = realSide(a), realSide(a)
+		err := g.Validate()
+		require.Error(t, err)
+		var gameErr *Error
+		require.ErrorAs(t, err, &gameErr)
+		assert.Equal(t, REASON_INVALID_GAME_RESULT, gameErr.Reason)
+	})
+
+	t.Run("undetermined playoff sides still allowed", func(t *testing.T) {
+		g := validScheduledGame()
+		g.Phase = GamePhasePlayoff
+		g.SideA, g.SideB = Side{}, Side{}
+		require.NoError(t, g.Validate())
+	})
+}
