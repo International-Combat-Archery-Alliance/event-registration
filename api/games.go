@@ -409,19 +409,23 @@ func (a *API) generateRoundRobin(ctx context.Context, request PostEventsV1EventI
 }
 
 func (a *API) generateSwiss(ctx context.Context, request PostEventsV1EventIdGamesGenerateRequestObject, existing []games.Game, confirmed []uuid.UUID, names map[string]string) ([]games.Game, error) {
+	if replaceRequested(*request.Body) {
+		round := nextSwissRound(existing)
+		if request.Body.Round != nil {
+			round = *request.Body.Round
+		}
+		if err := a.replaceSwissRound(ctx, request.EventId, existing, round); err != nil {
+			return nil, err
+		}
+		existing = removeRound(existing, round)
+	}
+
 	round := nextSwissRound(existing)
 	if request.Body.Round != nil {
 		if *request.Body.Round <= maxRound(existing) {
 			return nil, &conflictError{msg: "Swiss round already generated"}
 		}
 		round = *request.Body.Round
-	}
-
-	if replaceRequested(*request.Body) {
-		if err := a.replaceSwissRound(ctx, request.EventId, existing, round); err != nil {
-			return nil, err
-		}
-		existing = removeRound(existing, round)
 	}
 
 	generated, err := games.GenerateSwissRound(request.EventId, confirmed, names, existing, round)
