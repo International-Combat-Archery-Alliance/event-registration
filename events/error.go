@@ -14,6 +14,7 @@ const (
 	REASON_TIMEOUT                         ErrorReason = "TIMEOUT"
 	REASON_INVALID_EVENT_STATUS            ErrorReason = "INVALID_EVENT_STATUS"
 	REASON_INVALID_STATUS_TRANSITION       ErrorReason = "INVALID_STATUS_TRANSITION"
+	REASON_VERSION_CONFLICT                ErrorReason = "VERSION_CONFLICT"
 )
 
 type Error struct {
@@ -76,4 +77,8 @@ func NewInvalidEventStatusError(message string, cause error) *Error {
 
 func NewInvalidStatusTransitionError(message string, cause error) *Error {
 	return newEventError(REASON_INVALID_STATUS_TRANSITION, message, cause)
+}
+
+func NewVersionConflictError(message string, cause error) *Error {
+	return newEventError(REASON_VERSION_CONFLICT, message, cause)
 }

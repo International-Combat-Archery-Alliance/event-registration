@@ -50,8 +50,6 @@ func TestUpdateEventStatus(t *testing.T) {
 			to   EventStatus
 		}{
 			{EventStatusOpened, EventStatusInProgress},
-			{EventStatusOpened, EventStatusFinalized},
-			{EventStatusInProgress, EventStatusFinalized},
 		} {
 			repo := &mockRepository{
 				GetEventFunc: func(ctx context.Context, id uuid.UUID) (Event, error) {
@@ -131,4 +129,45 @@ func TestUpdateEventStatus(t *testing.T) {
 		assert.ErrorAs(t, err, &eventErr)
 		assert.Equal(t, REASON_INVALID_EVENT_STATUS, eventErr.Reason)
 	})
+}
+
+func TestUpdateEventFinalizeDeferred(t *testing.T) {
+	eventID := uuid.New()
+
+	for _, from := range []EventStatus{EventStatusOpened, EventStatusInProgress} {
+		repo := &mockRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (Event, error) {
+				return Event{ID: eventID, Version: 1, Name: "E", Status: from}, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event Event) error {
+				t.Fatal("UpdateEvent should not be called for deferred finalize")
+				return nil
+			},
+		}
+
+		_, err := UpdateEvent(context.Background(), repo, eventID, Event{Name: "E", Status: EventStatusFinalized})
+		assert.Error(t, err)
+		var eventErr *Error
+		assert.ErrorAs(t, err, &eventErr)
+		assert.Equal(t, REASON_INVALID_STATUS_TRANSITION, eventErr.Reason)
+	}
+}
+
+func TestUpdateEventVersionConflict(t *testing.T) {
+	eventID := uuid.New()
+
+	repo := &mockRepository{
+		GetEventFunc: func(ctx context.Context, id uuid.UUID) (Event, error) {
+			return Event{ID: eventID, Version: 1, Name: "E", Status: EventStatusOpened}, nil
+		},
+		UpdateEventFunc: func(ctx context.Context, event Event) error {
+			return &Error{Reason: REASON_EVENT_DOES_NOT_EXIST}
+		},
+	}
+
+	_, err := UpdateEvent(context.Background(), repo, eventID, Event{Name: "E"})
+	assert.Error(t, err)
+	var eventErr *Error
+	assert.ErrorAs(t, err, &eventErr)
+	assert.Equal(t, REASON_VERSION_CONFLICT, eventErr.Reason)
 }

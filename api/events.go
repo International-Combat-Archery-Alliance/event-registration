@@ -218,6 +218,13 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 					Code:    InvalidBody,
 					Message: "Invalid event status transition",
 				}, nil
+			case events.REASON_VERSION_CONFLICT:
+				// Upgraded to 409 Conflict stacked above (49a adds the
+				// Conflict code); 400 carries the retry message meanwhile.
+				return PatchEventsV1Id400JSONResponse{
+					Code:    InvalidBody,
+					Message: "Event changed concurrently; refetch and retry",
+				}, nil
 			}
 		}
 

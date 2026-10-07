@@ -251,3 +251,33 @@ func TestPostEventsRejectsInvalidStatus(t *testing.T) {
 		t.Fatalf("unexpected response type: %T", resp)
 	}
 }
+
+func TestPatchEventsRefusesFinalizeInMVP(t *testing.T) {
+	eventID := uuid.New()
+	mock := &mockDB{
+		GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+			return events.Event{ID: eventID, Version: 1, Name: "E", Status: events.EventStatusInProgress, TimeZone: time.UTC}, nil
+		},
+	}
+	api := NewAPI(mock, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockSubscriberManager{}, &mockCheckoutManager{}, func(context.Context) error { return nil })
+
+	now := time.Now()
+	finalized := FINALIZED
+	body := Event{
+		Name:                  "E",
+		StartTime:             now,
+		EndTime:               now.Add(time.Hour),
+		RegistrationCloseTime: now,
+		RegistrationOptions:   []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}},
+		Status:                &finalized,
+		SignUpStats:           &SignUpStats{},
+	}
+	resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{Id: eventID, Body: &body})
+	require.NoError(t, err)
+	switch r := resp.(type) {
+	case PatchEventsV1Id400JSONResponse:
+		assert.Equal(t, InvalidBody, r.Code)
+	default:
+		t.Fatalf("unexpected response type: %T", resp)
+	}
+}
