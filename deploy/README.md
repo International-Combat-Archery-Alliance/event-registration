@@ -41,6 +41,9 @@ aws iam put-role-policy --role-name event-registration-github-deploy \
   packaged template there on every deploy, even for image-based Lambdas)
 - ECR image push on the existing `icaaeventregistration` repo
   (`ecr:GetAuthorizationToken` on `*` is required by AWS, it can't be scoped)
+- ECR Public auth (`ecr-public:GetAuthorizationToken` + `sts:GetServiceBearerToken`
+  on `*`) so `sam build` can pull the public Lambda adapter base image without
+  hitting anonymous rate limits
 - Lambda `*` on `function:event-registration-*` (SAM names functions
   `<stack>-<resource>-<hash>`)
 - `apigatewayv2:*` (API Gateway has no resource-level scoping granular enough
