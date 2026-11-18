@@ -113,11 +113,6 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		return Event{}, err
 	}
 
-	media := existingEvent.Media
-	if event.Media != nil {
-		media = event.Media
-	}
-
 	updatedEvent := Event{
 		ID:                    id,
 		Version:               existingEvent.Version + 1,
@@ -134,7 +129,7 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		NumTotalPlayers:       existingEvent.NumTotalPlayers,
 		RulesDocLink:          event.RulesDocLink,
 		ImageName:             event.ImageName,
-		Media:                 media,
+		Media:                 event.Media,
 		MailingListGroupID:    existingEvent.MailingListGroupID,
 	}
 

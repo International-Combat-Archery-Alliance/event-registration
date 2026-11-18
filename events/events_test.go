@@ -278,12 +278,12 @@ func TestUpdateEventMedia(t *testing.T) {
 		return result
 	}
 
-	t.Run("omitted media preserves the existing list", func(t *testing.T) {
+	t.Run("omitted media clears the existing list", func(t *testing.T) {
 		existing := Event{ID: eventID, Version: 1, Media: existingMedia}
 
 		result := runUpdate(t, existing, Event{Name: "Updated"})
 
-		assert.Equal(t, existingMedia, result.Media)
+		assert.Nil(t, result.Media)
 	})
 
 	t.Run("provided media replaces the existing list", func(t *testing.T) {

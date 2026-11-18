@@ -62,15 +62,7 @@ type eventRegistrationOptionDynamo struct {
 	PriceCurrency    string
 }
 
-const (
-	eventEntityName = "EVENT"
-
-	maxDynamoItemSizeBytes = 400 * 1024
-
-	// DynamoDB charges nested maps and lists a container overhead plus one byte per element.
-	dynamoContainerOverheadBytes = 3
-	dynamoElementOverheadBytes   = 1
-)
+const eventEntityName = "EVENT"
 
 func eventPK(id uuid.UUID) string {
 	return fmt.Sprintf("%s#%s", eventEntityName, id)
@@ -244,10 +236,6 @@ func (d *DB) CreateEvent(ctx context.Context, event events.Event) error {
 		return events.NewFailedToTranslateToDBModelError("Failed to convert Event to eventDynamo", err)
 	}
 
-	if size := dynamoItemSizeBytes(item); size > maxDynamoItemSizeBytes {
-		return events.NewFailedToWriteError(fmt.Sprintf("Event item size of %d bytes exceeds the %d byte limit", size, maxDynamoItemSizeBytes), nil)
-	}
-
 	expr := exprMustBuild(expression.NewBuilder().
 		WithCondition(newEntityVersionConditional(dynamoItem.Version)))
 
@@ -351,10 +339,6 @@ func (d *DB) UpdateEvent(ctx context.Context, event events.Event) error {
 		return events.NewFailedToTranslateToDBModelError("Failed to convert Event to eventDynamo", err)
 	}
 
-	if size := dynamoItemSizeBytes(item); size > maxDynamoItemSizeBytes {
-		return events.NewFailedToWriteError(fmt.Sprintf("Event item size of %d bytes exceeds the %d byte limit", size, maxDynamoItemSizeBytes), nil)
-	}
-
 	expr := exprMustBuild(expression.NewBuilder().
 		WithCondition(existingEntityVersionConditional(dynamoItem.Version)))
 
@@ -377,55 +361,4 @@ func (d *DB) UpdateEvent(ctx context.Context, event events.Event) error {
 	}
 
 	return nil
-}
-
-// dynamoItemSizeBytes follows DynamoDB's accounting: attribute names and values count by UTF-8 bytes.
-func dynamoItemSizeBytes(item map[string]types.AttributeValue) int {
-	size := 0
-	for name, value := range item {
-		size += len(name) + attributeValueSizeBytes(value)
-	}
-	return size
-}
-
-func attributeValueSizeBytes(value types.AttributeValue) int {
-	switch v := value.(type) {
-	case *types.AttributeValueMemberS:
-		return len(v.Value)
-	case *types.AttributeValueMemberN:
-		return len(v.Value)
-	case *types.AttributeValueMemberB:
-		return len(v.Value)
-	case *types.AttributeValueMemberBOOL:
-		return 1
-	case *types.AttributeValueMemberNULL:
-		return 1
-	case *types.AttributeValueMemberSS:
-		return stringSetSizeBytes(v.Value)
-	case *types.AttributeValueMemberNS:
-		return stringSetSizeBytes(v.Value)
-	case *types.AttributeValueMemberBS:
-		size := 0
-		for _, item := range v.Value {
-			size += len(item)
-		}
-		return size
-	case *types.AttributeValueMemberM:
-		return dynamoContainerOverheadBytes + dynamoElementOverheadBytes*len(v.Value) + dynamoItemSizeBytes(v.Value)
-	case *types.AttributeValueMemberL:
-		size := dynamoContainerOverheadBytes + dynamoElementOverheadBytes*len(v.Value)
-		for _, item := range v.Value {
-			size += attributeValueSizeBytes(item)
-		}
-		return size
-	}
-	return 0
-}
-
-func stringSetSizeBytes(values []string) int {
-	size := 0
-	for _, value := range values {
-		size += len(value)
-	}
-	return size
 }

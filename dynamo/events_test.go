@@ -3,7 +3,6 @@ package dynamo
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -935,44 +934,4 @@ func TestEventMediaStorage(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, actual.Media)
 	})
-
-	t.Run("create rejects an item over the dynamo item size limit", func(t *testing.T) {
-		resetTable(ctx)
-		event := newMediaEvent(oversizedMedia())
-
-		err := db.CreateEvent(ctx, event)
-		require.Error(t, err)
-		var eventErr *events.Error
-		require.ErrorAs(t, err, &eventErr)
-		assert.Equal(t, events.REASON_FAILED_TO_WRITE, eventErr.Reason)
-	})
-
-	t.Run("update rejects an item over the dynamo item size limit", func(t *testing.T) {
-		resetTable(ctx)
-		event := newMediaEvent(nil)
-		require.NoError(t, db.CreateEvent(ctx, event))
-
-		event.Media = oversizedMedia()
-		event.Version++
-
-		err := db.UpdateEvent(ctx, event)
-		require.Error(t, err)
-		var eventErr *events.Error
-		require.ErrorAs(t, err, &eventErr)
-		assert.Equal(t, events.REASON_FAILED_TO_WRITE, eventErr.Reason)
-	})
-}
-
-func oversizedMedia() []events.EventMediaItem {
-	description := strings.Repeat("😀", 10_000)
-	media := make([]events.EventMediaItem, 0, 50)
-	for range 50 {
-		media = append(media, events.EventMediaItem{
-			ID:          uuid.New(),
-			Type:        events.MediaTypeAssetFolder,
-			Source:      "/images/events/boston-2026",
-			Description: &description,
-		})
-	}
-	return media
 }

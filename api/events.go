@@ -269,7 +269,8 @@ func eventToApiEvent(event events.Event) (Event, error) {
 }
 
 func (a *API) apiEventToEvent(event Event) (events.Event, error) {
-	if err := a.validateMedia(event.Media); err != nil {
+	media := apiMediaToEventMedia(event.Media)
+	if err := events.ValidateMedia(media, a.env == LOCAL); err != nil {
 		return events.Event{}, err
 	}
 
@@ -310,7 +311,7 @@ func (a *API) apiEventToEvent(event Event) (events.Event, error) {
 		},
 		RulesDocLink: event.RulesDocLink,
 		ImageName:    event.ImageName,
-		Media:        apiMediaToEventMedia(event.Media),
+		Media:        media,
 	}, nil
 }
 
