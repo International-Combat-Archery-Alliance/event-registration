@@ -2,6 +2,10 @@ package ptr
 
 import "time"
 
+func To[T any](v T) *T {
+	return &v
+}
+
 func Int(i int) *int {
 	return &i
 }

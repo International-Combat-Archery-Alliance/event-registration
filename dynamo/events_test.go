@@ -963,7 +963,6 @@ func TestEventMediaStorage(t *testing.T) {
 	})
 }
 
-// oversizedMedia is larger than DynamoDB's 400 KB item limit once UTF-8 encoded.
 func oversizedMedia() []events.EventMediaItem {
 	description := strings.Repeat("😀", 10_000)
 	media := make([]events.EventMediaItem, 0, 50)

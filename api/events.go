@@ -122,6 +122,8 @@ func (a *API) PostEventsV1(ctx context.Context, request PostEventsV1RequestObjec
 
 	logger.Info("created new event", slog.String("event-id", id.String()))
 
+	request.Body.Media = eventMediaToApiMedia(event.Media)
+
 	return PostEventsV1200JSONResponse(*request.Body), nil
 }
 

@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
-	"github.com/International-Combat-Archery-Alliance/event-registration/events"
 	"github.com/google/uuid"
+
+	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
+	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
 )
 
 const (
@@ -20,36 +24,12 @@ const (
 	maxEventMediaDescriptionLength = 1000
 )
 
-var (
-	encodedMediaPathSegments   = []string{"%2e", "%2f", "%5c"}
-	encodedMediaPathSeparators = []string{"%2f", "%5c"}
-)
-
 func eventMediaToApiMedia(media []events.EventMediaItem) *[]EventMediaItem {
 	if len(media) == 0 {
 		return nil
 	}
 
-	apiMedia := make([]EventMediaItem, 0, len(media))
-	for _, item := range media {
-		apiItem := EventMediaItem{
-			Id:          item.ID,
-			Type:        EventMediaType(item.Type),
-			Source:      item.Source,
-			Title:       item.Title,
-			Description: item.Description,
-		}
-		if item.DisplayMode != nil {
-			displayMode := EventMediaDisplayMode(*item.DisplayMode)
-			apiItem.DisplayMode = &displayMode
-		}
-		if item.Icon != nil {
-			icon := EventMediaIcon(*item.Icon)
-			apiItem.Icon = &icon
-		}
-		apiMedia = append(apiMedia, apiItem)
-	}
-
+	apiMedia := slices.Map(media, eventMediaItemToApiMediaItem)
 	return &apiMedia
 }
 
@@ -57,28 +37,45 @@ func apiMediaToEventMedia(media *[]EventMediaItem) []events.EventMediaItem {
 	if media == nil {
 		return nil
 	}
-
-	eventMedia := make([]events.EventMediaItem, 0, len(*media))
-	for _, item := range *media {
-		eventItem := events.EventMediaItem{
-			ID:          item.Id,
-			Type:        events.EventMediaType(item.Type),
-			Source:      item.Source,
-			Title:       item.Title,
-			Description: item.Description,
-		}
-		if item.DisplayMode != nil {
-			displayMode := events.EventMediaDisplayMode(*item.DisplayMode)
-			eventItem.DisplayMode = &displayMode
-		}
-		if item.Icon != nil {
-			icon := events.EventMediaIcon(*item.Icon)
-			eventItem.Icon = &icon
-		}
-		eventMedia = append(eventMedia, eventItem)
+	if *media == nil {
+		return make([]events.EventMediaItem, 0)
 	}
 
-	return eventMedia
+	return slices.Map(*media, apiMediaItemToEventMediaItem)
+}
+
+func eventMediaItemToApiMediaItem(item events.EventMediaItem) EventMediaItem {
+	apiItem := EventMediaItem{
+		Id:          item.ID,
+		Type:        EventMediaType(item.Type),
+		Source:      item.Source,
+		Title:       item.Title,
+		Description: item.Description,
+	}
+	if item.DisplayMode != nil {
+		apiItem.DisplayMode = ptr.To(EventMediaDisplayMode(*item.DisplayMode))
+	}
+	if item.Icon != nil {
+		apiItem.Icon = ptr.To(EventMediaIcon(*item.Icon))
+	}
+	return apiItem
+}
+
+func apiMediaItemToEventMediaItem(item EventMediaItem) events.EventMediaItem {
+	eventItem := events.EventMediaItem{
+		ID:          item.Id,
+		Type:        events.EventMediaType(item.Type),
+		Source:      item.Source,
+		Title:       item.Title,
+		Description: item.Description,
+	}
+	if item.DisplayMode != nil {
+		eventItem.DisplayMode = ptr.To(events.EventMediaDisplayMode(*item.DisplayMode))
+	}
+	if item.Icon != nil {
+		eventItem.Icon = ptr.To(events.EventMediaIcon(*item.Icon))
+	}
+	return eventItem
 }
 
 func (a *API) validateMedia(media *[]EventMediaItem) error {
@@ -161,39 +158,31 @@ func validateAssetFolderSource(source string) error {
 	if source != "/" && strings.HasSuffix(source, "/") {
 		return errors.New("folder source must not end with /")
 	}
-
-	loweredSource := strings.ToLower(source)
-	for _, encoded := range encodedMediaPathSeparators {
-		if strings.Contains(loweredSource, encoded) {
-			return fmt.Errorf("folder source must not contain encoded path segment %q", encoded)
-		}
+	if strings.ContainsAny(source, `\?#`) {
+		return errors.New("folder source must not contain backslashes, queries, or fragments")
+	}
+	if containsControlChar(source) {
+		return errors.New("folder source must not contain control characters")
 	}
 
 	decoded, err := url.PathUnescape(source)
 	if err != nil {
-		return fmt.Errorf("folder source has invalid percent-encoding: %w", err)
+		return fmt.Errorf("folder source must be a canonical unencoded path: %w", err)
+	}
+	if decoded != source {
+		return errors.New("folder source must not contain percent-encoded characters")
 	}
 
-	loweredDecoded := strings.ToLower(decoded)
-	for _, encoded := range encodedMediaPathSegments {
-		if strings.Contains(loweredDecoded, encoded) {
-			return fmt.Errorf("folder source must not contain encoded path segment %q", encoded)
-		}
-	}
-
-	if decoded == "/" {
+	if source == "/" {
 		return nil
 	}
 
-	for _, segment := range strings.Split(strings.TrimPrefix(decoded, "/"), "/") {
+	for _, segment := range strings.Split(strings.TrimPrefix(source, "/"), "/") {
 		switch segment {
 		case "":
 			return errors.New("folder source must not contain empty segments")
 		case ".", "..":
 			return errors.New("folder source must not contain relative segments")
-		}
-		if strings.ContainsAny(segment, `\?#`) {
-			return errors.New("folder source must not contain backslashes, queries, or fragments")
 		}
 	}
 
@@ -201,6 +190,13 @@ func validateAssetFolderSource(source string) error {
 }
 
 func (a *API) validateMediaSourceURL(source string) error {
+	if strings.Contains(source, `\`) {
+		return errors.New("source must not contain backslashes")
+	}
+	if containsSpaceOrControlChar(source) {
+		return errors.New("source must not contain whitespace or control characters")
+	}
+
 	parsed, err := url.Parse(source)
 	if err != nil {
 		return fmt.Errorf("source is not a valid URL: %w", err)
@@ -223,6 +219,24 @@ func (a *API) validateMediaSourceURL(source string) error {
 	default:
 		return fmt.Errorf("source must use http or https, got %q", parsed.Scheme)
 	}
+}
+
+func containsControlChar(s string) bool {
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSpaceOrControlChar(s string) bool {
+	for _, r := range s {
+		if unicode.IsSpace(r) || r < 0x20 || r == 0x7f {
+			return true
+		}
+	}
+	return false
 }
 
 func isLoopbackHost(host string) bool {

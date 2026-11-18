@@ -254,7 +254,7 @@ func TestUpdateEventMedia(t *testing.T) {
 	eventID := uuid.New()
 	existingMedia := []EventMediaItem{
 		{ID: uuid.New(), Type: MediaTypeAssetFolder, Source: "/images/events/boston-2026", Title: ptr.String("Photos")},
-		{ID: uuid.New(), Type: MediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123", DisplayMode: displayModePtr(MediaDisplayModeEmbed)},
+		{ID: uuid.New(), Type: MediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123", DisplayMode: ptr.To(MediaDisplayModeEmbed)},
 	}
 
 	runUpdate := func(t *testing.T, existing Event, update Event) Event {
@@ -289,7 +289,7 @@ func TestUpdateEventMedia(t *testing.T) {
 	t.Run("provided media replaces the existing list", func(t *testing.T) {
 		existing := Event{ID: eventID, Version: 1, Media: existingMedia}
 		replacement := []EventMediaItem{
-			{ID: uuid.New(), Type: MediaTypeExternalLink, Source: "https://example.com/bracket.pdf", Icon: iconPtr(MediaIconPDF)},
+			{ID: uuid.New(), Type: MediaTypeExternalLink, Source: "https://example.com/bracket.pdf", Icon: ptr.To(MediaIconPDF)},
 		}
 
 		result := runUpdate(t, existing, Event{Name: "Updated", Media: replacement})
@@ -317,14 +317,6 @@ func TestUpdateEventMedia(t *testing.T) {
 
 		assert.Equal(t, ordered, result.Media)
 	})
-}
-
-func displayModePtr(mode EventMediaDisplayMode) *EventMediaDisplayMode {
-	return &mode
-}
-
-func iconPtr(icon EventMediaIcon) *EventMediaIcon {
-	return &icon
 }
 
 func TestUpdateEventTimeZone(t *testing.T) {
