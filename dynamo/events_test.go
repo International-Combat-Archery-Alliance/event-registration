@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -797,5 +798,140 @@ func TestTimeZoneStorage(t *testing.T) {
 			// All events should have the same UTC time but different local representations
 			assert.True(t, event.StartTime.Equal(retrieved.StartTime))
 		}
+	})
+}
+
+func TestEventMediaStorage(t *testing.T) {
+	ctx := context.Background()
+
+	newMediaEvent := func(media []events.EventMediaItem) events.Event {
+		return events.Event{
+			ID:        uuid.New(),
+			Name:      "Media Event",
+			StartTime: time.Now().UTC().Truncate(time.Second),
+			EndTime:   time.Now().Add(time.Hour).UTC().Truncate(time.Second),
+			Version:   1,
+			Media:     media,
+		}
+	}
+
+	getRawItem := func(t *testing.T, id uuid.UUID) map[string]types.AttributeValue {
+		t.Helper()
+
+		dynamoEvent := newEventDynamo(events.Event{ID: id})
+		key, err := attributevalue.MarshalMap(map[string]any{
+			"PK": dynamoEvent.PK,
+			"SK": dynamoEvent.SK,
+		})
+		require.NoError(t, err)
+
+		out, err := dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
+			TableName: aws.String(tableName),
+			Key:       key,
+		})
+		require.NoError(t, err)
+
+		return out.Item
+	}
+
+	t.Run("media round-trips with optional fields and order", func(t *testing.T) {
+		resetTable(ctx)
+
+		title := "Event Photos"
+		description := "Finals, podium, and behind-the-scenes shots."
+		displayMode := events.MediaDisplayModeGallery
+		icon := events.MediaIconPhotoGallery
+		media := []events.EventMediaItem{
+			{
+				ID:          uuid.New(),
+				Type:        events.MediaTypeAssetFolder,
+				Source:      "/images/events/boston-2026",
+				Title:       &title,
+				Description: &description,
+				DisplayMode: &displayMode,
+				Icon:        &icon,
+			},
+			{
+				ID:     uuid.New(),
+				Type:   events.MediaTypeVideo,
+				Source: "https://www.youtube.com/watch?v=abc123",
+			},
+			{
+				ID:     uuid.New(),
+				Type:   events.MediaTypeExternalLink,
+				Source: "https://example.com/bracket.pdf",
+				Title:  ptr.String("Bracket"),
+			},
+		}
+		event := newMediaEvent(media)
+
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		actual, err := db.GetEvent(ctx, event.ID)
+		require.NoError(t, err)
+		assert.Equal(t, media, actual.Media)
+
+		raw := getRawItem(t, event.ID)
+		mediaList, ok := raw["Media"].(*types.AttributeValueMemberL)
+		require.True(t, ok)
+		require.Len(t, mediaList.Value, 3)
+
+		videoItem, ok := mediaList.Value[1].(*types.AttributeValueMemberM)
+		require.True(t, ok)
+		assert.NotContains(t, videoItem.Value, "Title")
+		assert.NotContains(t, videoItem.Value, "Description")
+		assert.NotContains(t, videoItem.Value, "DisplayMode")
+		assert.NotContains(t, videoItem.Value, "Icon")
+	})
+
+	t.Run("empty media writes no Media attribute", func(t *testing.T) {
+		resetTable(ctx)
+		event := newMediaEvent(nil)
+
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		assert.NotContains(t, getRawItem(t, event.ID), "Media")
+
+		actual, err := db.GetEvent(ctx, event.ID)
+		require.NoError(t, err)
+		assert.Empty(t, actual.Media)
+	})
+
+	t.Run("clearing media on update removes the attribute", func(t *testing.T) {
+		resetTable(ctx)
+		event := newMediaEvent([]events.EventMediaItem{
+			{ID: uuid.New(), Type: events.MediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123"},
+		})
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		event.Media = nil
+		event.Version++
+		require.NoError(t, db.UpdateEvent(ctx, event))
+
+		assert.NotContains(t, getRawItem(t, event.ID), "Media")
+
+		actual, err := db.GetEvent(ctx, event.ID)
+		require.NoError(t, err)
+		assert.Empty(t, actual.Media)
+	})
+
+	t.Run("legacy item without a Media attribute reads as empty", func(t *testing.T) {
+		resetTable(ctx)
+		event := newMediaEvent([]events.EventMediaItem{
+			{ID: uuid.New(), Type: events.MediaTypeAssetFile, Source: "https://cdn.example.com/photo.jpg"},
+		})
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		item := getRawItem(t, event.ID)
+		delete(item, "Media")
+		_, err := dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+			TableName: aws.String(tableName),
+			Item:      item,
+		})
+		require.NoError(t, err)
+
+		actual, err := db.GetEvent(ctx, event.ID)
+		require.NoError(t, err)
+		assert.Empty(t, actual.Media)
 	})
 }

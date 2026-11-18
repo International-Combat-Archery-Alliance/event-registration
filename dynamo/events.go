@@ -42,7 +42,18 @@ type eventDynamo struct {
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
-	MailingListGroupID     *string
+	Media                 []eventMediaItemDynamo `dynamodbav:"Media,omitempty"`
+	MailingListGroupID    *string
+}
+
+type eventMediaItemDynamo struct {
+	ID          string
+	Type        events.EventMediaType
+	Source      string
+	Title       *string                       `dynamodbav:",omitempty"`
+	Description *string                       `dynamodbav:",omitempty"`
+	DisplayMode *events.EventMediaDisplayMode `dynamodbav:",omitempty"`
+	Icon        *events.EventMediaIcon        `dynamodbav:",omitempty"`
 }
 
 type eventRegistrationOptionDynamo struct {
@@ -51,9 +62,7 @@ type eventRegistrationOptionDynamo struct {
 	PriceCurrency    string
 }
 
-const (
-	eventEntityName = "EVENT"
-)
+const eventEntityName = "EVENT"
 
 func eventPK(id uuid.UUID) string {
 	return fmt.Sprintf("%s#%s", eventEntityName, id)
@@ -68,6 +77,11 @@ func newEventDynamo(event events.Event) eventDynamo {
 	if event.TimeZone != nil {
 		tzStr := event.TimeZone.String()
 		timeZoneStr = &tzStr
+	}
+
+	var media []eventMediaItemDynamo
+	if len(event.Media) > 0 {
+		media = slices.Map(event.Media, eventMediaItemToDynamo)
 	}
 
 	return eventDynamo{
@@ -93,7 +107,8 @@ func newEventDynamo(event events.Event) eventDynamo {
 		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
-		MailingListGroupID:    event.MailingListGroupID,
+		Media:                media,
+		MailingListGroupID:   event.MailingListGroupID,
 	}
 }
 
@@ -136,7 +151,32 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
-		MailingListGroupID:    event.MailingListGroupID,
+		Media:                slices.Map(event.Media, eventMediaItemFromDynamo),
+		MailingListGroupID:   event.MailingListGroupID,
+	}
+}
+
+func eventMediaItemToDynamo(item events.EventMediaItem) eventMediaItemDynamo {
+	return eventMediaItemDynamo{
+		ID:          item.ID.String(),
+		Type:        item.Type,
+		Source:      item.Source,
+		Title:       item.Title,
+		Description: item.Description,
+		DisplayMode: item.DisplayMode,
+		Icon:        item.Icon,
+	}
+}
+
+func eventMediaItemFromDynamo(item eventMediaItemDynamo) events.EventMediaItem {
+	return events.EventMediaItem{
+		ID:          uuid.MustParse(item.ID),
+		Type:        item.Type,
+		Source:      item.Source,
+		Title:       item.Title,
+		Description: item.Description,
+		DisplayMode: item.DisplayMode,
+		Icon:        item.Icon,
 	}
 }
 

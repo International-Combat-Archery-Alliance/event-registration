@@ -697,6 +697,72 @@ components:
           maxLength: 500
           description: A file name that exists in the UI assets to use as the logo.
           example: boston-tournament.jpg
+        media:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/EventMediaItem'
+    EventMediaType:
+      type: string
+      enum:
+        - asset_folder
+        - asset_file
+        - video
+        - external_link
+    EventMediaDisplayMode:
+      type: string
+      enum:
+        - auto
+        - carousel
+        - gallery
+        - file_list
+        - embed
+        - link
+    EventMediaIcon:
+      type: string
+      enum:
+        - youtube
+        - twitch
+        - google_drive
+        - instagram
+        - pdf
+        - photo_gallery
+        - file
+        - video
+        - external_link
+    EventMediaItem:
+      type: object
+      required:
+        - id
+        - type
+        - source
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Stable client-generated identity, preserved across edits and reordering.
+        type:
+          $ref: '#/components/schemas/EventMediaType'
+        source:
+          type: string
+          maxLength: 1000
+          description: >-
+            A canonical assets-api folder path (starts with "/") for asset_folder, otherwise an
+            absolute https URL. HTTP is permitted only for loopback development URLs in local mode.
+          example: /images/events/boston-2026
+        title:
+          type: string
+          maxLength: 255
+          example: 2026 Boston Championship Photos
+        description:
+          type: string
+          maxLength: 1000
+          example: Finals, podium, and behind-the-scenes shots.
+        displayMode:
+          $ref: '#/components/schemas/EventMediaDisplayMode'
+        icon:
+          $ref: '#/components/schemas/EventMediaIcon'
+          description: Optional preset override; when omitted, the frontend detects an icon automatically.
     SignUpStats:
       type: object
       readOnly: true

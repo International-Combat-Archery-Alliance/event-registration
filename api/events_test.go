@@ -3,6 +3,9 @@ package api
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetEvents(t *testing.T) {
@@ -28,6 +32,9 @@ func TestGetEvents(t *testing.T) {
 				RegistrationCloseTime: now,
 				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")}},
 				RulesDocLink:          ptr.String("https://example.com/rules"),
+				Media: []events.EventMediaItem{
+					{ID: uuid.New(), Type: events.MediaTypeAssetFolder, Source: "/images/events/boston-2026"},
+				},
 			},
 		}
 		mock := &mockDB{
@@ -57,6 +64,9 @@ func TestGetEvents(t *testing.T) {
 			assert.Equal(t, ptr.String("America/New_York"), r.Data[0].TimeZone)
 			assert.Equal(t, []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}}, r.Data[0].RegistrationOptions)
 			assert.Equal(t, expectedEvents[0].RulesDocLink, r.Data[0].RulesDocLink)
+			require.NotNil(t, r.Data[0].Media)
+			require.Len(t, *r.Data[0].Media, 1)
+			assert.Equal(t, expectedEvents[0].Media[0].ID, (*r.Data[0].Media)[0].Id)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
@@ -102,6 +112,87 @@ func TestPostEvents(t *testing.T) {
 	})
 }
 
+func TestPostEventsMedia(t *testing.T) {
+	t.Run("created event includes media", func(t *testing.T) {
+		media := []EventMediaItem{
+			{
+				Id:          uuid.New(),
+				Type:        EventMediaTypeAssetFolder,
+				Source:      "/images/events/boston-2026",
+				Title:       ptr.String("Event Photos"),
+				DisplayMode: ptr.To(Carousel),
+			},
+		}
+		var created events.Event
+		mock := &mockDB{
+			CreateEventFunc: func(ctx context.Context, event events.Event) error {
+				created = event
+				return nil
+			},
+		}
+		api := newEventsTestAPI(mock, LOCAL)
+
+		resp, err := api.PostEventsV1(ctxWithLogger(context.Background(), noopLogger), PostEventsV1RequestObject{
+			Body: &PostEventsV1JSONRequestBody{Name: "Test Event", Media: &media},
+		})
+		assert.NoError(t, err)
+
+		require.Len(t, created.Media, 1)
+		assert.Equal(t, media[0].Id, created.Media[0].ID)
+		assert.Equal(t, events.MediaDisplayModeCarousel, *created.Media[0].DisplayMode)
+
+		r, ok := resp.(PostEventsV1200JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, r.Media)
+		require.Len(t, *r.Media, 1)
+		assert.Equal(t, media[0].Id, (*r.Media)[0].Id)
+	})
+
+	t.Run("empty media is omitted from the response", func(t *testing.T) {
+		media := []EventMediaItem{}
+		mock := &mockDB{
+			CreateEventFunc: func(ctx context.Context, event events.Event) error {
+				assert.Empty(t, event.Media)
+				return nil
+			},
+		}
+		api := newEventsTestAPI(mock, LOCAL)
+
+		resp, err := api.PostEventsV1(ctxWithLogger(context.Background(), noopLogger), PostEventsV1RequestObject{
+			Body: &PostEventsV1JSONRequestBody{Name: "Test Event", Media: &media},
+		})
+		assert.NoError(t, err)
+
+		r, ok := resp.(PostEventsV1200JSONResponse)
+		require.True(t, ok)
+		assert.Nil(t, r.Media)
+	})
+
+	t.Run("invalid media is rejected before the repository call", func(t *testing.T) {
+		media := []EventMediaItem{
+			{Id: uuid.New(), Type: EventMediaTypeExternalLink, Source: "javascript:alert(1)"},
+		}
+		createCalled := false
+		mock := &mockDB{
+			CreateEventFunc: func(ctx context.Context, event events.Event) error {
+				createCalled = true
+				return nil
+			},
+		}
+		api := newEventsTestAPI(mock, LOCAL)
+
+		resp, err := api.PostEventsV1(ctxWithLogger(context.Background(), noopLogger), PostEventsV1RequestObject{
+			Body: &PostEventsV1JSONRequestBody{Name: "Test Event", Media: &media},
+		})
+		assert.NoError(t, err)
+
+		r, ok := resp.(PostEventsV1400JSONResponse)
+		require.True(t, ok)
+		assert.Equal(t, InvalidBody, r.Code)
+		assert.False(t, createCalled)
+	})
+}
+
 func TestGetEventsId(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		id := uuid.New()
@@ -116,6 +207,9 @@ func TestGetEventsId(t *testing.T) {
 			RegistrationCloseTime: now,
 			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")}},
 			RulesDocLink:          ptr.String("https://example.com/rules"),
+			Media: []events.EventMediaItem{
+				{ID: uuid.New(), Type: events.MediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123", Title: ptr.String("Final")},
+			},
 		}
 		mock := &mockDB{
 			GetEventFunc: func(ctx context.Context, eventId uuid.UUID) (events.Event, error) {
@@ -139,6 +233,9 @@ func TestGetEventsId(t *testing.T) {
 			assert.Equal(t, ptr.String("Europe/London"), r.Event.TimeZone)
 			assert.Equal(t, []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}}, r.Event.RegistrationOptions)
 			assert.Equal(t, expectedEvent.RulesDocLink, r.Event.RulesDocLink)
+			require.NotNil(t, r.Event.Media)
+			require.Len(t, *r.Event.Media, 1)
+			assert.Equal(t, expectedEvent.Media[0].ID, (*r.Event.Media)[0].Id)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
@@ -596,4 +693,173 @@ func TestTimeZoneHandling(t *testing.T) {
 			t.Fatalf("unexpected response type: %T", resp)
 		}
 	})
+}
+
+func newEventsTestAPI(db DB, env Environment) *API {
+	return NewAPI(db, noopLogger, env, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockSubscriberManager{}, &mockCheckoutManager{}, func(context.Context) error { return nil })
+}
+
+func TestPatchEventsV1IdMedia(t *testing.T) {
+	existingMedia := []events.EventMediaItem{
+		{ID: uuid.New(), Type: events.MediaTypeAssetFolder, Source: "/images/events/boston-2026"},
+	}
+
+	newMock := func(captured *events.Event) *mockDB {
+		eventID := uuid.New()
+		return &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{ID: eventID, Version: 1, Media: existingMedia}, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event events.Event) error {
+				*captured = event
+				return nil
+			},
+		}
+	}
+
+	t.Run("omitted media clears existing media", func(t *testing.T) {
+		var captured events.Event
+		api := newEventsTestAPI(newMock(&captured), LOCAL)
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{
+			Id:   uuid.New(),
+			Body: &Event{Name: "Updated Event"},
+		})
+		assert.NoError(t, err)
+
+		assert.Nil(t, captured.Media)
+
+		r, ok := resp.(PatchEventsV1Id200JSONResponse)
+		require.True(t, ok)
+		assert.Nil(t, r.Event.Media)
+	})
+
+	t.Run("explicit empty media clears existing media", func(t *testing.T) {
+		var captured events.Event
+		api := newEventsTestAPI(newMock(&captured), LOCAL)
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{
+			Id:   uuid.New(),
+			Body: &Event{Name: "Updated Event", Media: &[]EventMediaItem{}},
+		})
+		assert.NoError(t, err)
+
+		assert.Nil(t, captured.Media)
+
+		r, ok := resp.(PatchEventsV1Id200JSONResponse)
+		require.True(t, ok)
+		assert.Nil(t, r.Event.Media)
+	})
+
+	t.Run("provided media replaces existing media", func(t *testing.T) {
+		var captured events.Event
+		api := newEventsTestAPI(newMock(&captured), LOCAL)
+
+		replacementID := uuid.New()
+		media := []EventMediaItem{
+			{Id: replacementID, Type: EventMediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123", Title: ptr.String("Final")},
+		}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{
+			Id:   uuid.New(),
+			Body: &Event{Name: "Updated Event", Media: &media},
+		})
+		assert.NoError(t, err)
+
+		assert.Equal(t, []events.EventMediaItem{
+			{ID: replacementID, Type: events.MediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123", Title: ptr.String("Final")},
+		}, captured.Media)
+
+		r, ok := resp.(PatchEventsV1Id200JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, r.Event.Media)
+		assert.Len(t, *r.Event.Media, 1)
+	})
+
+	t.Run("invalid media is rejected before the repository call", func(t *testing.T) {
+		var captured events.Event
+		mock := newMock(&captured)
+		api := newEventsTestAPI(mock, LOCAL)
+
+		media := []EventMediaItem{{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/../secret"}}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{
+			Id:   uuid.New(),
+			Body: &Event{Name: "Updated Event", Media: &media},
+		})
+		assert.NoError(t, err)
+
+		r, ok := resp.(PatchEventsV1Id400JSONResponse)
+		require.True(t, ok)
+		assert.Equal(t, InvalidBody, r.Code)
+		assert.Zero(t, captured)
+	})
+}
+
+func TestOpenAPIValidationMedia(t *testing.T) {
+	swagger, err := GetSwagger()
+	require.NoError(t, err)
+	swagger.Servers = nil
+
+	api := newEventsTestAPI(&mockDB{}, LOCAL)
+	handlerCalled := false
+	handler := api.openapiValidateMiddleware(swagger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	authHeader := "Bearer " + generateTestToken("admin@example.com", true)
+	eventID := uuid.New()
+
+	bodyWithMedia := func(media string) string {
+		mediaField := ""
+		if media != "" {
+			mediaField = `, "media": ` + media
+		}
+		return `{
+			"name": "Media Validation Event",
+			"location": {
+				"name": "Test Venue",
+				"address": {
+					"street": "123 Main St",
+					"city": "Anytown",
+					"state": "CA",
+					"postalCode": "90210",
+					"country": "USA"
+				}
+			},
+			"startTime": "2026-08-19T18:00:00.000Z",
+			"endTime": "2026-08-19T22:00:00.000Z",
+			"registrationCloseTime": "2026-08-17T23:59:59.000Z",
+			"registrationOptions": [
+				{"registrationType": "ByIndividual", "price": {"currency": "USD", "amount": 0}}
+			],
+			"allowedTeamSizeRange": {"min": 1, "max": 5}` + mediaField + `
+		}`
+	}
+
+	tests := []struct {
+		name       string
+		body       string
+		wantStatus int
+	}{
+		{name: "omitted media", body: bodyWithMedia(""), wantStatus: http.StatusOK},
+		{name: "empty media", body: bodyWithMedia("[]"), wantStatus: http.StatusOK},
+		{name: "null media", body: bodyWithMedia("null"), wantStatus: http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handlerCalled = false
+			req := httptest.NewRequest(http.MethodPatch, "/events/v1/"+eventID.String(), strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", authHeader)
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			assert.Equal(t, tt.wantStatus, rec.Code)
+			assert.Equal(t, tt.wantStatus == http.StatusOK, handlerCalled)
+		})
+	}
 }

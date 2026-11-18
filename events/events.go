@@ -29,7 +29,52 @@ type Event struct {
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
-	MailingListGroupID     *string
+	Media                 []EventMediaItem
+	MailingListGroupID    *string
+}
+
+type EventMediaType string
+
+const (
+	MediaTypeAssetFolder  EventMediaType = "asset_folder"
+	MediaTypeAssetFile    EventMediaType = "asset_file"
+	MediaTypeVideo        EventMediaType = "video"
+	MediaTypeExternalLink EventMediaType = "external_link"
+)
+
+type EventMediaDisplayMode string
+
+const (
+	MediaDisplayModeAuto     EventMediaDisplayMode = "auto"
+	MediaDisplayModeCarousel EventMediaDisplayMode = "carousel"
+	MediaDisplayModeGallery  EventMediaDisplayMode = "gallery"
+	MediaDisplayModeFileList EventMediaDisplayMode = "file_list"
+	MediaDisplayModeEmbed    EventMediaDisplayMode = "embed"
+	MediaDisplayModeLink     EventMediaDisplayMode = "link"
+)
+
+type EventMediaIcon string
+
+const (
+	MediaIconYouTube      EventMediaIcon = "youtube"
+	MediaIconTwitch       EventMediaIcon = "twitch"
+	MediaIconGoogleDrive  EventMediaIcon = "google_drive"
+	MediaIconInstagram    EventMediaIcon = "instagram"
+	MediaIconPDF          EventMediaIcon = "pdf"
+	MediaIconPhotoGallery EventMediaIcon = "photo_gallery"
+	MediaIconFile         EventMediaIcon = "file"
+	MediaIconVideo        EventMediaIcon = "video"
+	MediaIconExternalLink EventMediaIcon = "external_link"
+)
+
+type EventMediaItem struct {
+	ID          uuid.UUID
+	Type        EventMediaType
+	Source      string
+	Title       *string
+	Description *string
+	DisplayMode *EventMediaDisplayMode
+	Icon        *EventMediaIcon
 }
 
 type EventRegistrationOption struct {
@@ -84,7 +129,8 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		NumTotalPlayers:       existingEvent.NumTotalPlayers,
 		RulesDocLink:          event.RulesDocLink,
 		ImageName:             event.ImageName,
-		MailingListGroupID:     existingEvent.MailingListGroupID,
+		Media:                 event.Media,
+		MailingListGroupID:    existingEvent.MailingListGroupID,
 	}
 
 	err = repo.UpdateEvent(ctx, updatedEvent)
