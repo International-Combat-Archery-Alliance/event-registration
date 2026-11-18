@@ -89,7 +89,7 @@ func (a *API) PostEventsV1(ctx context.Context, request PostEventsV1RequestObjec
 		NumTotalPlayers:    0,
 	}
 	// request.Body is guaranteed to be non-nil from openapi doc
-	event, err := apiEventToEvent(*request.Body)
+	event, err := a.apiEventToEvent(*request.Body)
 	if err != nil {
 		span.RecordError(err)
 		logger.Error("Failed to convert event into core type", "error", err)
@@ -182,7 +182,7 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 	request.Body.Version = ptr.Int(1)
 	request.Body.SignUpStats = &SignUpStats{}
 
-	event, err := apiEventToEvent(*request.Body)
+	event, err := a.apiEventToEvent(*request.Body)
 	if err != nil {
 		span.RecordError(err)
 		logger.Error("Invalid event body", slog.String("error", err.Error()))
@@ -262,10 +262,15 @@ func eventToApiEvent(event events.Event) (Event, error) {
 		},
 		RulesDocLink: event.RulesDocLink,
 		ImageName:    event.ImageName,
+		Media:        eventMediaToApiMedia(event.Media),
 	}, nil
 }
 
-func apiEventToEvent(event Event) (events.Event, error) {
+func (a *API) apiEventToEvent(event Event) (events.Event, error) {
+	if err := a.validateMedia(event.Media); err != nil {
+		return events.Event{}, err
+	}
+
 	regOptions := []events.EventRegistrationOption{}
 	for _, t := range event.RegistrationOptions {
 		convT, err := apiRegistrationOptionToRegistrationOption(t)
@@ -303,6 +308,7 @@ func apiEventToEvent(event Event) (events.Event, error) {
 		},
 		RulesDocLink: event.RulesDocLink,
 		ImageName:    event.ImageName,
+		Media:        apiMediaToEventMedia(event.Media),
 	}, nil
 }
 

@@ -9,6 +9,8 @@ import (
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 )
 
 type mockRepository struct {
@@ -246,6 +248,83 @@ func TestUpdateEvent(t *testing.T) {
 		assert.Equal(t, 50, capturedEvent.NumRosteredPlayers)
 		assert.Equal(t, 60, capturedEvent.NumTotalPlayers)
 	})
+}
+
+func TestUpdateEventMedia(t *testing.T) {
+	eventID := uuid.New()
+	existingMedia := []EventMediaItem{
+		{ID: uuid.New(), Type: MediaTypeAssetFolder, Source: "/images/events/boston-2026", Title: ptr.String("Photos")},
+		{ID: uuid.New(), Type: MediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123", DisplayMode: displayModePtr(MediaDisplayModeEmbed)},
+	}
+
+	runUpdate := func(t *testing.T, existing Event, update Event) Event {
+		t.Helper()
+
+		var captured Event
+		repo := &mockRepository{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (Event, error) {
+				return existing, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event Event) error {
+				captured = event
+				return nil
+			},
+		}
+
+		result, err := UpdateEvent(context.Background(), repo, eventID, update)
+		assert.NoError(t, err)
+		assert.Equal(t, captured.Media, result.Media)
+
+		return result
+	}
+
+	t.Run("omitted media preserves the existing list", func(t *testing.T) {
+		existing := Event{ID: eventID, Version: 1, Media: existingMedia}
+
+		result := runUpdate(t, existing, Event{Name: "Updated"})
+
+		assert.Equal(t, existingMedia, result.Media)
+	})
+
+	t.Run("provided media replaces the existing list", func(t *testing.T) {
+		existing := Event{ID: eventID, Version: 1, Media: existingMedia}
+		replacement := []EventMediaItem{
+			{ID: uuid.New(), Type: MediaTypeExternalLink, Source: "https://example.com/bracket.pdf", Icon: iconPtr(MediaIconPDF)},
+		}
+
+		result := runUpdate(t, existing, Event{Name: "Updated", Media: replacement})
+
+		assert.Equal(t, replacement, result.Media)
+	})
+
+	t.Run("empty media clears the existing list", func(t *testing.T) {
+		existing := Event{ID: eventID, Version: 1, Media: existingMedia}
+
+		result := runUpdate(t, existing, Event{Name: "Updated", Media: []EventMediaItem{}})
+
+		assert.Empty(t, result.Media)
+	})
+
+	t.Run("media order is preserved", func(t *testing.T) {
+		existing := Event{ID: eventID, Version: 1}
+		ordered := []EventMediaItem{
+			{ID: uuid.New(), Type: MediaTypeVideo, Source: "https://www.youtube.com/watch?v=third"},
+			{ID: uuid.New(), Type: MediaTypeAssetFolder, Source: "/images/events/first"},
+			{ID: uuid.New(), Type: MediaTypeExternalLink, Source: "https://example.com/second"},
+		}
+
+		result := runUpdate(t, existing, Event{Name: "Updated", Media: ordered})
+
+		assert.Equal(t, ordered, result.Media)
+	})
+}
+
+func displayModePtr(mode EventMediaDisplayMode) *EventMediaDisplayMode {
+	return &mode
+}
+
+func iconPtr(icon EventMediaIcon) *EventMediaIcon {
+	return &icon
 }
 
 func TestUpdateEventTimeZone(t *testing.T) {

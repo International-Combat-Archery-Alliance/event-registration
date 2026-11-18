@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetEvents(t *testing.T) {
@@ -28,6 +30,9 @@ func TestGetEvents(t *testing.T) {
 				RegistrationCloseTime: now,
 				RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")}},
 				RulesDocLink:          ptr.String("https://example.com/rules"),
+				Media: []events.EventMediaItem{
+					{ID: uuid.New(), Type: events.MediaTypeAssetFolder, Source: "/images/events/boston-2026"},
+				},
 			},
 		}
 		mock := &mockDB{
@@ -57,6 +62,9 @@ func TestGetEvents(t *testing.T) {
 			assert.Equal(t, ptr.String("America/New_York"), r.Data[0].TimeZone)
 			assert.Equal(t, []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}}, r.Data[0].RegistrationOptions)
 			assert.Equal(t, expectedEvents[0].RulesDocLink, r.Data[0].RulesDocLink)
+			require.NotNil(t, r.Data[0].Media)
+			require.Len(t, *r.Data[0].Media, 1)
+			assert.Equal(t, expectedEvents[0].Media[0].ID, (*r.Data[0].Media)[0].Id)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
@@ -102,6 +110,67 @@ func TestPostEvents(t *testing.T) {
 	})
 }
 
+func TestPostEventsMedia(t *testing.T) {
+	t.Run("created event includes media", func(t *testing.T) {
+		media := []EventMediaItem{
+			{
+				Id:          uuid.New(),
+				Type:        EventMediaTypeAssetFolder,
+				Source:      "/images/events/boston-2026",
+				Title:       ptr.String("Event Photos"),
+				DisplayMode: displayModeRef(Carousel),
+			},
+		}
+		var created events.Event
+		mock := &mockDB{
+			CreateEventFunc: func(ctx context.Context, event events.Event) error {
+				created = event
+				return nil
+			},
+		}
+		api := newEventsTestAPI(mock, LOCAL)
+
+		resp, err := api.PostEventsV1(ctxWithLogger(context.Background(), noopLogger), PostEventsV1RequestObject{
+			Body: &PostEventsV1JSONRequestBody{Name: "Test Event", Media: &media},
+		})
+		assert.NoError(t, err)
+
+		require.Len(t, created.Media, 1)
+		assert.Equal(t, media[0].Id, created.Media[0].ID)
+		assert.Equal(t, events.MediaDisplayModeCarousel, *created.Media[0].DisplayMode)
+
+		r, ok := resp.(PostEventsV1200JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, r.Media)
+		require.Len(t, *r.Media, 1)
+		assert.Equal(t, media[0].Id, (*r.Media)[0].Id)
+	})
+
+	t.Run("invalid media is rejected before the repository call", func(t *testing.T) {
+		media := []EventMediaItem{
+			{Id: uuid.New(), Type: EventMediaTypeExternalLink, Source: "javascript:alert(1)"},
+		}
+		createCalled := false
+		mock := &mockDB{
+			CreateEventFunc: func(ctx context.Context, event events.Event) error {
+				createCalled = true
+				return nil
+			},
+		}
+		api := newEventsTestAPI(mock, LOCAL)
+
+		resp, err := api.PostEventsV1(ctxWithLogger(context.Background(), noopLogger), PostEventsV1RequestObject{
+			Body: &PostEventsV1JSONRequestBody{Name: "Test Event", Media: &media},
+		})
+		assert.NoError(t, err)
+
+		r, ok := resp.(PostEventsV1400JSONResponse)
+		require.True(t, ok)
+		assert.Equal(t, InvalidBody, r.Code)
+		assert.False(t, createCalled)
+	})
+}
+
 func TestGetEventsId(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		id := uuid.New()
@@ -116,6 +185,9 @@ func TestGetEventsId(t *testing.T) {
 			RegistrationCloseTime: now,
 			RegistrationOptions:   []events.EventRegistrationOption{{RegType: events.BY_INDIVIDUAL, Price: money.New(5000, "USD")}},
 			RulesDocLink:          ptr.String("https://example.com/rules"),
+			Media: []events.EventMediaItem{
+				{ID: uuid.New(), Type: events.MediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123", Title: ptr.String("Final")},
+			},
 		}
 		mock := &mockDB{
 			GetEventFunc: func(ctx context.Context, eventId uuid.UUID) (events.Event, error) {
@@ -139,6 +211,9 @@ func TestGetEventsId(t *testing.T) {
 			assert.Equal(t, ptr.String("Europe/London"), r.Event.TimeZone)
 			assert.Equal(t, []EventRegistrationOption{{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}}}, r.Event.RegistrationOptions)
 			assert.Equal(t, expectedEvent.RulesDocLink, r.Event.RulesDocLink)
+			require.NotNil(t, r.Event.Media)
+			require.Len(t, *r.Event.Media, 1)
+			assert.Equal(t, expectedEvent.Media[0].ID, (*r.Event.Media)[0].Id)
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
@@ -595,5 +670,238 @@ func TestTimeZoneHandling(t *testing.T) {
 		default:
 			t.Fatalf("unexpected response type: %T", resp)
 		}
+	})
+}
+
+func newEventsTestAPI(db DB, env Environment) *API {
+	return NewAPI(db, noopLogger, env, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockSubscriberManager{}, &mockCheckoutManager{}, func(context.Context) error { return nil })
+}
+
+func TestValidateMedia(t *testing.T) {
+	mediaPtr := func(items ...EventMediaItem) *[]EventMediaItem {
+		return &items
+	}
+	folderItem := func(source string) EventMediaItem {
+		return EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: source}
+	}
+	urlItem := func(mediaType EventMediaType, source string) EventMediaItem {
+		return EventMediaItem{Id: uuid.New(), Type: mediaType, Source: source}
+	}
+	validURL := "https://example.com/resource"
+
+	manyItems := make([]EventMediaItem, 0, maxEventMediaItems+1)
+	for range maxEventMediaItems + 1 {
+		manyItems = append(manyItems, folderItem("/images/events/photo"))
+	}
+
+	duplicateID := uuid.New()
+	duplicateItems := []EventMediaItem{
+		{Id: duplicateID, Type: EventMediaTypeAssetFolder, Source: "/images/events/a"},
+		{Id: duplicateID, Type: EventMediaTypeAssetFolder, Source: "/images/events/b"},
+	}
+
+	bigItems := make([]EventMediaItem, 0, maxEventMediaItems)
+	for range maxEventMediaItems {
+		source := "/" + strings.Repeat("😀", 900)
+		title := strings.Repeat("😀", 250)
+		description := strings.Repeat("😀", 990)
+		bigItems = append(bigItems, EventMediaItem{
+			Id:          uuid.New(),
+			Type:        EventMediaTypeAssetFolder,
+			Source:      source,
+			Title:       &title,
+			Description: &description,
+		})
+	}
+
+	tests := []struct {
+		name    string
+		env     Environment
+		media   *[]EventMediaItem
+		wantErr bool
+	}{
+		{name: "omitted media", env: LOCAL, media: nil},
+		{name: "empty media list", env: LOCAL, media: mediaPtr()},
+		{name: "asset folder", env: LOCAL, media: mediaPtr(folderItem("/images/events/boston-2026"))},
+		{name: "asset folder root", env: LOCAL, media: mediaPtr(folderItem("/"))},
+		{name: "asset folder without leading slash", env: LOCAL, media: mediaPtr(folderItem("images/events")), wantErr: true},
+		{name: "asset folder with trailing slash", env: LOCAL, media: mediaPtr(folderItem("/images/events/")), wantErr: true},
+		{name: "asset folder with empty segment", env: LOCAL, media: mediaPtr(folderItem("/images//events")), wantErr: true},
+		{name: "asset folder with dot segment", env: LOCAL, media: mediaPtr(folderItem("/images/./events")), wantErr: true},
+		{name: "asset folder with parent segment", env: LOCAL, media: mediaPtr(folderItem("/images/../events")), wantErr: true},
+		{name: "asset folder with encoded parent segment", env: LOCAL, media: mediaPtr(folderItem("/images/%2e%2e/events")), wantErr: true},
+		{name: "asset folder with double-encoded parent segment", env: LOCAL, media: mediaPtr(folderItem("/images/%252e%252e/events")), wantErr: true},
+		{name: "asset folder with encoded separator", env: LOCAL, media: mediaPtr(folderItem("/images%2Fevents")), wantErr: true},
+		{name: "asset folder with encoded backslash", env: LOCAL, media: mediaPtr(folderItem("/images%5Cevents")), wantErr: true},
+		{name: "asset folder with backslash", env: LOCAL, media: mediaPtr(folderItem(`/images\events`)), wantErr: true},
+		{name: "asset folder with query", env: LOCAL, media: mediaPtr(folderItem("/images/events?sort=asc")), wantErr: true},
+		{name: "asset folder with fragment", env: LOCAL, media: mediaPtr(folderItem("/images/events#top")), wantErr: true},
+		{name: "asset folder with invalid percent encoding", env: LOCAL, media: mediaPtr(folderItem("/images/%zz")), wantErr: true},
+		{name: "empty source", env: LOCAL, media: mediaPtr(folderItem("")), wantErr: true},
+		{name: "asset file over https", env: PROD, media: mediaPtr(urlItem(EventMediaTypeAssetFile, validURL))},
+		{name: "asset file over loopback http in local mode", env: LOCAL, media: mediaPtr(urlItem(EventMediaTypeAssetFile, "http://localhost:8080/photo.jpg"))},
+		{name: "asset file over loopback ipv4 in local mode", env: LOCAL, media: mediaPtr(urlItem(EventMediaTypeAssetFile, "http://127.0.0.1:8080/photo.jpg"))},
+		{name: "asset file over loopback ipv6 in local mode", env: LOCAL, media: mediaPtr(urlItem(EventMediaTypeAssetFile, "http://[::1]:8080/photo.jpg"))},
+		{name: "video over https", env: PROD, media: mediaPtr(urlItem(EventMediaTypeVideo, "https://www.twitch.tv/videos/987654321"))},
+		{name: "external link over https", env: PROD, media: mediaPtr(urlItem(EventMediaTypeExternalLink, validURL))},
+		{name: "asset file over loopback http in prod", env: PROD, media: mediaPtr(urlItem(EventMediaTypeAssetFile, "http://localhost:8080/photo.jpg")), wantErr: true},
+		{name: "video over loopback http in prod", env: PROD, media: mediaPtr(urlItem(EventMediaTypeVideo, "http://127.0.0.1:8080/stream")), wantErr: true},
+		{name: "external link over non-loopback http in local mode", env: LOCAL, media: mediaPtr(urlItem(EventMediaTypeExternalLink, "http://example.com/page")), wantErr: true},
+		{name: "javascript scheme", env: LOCAL, media: mediaPtr(urlItem(EventMediaTypeExternalLink, "javascript:alert(1)")), wantErr: true},
+		{name: "data scheme", env: LOCAL, media: mediaPtr(urlItem(EventMediaTypeAssetFile, "data:text/html,<p>hi</p>")), wantErr: true},
+		{name: "protocol-relative url", env: LOCAL, media: mediaPtr(urlItem(EventMediaTypeExternalLink, "//example.com/page")), wantErr: true},
+		{name: "url with credentials", env: PROD, media: mediaPtr(urlItem(EventMediaTypeExternalLink, "https://user:password@example.com/page")), wantErr: true},
+		{name: "relative url", env: PROD, media: mediaPtr(urlItem(EventMediaTypeAssetFile, "/photo.jpg")), wantErr: true},
+		{name: "malformed url", env: PROD, media: mediaPtr(urlItem(EventMediaTypeAssetFile, "https://exa mple.com/photo.jpg")), wantErr: true},
+		{name: "unknown media type", env: LOCAL, media: mediaPtr(urlItem(EventMediaType("audio"), validURL)), wantErr: true},
+		{name: "auto display mode", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", DisplayMode: displayModeRef(Auto)})},
+		{name: "carousel display mode", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", DisplayMode: displayModeRef(Carousel)})},
+		{name: "gallery display mode", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", DisplayMode: displayModeRef(Gallery)})},
+		{name: "file list display mode", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", DisplayMode: displayModeRef(FileList)})},
+		{name: "embed display mode", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeVideo, Source: validURL, DisplayMode: displayModeRef(Embed)})},
+		{name: "link display mode", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeExternalLink, Source: validURL, DisplayMode: displayModeRef(Link)})},
+		{name: "unknown display mode", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", DisplayMode: displayModeRef(EventMediaDisplayMode("slideshow"))}), wantErr: true},
+		{name: "youtube icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeVideo, Source: validURL, Icon: iconRef(EventMediaIconYoutube)})},
+		{name: "twitch icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeVideo, Source: validURL, Icon: iconRef(EventMediaIconTwitch)})},
+		{name: "google drive icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeExternalLink, Source: validURL, Icon: iconRef(EventMediaIconGoogleDrive)})},
+		{name: "instagram icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeExternalLink, Source: validURL, Icon: iconRef(EventMediaIconInstagram)})},
+		{name: "pdf icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFile, Source: validURL, Icon: iconRef(EventMediaIconPdf)})},
+		{name: "photo gallery icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", Icon: iconRef(EventMediaIconPhotoGallery)})},
+		{name: "file icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFile, Source: validURL, Icon: iconRef(EventMediaIconFile)})},
+		{name: "video icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeVideo, Source: validURL, Icon: iconRef(EventMediaIconVideo)})},
+		{name: "external link icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeExternalLink, Source: validURL, Icon: iconRef(EventMediaIconExternalLink)})},
+		{name: "unknown icon", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeExternalLink, Source: validURL, Icon: iconRef(EventMediaIcon("spotify"))}), wantErr: true},
+		{name: "title at limit", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", Title: ptr.String(strings.Repeat("a", maxEventMediaTitleLength))})},
+		{name: "title over limit", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", Title: ptr.String(strings.Repeat("a", maxEventMediaTitleLength+1))}), wantErr: true},
+		{name: "description at limit", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", Description: ptr.String(strings.Repeat("a", maxEventMediaDescriptionLength))})},
+		{name: "description over limit", env: LOCAL, media: mediaPtr(EventMediaItem{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/events", Description: ptr.String(strings.Repeat("a", maxEventMediaDescriptionLength+1))}), wantErr: true},
+		{name: "source at character limit", env: PROD, media: mediaPtr(urlItem(EventMediaTypeAssetFile, "https://example.com/"+strings.Repeat("a", maxEventMediaSourceLength-20)))},
+		{name: "source over character limit", env: PROD, media: mediaPtr(urlItem(EventMediaTypeAssetFile, "https://example.com/"+strings.Repeat("a", maxEventMediaSourceLength-19))), wantErr: true},
+		{name: "too many items", env: LOCAL, media: mediaPtr(manyItems...), wantErr: true},
+		{name: "duplicate item ids", env: LOCAL, media: mediaPtr(duplicateItems...), wantErr: true},
+		{name: "nil item id", env: LOCAL, media: mediaPtr(EventMediaItem{Type: EventMediaTypeAssetFolder, Source: "/images/events"}), wantErr: true},
+		{name: "serialized media over byte budget", env: LOCAL, media: mediaPtr(bigItems...), wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			api := newEventsTestAPI(&mockDB{}, tt.env)
+
+			err := api.validateMedia(tt.media)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func displayModeRef(mode EventMediaDisplayMode) *EventMediaDisplayMode {
+	return &mode
+}
+
+func iconRef(icon EventMediaIcon) *EventMediaIcon {
+	return &icon
+}
+
+func TestPatchEventsV1IdMedia(t *testing.T) {
+	existingMedia := []events.EventMediaItem{
+		{ID: uuid.New(), Type: events.MediaTypeAssetFolder, Source: "/images/events/boston-2026"},
+	}
+
+	newMock := func(captured *events.Event) *mockDB {
+		eventID := uuid.New()
+		return &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{ID: eventID, Version: 1, Media: existingMedia}, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event events.Event) error {
+				*captured = event
+				return nil
+			},
+		}
+	}
+
+	t.Run("omitted media preserves existing media", func(t *testing.T) {
+		var captured events.Event
+		api := newEventsTestAPI(newMock(&captured), LOCAL)
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{
+			Id:   uuid.New(),
+			Body: &Event{Name: "Updated Event"},
+		})
+		assert.NoError(t, err)
+
+		assert.Equal(t, existingMedia, captured.Media)
+
+		r, ok := resp.(PatchEventsV1Id200JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, r.Event.Media)
+		assert.Len(t, *r.Event.Media, 1)
+		assert.Equal(t, existingMedia[0].ID, (*r.Event.Media)[0].Id)
+	})
+
+	t.Run("explicit empty media clears existing media", func(t *testing.T) {
+		var captured events.Event
+		api := newEventsTestAPI(newMock(&captured), LOCAL)
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{
+			Id:   uuid.New(),
+			Body: &Event{Name: "Updated Event", Media: &[]EventMediaItem{}},
+		})
+		assert.NoError(t, err)
+
+		assert.NotNil(t, captured.Media)
+		assert.Empty(t, captured.Media)
+
+		r, ok := resp.(PatchEventsV1Id200JSONResponse)
+		require.True(t, ok)
+		assert.Nil(t, r.Event.Media)
+	})
+
+	t.Run("provided media replaces existing media", func(t *testing.T) {
+		var captured events.Event
+		api := newEventsTestAPI(newMock(&captured), LOCAL)
+
+		replacementID := uuid.New()
+		media := []EventMediaItem{
+			{Id: replacementID, Type: EventMediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123", Title: ptr.String("Final")},
+		}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{
+			Id:   uuid.New(),
+			Body: &Event{Name: "Updated Event", Media: &media},
+		})
+		assert.NoError(t, err)
+
+		assert.Equal(t, []events.EventMediaItem{
+			{ID: replacementID, Type: events.MediaTypeVideo, Source: "https://www.youtube.com/watch?v=abc123", Title: ptr.String("Final")},
+		}, captured.Media)
+
+		r, ok := resp.(PatchEventsV1Id200JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, r.Event.Media)
+		assert.Len(t, *r.Event.Media, 1)
+	})
+
+	t.Run("invalid media is rejected before the repository call", func(t *testing.T) {
+		var captured events.Event
+		mock := newMock(&captured)
+		api := newEventsTestAPI(mock, LOCAL)
+
+		media := []EventMediaItem{{Id: uuid.New(), Type: EventMediaTypeAssetFolder, Source: "/images/../secret"}}
+
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{
+			Id:   uuid.New(),
+			Body: &Event{Name: "Updated Event", Media: &media},
+		})
+		assert.NoError(t, err)
+
+		r, ok := resp.(PatchEventsV1Id400JSONResponse)
+		require.True(t, ok)
+		assert.Equal(t, InvalidBody, r.Code)
+		assert.Zero(t, captured)
 	})
 }

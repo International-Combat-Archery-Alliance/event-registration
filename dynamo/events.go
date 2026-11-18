@@ -42,7 +42,18 @@ type eventDynamo struct {
 	NumTotalPlayers       int
 	RulesDocLink          *string
 	ImageName             *string
-	MailingListGroupID     *string
+	Media                 []eventMediaItemDynamo `dynamodbav:"Media,omitempty"`
+	MailingListGroupID    *string
+}
+
+type eventMediaItemDynamo struct {
+	ID          string
+	Type        events.EventMediaType
+	Source      string
+	Title       *string                       `dynamodbav:",omitempty"`
+	Description *string                       `dynamodbav:",omitempty"`
+	DisplayMode *events.EventMediaDisplayMode `dynamodbav:",omitempty"`
+	Icon        *events.EventMediaIcon        `dynamodbav:",omitempty"`
 }
 
 type eventRegistrationOptionDynamo struct {
@@ -53,6 +64,8 @@ type eventRegistrationOptionDynamo struct {
 
 const (
 	eventEntityName = "EVENT"
+
+	maxDynamoItemSizeBytes = 400 * 1024
 )
 
 func eventPK(id uuid.UUID) string {
@@ -68,6 +81,11 @@ func newEventDynamo(event events.Event) eventDynamo {
 	if event.TimeZone != nil {
 		tzStr := event.TimeZone.String()
 		timeZoneStr = &tzStr
+	}
+
+	var media []eventMediaItemDynamo
+	if len(event.Media) > 0 {
+		media = slices.Map(event.Media, eventMediaItemToDynamo)
 	}
 
 	return eventDynamo{
@@ -93,7 +111,8 @@ func newEventDynamo(event events.Event) eventDynamo {
 		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
-		MailingListGroupID:    event.MailingListGroupID,
+		Media:                media,
+		MailingListGroupID:   event.MailingListGroupID,
 	}
 }
 
@@ -136,7 +155,32 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		NumTotalPlayers:      event.NumTotalPlayers,
 		RulesDocLink:         event.RulesDocLink,
 		ImageName:            event.ImageName,
-		MailingListGroupID:    event.MailingListGroupID,
+		Media:                slices.Map(event.Media, eventMediaItemFromDynamo),
+		MailingListGroupID:   event.MailingListGroupID,
+	}
+}
+
+func eventMediaItemToDynamo(item events.EventMediaItem) eventMediaItemDynamo {
+	return eventMediaItemDynamo{
+		ID:          item.ID.String(),
+		Type:        item.Type,
+		Source:      item.Source,
+		Title:       item.Title,
+		Description: item.Description,
+		DisplayMode: item.DisplayMode,
+		Icon:        item.Icon,
+	}
+}
+
+func eventMediaItemFromDynamo(item eventMediaItemDynamo) events.EventMediaItem {
+	return events.EventMediaItem{
+		ID:          uuid.MustParse(item.ID),
+		Type:        item.Type,
+		Source:      item.Source,
+		Title:       item.Title,
+		Description: item.Description,
+		DisplayMode: item.DisplayMode,
+		Icon:        item.Icon,
 	}
 }
 
@@ -194,6 +238,10 @@ func (d *DB) CreateEvent(ctx context.Context, event events.Event) error {
 	item, err := attributevalue.MarshalMap(dynamoItem)
 	if err != nil {
 		return events.NewFailedToTranslateToDBModelError("Failed to convert Event to eventDynamo", err)
+	}
+
+	if size := dynamoItemSizeBytes(item); size > maxDynamoItemSizeBytes {
+		return events.NewFailedToWriteError(fmt.Sprintf("Event item size of %d bytes exceeds the %d byte limit", size, maxDynamoItemSizeBytes), nil)
 	}
 
 	expr := exprMustBuild(expression.NewBuilder().
@@ -299,6 +347,10 @@ func (d *DB) UpdateEvent(ctx context.Context, event events.Event) error {
 		return events.NewFailedToTranslateToDBModelError("Failed to convert Event to eventDynamo", err)
 	}
 
+	if size := dynamoItemSizeBytes(item); size > maxDynamoItemSizeBytes {
+		return events.NewFailedToWriteError(fmt.Sprintf("Event item size of %d bytes exceeds the %d byte limit", size, maxDynamoItemSizeBytes), nil)
+	}
+
 	expr := exprMustBuild(expression.NewBuilder().
 		WithCondition(existingEntityVersionConditional(dynamoItem.Version)))
 
@@ -321,4 +373,60 @@ func (d *DB) UpdateEvent(ctx context.Context, event events.Event) error {
 	}
 
 	return nil
+}
+
+// dynamoItemSizeBytes estimates the stored size of an item, which DynamoDB counts as the
+// UTF-8 bytes of every attribute name plus its value.
+func dynamoItemSizeBytes(item map[string]types.AttributeValue) int {
+	size := 0
+	for name, value := range item {
+		size += len(name) + attributeValueSizeBytes(value)
+	}
+	return size
+}
+
+func attributeValueSizeBytes(value types.AttributeValue) int {
+	switch v := value.(type) {
+	case *types.AttributeValueMemberS:
+		return len(v.Value)
+	case *types.AttributeValueMemberN:
+		return len(v.Value)
+	case *types.AttributeValueMemberB:
+		return len(v.Value)
+	case *types.AttributeValueMemberBOOL:
+		return 1
+	case *types.AttributeValueMemberNULL:
+		return 1
+	case *types.AttributeValueMemberSS:
+		return stringSetSizeBytes(v.Value)
+	case *types.AttributeValueMemberNS:
+		return stringSetSizeBytes(v.Value)
+	case *types.AttributeValueMemberBS:
+		return binarySetSizeBytes(v.Value)
+	case *types.AttributeValueMemberM:
+		return dynamoItemSizeBytes(v.Value)
+	case *types.AttributeValueMemberL:
+		size := 0
+		for _, item := range v.Value {
+			size += attributeValueSizeBytes(item)
+		}
+		return size
+	}
+	return 0
+}
+
+func stringSetSizeBytes(values []string) int {
+	size := 0
+	for _, value := range values {
+		size += len(value)
+	}
+	return size
+}
+
+func binarySetSizeBytes(values [][]byte) int {
+	size := 0
+	for _, value := range values {
+		size += len(value)
+	}
+	return size
 }
