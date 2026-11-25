@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/games"
 	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
 	"github.com/Rhymond/go-money"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -44,6 +45,10 @@ type eventDynamo struct {
 	ImageName             *string
 	Media                 []eventMediaItemDynamo `dynamodbav:"Media,omitempty"`
 	MailingListGroupID    *string
+	Status                string
+	ScheduleGeneration    int
+	LastGameNo            int
+	Tiebreakers           []string
 }
 
 type eventMediaItemDynamo struct {
@@ -109,7 +114,33 @@ func newEventDynamo(event events.Event) eventDynamo {
 		ImageName:            event.ImageName,
 		Media:                media,
 		MailingListGroupID:   event.MailingListGroupID,
+		Status:               string(event.Status.NormalizeDefault()),
+		ScheduleGeneration:   event.ScheduleGeneration,
+		LastGameNo:           event.LastGameNo,
+		Tiebreakers:          tiebreakersToDynamo(event.Tiebreakers),
 	}
+}
+
+func tiebreakersToDynamo(order games.TiebreakOrder) []string {
+	if len(order) == 0 {
+		return nil
+	}
+	out := make([]string, len(order))
+	for i, tb := range order {
+		out[i] = string(tb)
+	}
+	return out
+}
+
+func tiebreakersFromDynamo(values []string) games.TiebreakOrder {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(games.TiebreakOrder, len(values))
+	for i, v := range values {
+		out[i] = games.Tiebreaker(v)
+	}
+	return out
 }
 
 func loadLocation(name string) *time.Location {
@@ -153,6 +184,11 @@ func eventFromEventDynamo(event eventDynamo) events.Event {
 		ImageName:            event.ImageName,
 		Media:                slices.Map(event.Media, eventMediaItemFromDynamo),
 		MailingListGroupID:   event.MailingListGroupID,
+		// Pre-status rows have no Status attribute; default to OPENED.
+		Status:             events.EventStatus(event.Status).NormalizeDefault(),
+		ScheduleGeneration: event.ScheduleGeneration,
+		LastGameNo:         event.LastGameNo,
+		Tiebreakers:        tiebreakersFromDynamo(event.Tiebreakers),
 	}
 }
 
@@ -352,7 +388,10 @@ func (d *DB) UpdateEvent(ctx context.Context, event events.Event) error {
 	if err != nil {
 		var condCheckFailedErr *types.ConditionalCheckFailedException
 		if errors.As(err, &condCheckFailedErr) {
-			return events.NewEventDoesNotExistsError(fmt.Sprintf("Event with ID %q does not exists", event.ID), err)
+			// The handler reads the event first, so a failed condition here is
+			// a concurrent write (including a schedule-generation bump), not a
+			// missing row: report a conflict so the client refetches.
+			return events.NewVersionConflictError(fmt.Sprintf("Event with ID %q changed concurrently", event.ID), err)
 		} else if errors.Is(err, context.DeadlineExceeded) {
 			return events.NewTimeoutError("UpdateEvent timed out")
 		} else {

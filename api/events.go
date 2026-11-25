@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/games"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/Rhymond/go-money"
 	"github.com/google/uuid"
@@ -88,6 +89,14 @@ func (a *API) PostEventsV1(ctx context.Context, request PostEventsV1RequestObjec
 		NumRosteredPlayers: 0,
 		NumTotalPlayers:    0,
 	}
+	if request.Body.Status == nil {
+		// Status is optional in the spec; default server-side to OPENED (RFC-0002 §3).
+		defaultStatus := OPENED
+		request.Body.Status = &defaultStatus
+	}
+	// Note: an explicit non-OPENED status on create is allowed (e.g. backfill
+	// recreating a past event as IN_PROGRESS/FINALIZED, then PATCH-forward).
+	// Unknown values are rejected by apiEventToEvent below with a 400.
 	// request.Body is guaranteed to be non-nil from openapi doc
 	event, err := a.apiEventToEvent(*request.Body)
 	if err != nil {
@@ -207,6 +216,16 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 					Code:    NotFound,
 					Message: "Event not found",
 				}, nil
+			case events.REASON_INVALID_EVENT_STATUS, events.REASON_INVALID_STATUS_TRANSITION:
+				return PatchEventsV1Id400JSONResponse{
+					Code:    InvalidBody,
+					Message: "Invalid event status transition",
+				}, nil
+			case events.REASON_VERSION_CONFLICT:
+				return PatchEventsV1Id409JSONResponse{
+					Code:    Conflict,
+					Message: "Event changed concurrently; refetch and retry",
+				}, nil
 			}
 		}
 
@@ -223,7 +242,7 @@ func (a *API) PatchEventsV1Id(ctx context.Context, request PatchEventsV1IdReques
 		logger.Error("error when converting updating event back to api event", slog.String("error", err.Error()))
 
 		return PatchEventsV1Id500JSONResponse{
-			Code:    NotFound,
+			Code:    InternalError,
 			Message: "Updating event failed",
 		}, nil
 	}
@@ -241,6 +260,11 @@ func eventToApiEvent(event events.Event) (Event, error) {
 			return Event{}, err
 		}
 		regOptions = append(regOptions, convT)
+	}
+
+	apiStatus, err := eventStatusToApiStatus(event.Status.NormalizeDefault())
+	if err != nil {
+		return Event{}, err
 	}
 
 	return Event{
@@ -265,6 +289,8 @@ func eventToApiEvent(event events.Event) (Event, error) {
 		RulesDocLink: event.RulesDocLink,
 		ImageName:    event.ImageName,
 		Media:        eventMediaToApiMedia(event.Media),
+		Status:       &apiStatus,
+		Tiebreakers:  tiebreakersToApi(event.Tiebreakers),
 	}, nil
 }
 
@@ -292,6 +318,22 @@ func (a *API) apiEventToEvent(event Event) (events.Event, error) {
 		}
 	}
 
+	// Status is optional in the spec; empty means "preserve existing" on
+	// update and "default to OPENED" on create (UpdateEvent handles both).
+	var status events.EventStatus
+	if event.Status != nil {
+		var err error
+		status, err = apiStatusToEventStatus(*event.Status)
+		if err != nil {
+			return events.Event{}, err
+		}
+	}
+
+	tiebreakers, err := apiTiebreakersToDomain(event.Tiebreakers)
+	if err != nil {
+		return events.Event{}, err
+	}
+
 	return events.Event{
 		ID:                    *event.Id,
 		Version:               *event.Version,
@@ -312,7 +354,64 @@ func (a *API) apiEventToEvent(event Event) (events.Event, error) {
 		RulesDocLink: event.RulesDocLink,
 		ImageName:    event.ImageName,
 		Media:        media,
+		Status:       status,
+		Tiebreakers:  tiebreakers,
 	}, nil
+}
+
+// tiebreakersToApi round-trips the stored order; empty means "default" and is
+// omitted from the response rather than echoed as a made-up list.
+func tiebreakersToApi(order games.TiebreakOrder) *[]Tiebreaker {
+	if len(order) == 0 {
+		return nil
+	}
+	out := make([]Tiebreaker, len(order))
+	for i, tb := range order {
+		out[i] = Tiebreaker(string(tb))
+	}
+	return &out
+}
+
+// apiTiebreakersToDomain converts and validates the request enum. An absent
+// or empty list is nil, which every consumer resolves to the D34 default.
+func apiTiebreakersToDomain(values *[]Tiebreaker) (games.TiebreakOrder, error) {
+	if values == nil || len(*values) == 0 {
+		return nil, nil
+	}
+	out := make(games.TiebreakOrder, len(*values))
+	for i, v := range *values {
+		out[i] = games.Tiebreaker(string(v))
+	}
+	if err := out.Validate(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func eventStatusToApiStatus(s events.EventStatus) (EventStatus, error) {
+	switch s {
+	case events.EventStatusOpened:
+		return OPENED, nil
+	case events.EventStatusInProgress:
+		return INPROGRESS, nil
+	case events.EventStatusFinalized:
+		return FINALIZED, nil
+	default:
+		return EventStatus(""), fmt.Errorf("unknown event status: %q", string(s))
+	}
+}
+
+func apiStatusToEventStatus(s EventStatus) (events.EventStatus, error) {
+	switch s {
+	case OPENED:
+		return events.EventStatusOpened, nil
+	case INPROGRESS:
+		return events.EventStatusInProgress, nil
+	case FINALIZED:
+		return events.EventStatusFinalized, nil
+	default:
+		return events.EventStatus(""), fmt.Errorf("unknown event status: %q", string(s))
+	}
 }
 
 func locationToApiLocation(location events.Location) Location {

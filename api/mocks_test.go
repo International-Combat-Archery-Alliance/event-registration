@@ -11,7 +11,9 @@ import (
 	"github.com/International-Combat-Archery-Alliance/captcha"
 	"github.com/International-Combat-Archery-Alliance/email"
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/games"
 	"github.com/International-Combat-Archery-Alliance/event-registration/registration"
+	"github.com/International-Combat-Archery-Alliance/event-registration/teams"
 	"github.com/International-Combat-Archery-Alliance/middleware"
 	"github.com/International-Combat-Archery-Alliance/payments"
 	"github.com/google/uuid"
@@ -147,6 +149,22 @@ type mockDB struct {
 	UpdateRegistrationToPaidFunc      func(ctx context.Context, reg registration.Registration) error
 	DeleteExpiredRegistrationFunc     func(ctx context.Context, registration registration.Registration, intent registration.RegistrationIntent, event events.Event) error
 	GetRegistrationIntentFunc         func(ctx context.Context, eventId uuid.UUID, email string) (registration.RegistrationIntent, error)
+	CreateTeamFunc                    func(ctx context.Context, team teams.Team) error
+	GetTeamFunc                       func(ctx context.Context, id uuid.UUID) (teams.Team, error)
+	SeedParticipationFunc             func(ctx context.Context, participation teams.Participation, history teams.TeamHistory) error
+	GetParticipationFunc              func(ctx context.Context, eventID, teamID uuid.UUID) (teams.Participation, error)
+	ListParticipationsForEventFunc    func(ctx context.Context, eventID uuid.UUID) ([]teams.Participation, error)
+	ListTeamsFunc                     func(ctx context.Context, limit int32, cursor *string) (teams.GetTeamsResponse, error)
+	GetGameByNumberFunc               func(ctx context.Context, eventID uuid.UUID, gameNo int) (games.Game, error)
+	ListGamesForEventFunc             func(ctx context.Context, eventID uuid.UUID) ([]games.Game, error)
+	CreateGamesFunc                   func(ctx context.Context, eventID uuid.UUID, epochVersion int, gameList []games.Game) error
+	UpdateGameCheckedFunc             func(ctx context.Context, eventID uuid.UUID, game games.Game) error
+	DeleteGamesFunc                   func(ctx context.Context, eventID uuid.UUID, epochVersion int, gameNos []int) error
+	BeginScheduleWriteFunc            func(ctx context.Context, eventID uuid.UUID, expectedVersion int) (int, error)
+	ReserveGameNumbersFunc            func(ctx context.Context, eventID uuid.UUID, expectedVersion int, lastGameNo int) (int, error)
+	CreateScheduledGameFunc           func(ctx context.Context, eventID uuid.UUID, expectedVersion int, game games.Game) error
+	DeleteScheduledGameFunc           func(ctx context.Context, eventID uuid.UUID, expectedVersion int, game games.Game) error
+	UpdateGameScheduleCheckedFunc     func(ctx context.Context, eventID uuid.UUID, expectedVersion int, stored, updated games.Game) error
 }
 
 func (m *mockDB) DeleteExpiredRegistration(ctx context.Context, registration registration.Registration, intent registration.RegistrationIntent, event events.Event) error {
@@ -198,6 +216,91 @@ func (m *mockDB) GetRegistration(ctx context.Context, eventId uuid.UUID, email s
 func (m *mockDB) UpdateRegistrationToPaid(ctx context.Context, reg registration.Registration) error {
 	if m.UpdateRegistrationToPaidFunc != nil {
 		return m.UpdateRegistrationToPaidFunc(ctx, reg)
+	}
+	return nil
+}
+
+func (m *mockDB) CreateTeam(ctx context.Context, team teams.Team) error {
+	return m.CreateTeamFunc(ctx, team)
+}
+
+func (m *mockDB) GetTeam(ctx context.Context, id uuid.UUID) (teams.Team, error) {
+	return m.GetTeamFunc(ctx, id)
+}
+
+func (m *mockDB) SeedParticipation(ctx context.Context, participation teams.Participation, history teams.TeamHistory) error {
+	return m.SeedParticipationFunc(ctx, participation, history)
+}
+
+func (m *mockDB) GetParticipation(ctx context.Context, eventID, teamID uuid.UUID) (teams.Participation, error) {
+	return m.GetParticipationFunc(ctx, eventID, teamID)
+}
+
+func (m *mockDB) ListParticipationsForEvent(ctx context.Context, eventID uuid.UUID) ([]teams.Participation, error) {
+	return m.ListParticipationsForEventFunc(ctx, eventID)
+}
+
+func (m *mockDB) ListTeams(ctx context.Context, limit int32, cursor *string) (teams.GetTeamsResponse, error) {
+	return m.ListTeamsFunc(ctx, limit, cursor)
+}
+
+func (m *mockDB) GetGameByNumber(ctx context.Context, eventID uuid.UUID, gameNo int) (games.Game, error) {
+	return m.GetGameByNumberFunc(ctx, eventID, gameNo)
+}
+
+func (m *mockDB) ListGamesForEvent(ctx context.Context, eventID uuid.UUID) ([]games.Game, error) {
+	return m.ListGamesForEventFunc(ctx, eventID)
+}
+
+func (m *mockDB) CreateGames(ctx context.Context, eventID uuid.UUID, epochVersion int, gameList []games.Game) error {
+	if m.CreateGamesFunc != nil {
+		return m.CreateGamesFunc(ctx, eventID, epochVersion, gameList)
+	}
+	return nil
+}
+
+func (m *mockDB) UpdateGameChecked(ctx context.Context, eventID uuid.UUID, game games.Game) error {
+	return m.UpdateGameCheckedFunc(ctx, eventID, game)
+}
+
+func (m *mockDB) DeleteGames(ctx context.Context, eventID uuid.UUID, epochVersion int, gameNos []int) error {
+	if m.DeleteGamesFunc != nil {
+		return m.DeleteGamesFunc(ctx, eventID, epochVersion, gameNos)
+	}
+	return nil
+}
+
+func (m *mockDB) BeginScheduleWrite(ctx context.Context, eventID uuid.UUID, expectedVersion int) (int, error) {
+	if m.BeginScheduleWriteFunc != nil {
+		return m.BeginScheduleWriteFunc(ctx, eventID, expectedVersion)
+	}
+	return expectedVersion + 1, nil
+}
+
+func (m *mockDB) ReserveGameNumbers(ctx context.Context, eventID uuid.UUID, expectedVersion int, lastGameNo int) (int, error) {
+	if m.ReserveGameNumbersFunc != nil {
+		return m.ReserveGameNumbersFunc(ctx, eventID, expectedVersion, lastGameNo)
+	}
+	return expectedVersion + 1, nil
+}
+
+func (m *mockDB) CreateScheduledGame(ctx context.Context, eventID uuid.UUID, expectedVersion int, game games.Game) error {
+	if m.CreateScheduledGameFunc != nil {
+		return m.CreateScheduledGameFunc(ctx, eventID, expectedVersion, game)
+	}
+	return nil
+}
+
+func (m *mockDB) DeleteScheduledGame(ctx context.Context, eventID uuid.UUID, expectedVersion int, game games.Game) error {
+	if m.DeleteScheduledGameFunc != nil {
+		return m.DeleteScheduledGameFunc(ctx, eventID, expectedVersion, game)
+	}
+	return nil
+}
+
+func (m *mockDB) UpdateGameScheduleChecked(ctx context.Context, eventID uuid.UUID, expectedVersion int, stored, updated games.Game) error {
+	if m.UpdateGameScheduleCheckedFunc != nil {
+		return m.UpdateGameScheduleCheckedFunc(ctx, eventID, expectedVersion, stored, updated)
 	}
 	return nil
 }

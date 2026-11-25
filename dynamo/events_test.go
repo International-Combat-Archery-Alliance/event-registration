@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/International-Combat-Archery-Alliance/event-registration/events"
+	"github.com/International-Combat-Archery-Alliance/event-registration/games"
 	"github.com/International-Combat-Archery-Alliance/event-registration/ptr"
 	"github.com/International-Combat-Archery-Alliance/event-registration/slices"
 	"github.com/Rhymond/go-money"
@@ -343,7 +344,48 @@ func TestUpdateEvent(t *testing.T) {
 		require.NoError(t, db.UpdateEvent(ctx, event))
 	})
 
-	t.Run("fail to update an event that does not exist", func(t *testing.T) {
+	t.Run("schedule counters and tiebreakers survive a PATCH", func(t *testing.T) {
+		resetTable(ctx)
+		event := events.Event{
+			ID:        uuid.New(),
+			Name:      "Counter Event",
+			TimeZone:  time.UTC,
+			StartTime: time.Now().UTC(),
+			EndTime:   time.Now().Add(time.Hour).UTC(),
+			RegistrationOptions: []events.EventRegistrationOption{
+				{RegType: events.BY_TEAM, Price: money.New(1000, "USD")},
+			},
+			Version:     1,
+			Status:      events.EventStatusInProgress,
+			Tiebreakers: []games.Tiebreaker{games.TiebreakerWins, games.TiebreakerNet},
+		}
+		require.NoError(t, db.CreateEvent(ctx, event))
+
+		// A schedule write advances the counters.
+		_, err := db.BeginScheduleWrite(ctx, event.ID, event.Version)
+		require.NoError(t, err)
+		_, err = db.ReserveGameNumbers(ctx, event.ID, event.Version+1, 12)
+		require.NoError(t, err)
+
+		// A body PATCH runs through the domain update, which must carry the
+		// counters forward rather than let the full-item Put erase them.
+		body := event
+		body.Name = "Renamed Event"
+		updated, err := events.UpdateEvent(ctx, db, event.ID, body)
+		require.NoError(t, err)
+		assert.Equal(t, 4, updated.Version)
+		assert.Equal(t, 1, updated.ScheduleGeneration)
+		assert.Equal(t, 12, updated.LastGameNo)
+		assert.Equal(t, event.Tiebreakers, updated.Tiebreakers)
+
+		got, err := db.GetEvent(ctx, event.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 1, got.ScheduleGeneration, "PATCH must not erase the generation counter")
+		assert.Equal(t, 12, got.LastGameNo, "PATCH must not erase the game-number high-water mark")
+		assert.Equal(t, event.Tiebreakers, got.Tiebreakers)
+	})
+
+	t.Run("a failed condition is a version conflict", func(t *testing.T) {
 		resetTable(ctx)
 		event := events.Event{
 			ID:        uuid.New(),
@@ -358,7 +400,7 @@ func TestUpdateEvent(t *testing.T) {
 		require.Error(t, eventErr)
 		var eventError *events.Error
 		require.ErrorAs(t, eventErr, &eventError)
-		assert.Equal(t, events.REASON_EVENT_DOES_NOT_EXIST, eventError.Reason)
+		assert.Equal(t, events.REASON_VERSION_CONFLICT, eventError.Reason)
 	})
 
 	t.Run("successfully update an event and verify data", func(t *testing.T) {

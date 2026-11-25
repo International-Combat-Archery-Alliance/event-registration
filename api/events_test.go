@@ -445,6 +445,36 @@ func TestPatchEventsV1Id(t *testing.T) {
 		}
 	})
 
+	t.Run("concurrent modification returns 409", func(t *testing.T) {
+		eventID := uuid.New()
+		mock := &mockDB{
+			GetEventFunc: func(ctx context.Context, id uuid.UUID) (events.Event, error) {
+				return events.Event{ID: eventID, Version: 1, Name: "Original Event"}, nil
+			},
+			UpdateEventFunc: func(ctx context.Context, event events.Event) error {
+				return events.NewVersionConflictError("changed concurrently", nil)
+			},
+		}
+		api := NewAPI(mock, noopLogger, LOCAL, newTestTokenValidator(), &mockCaptchaValidator{}, &mockEmailSender{}, &mockSubscriberManager{}, &mockCheckoutManager{}, func(context.Context) error { return nil })
+
+		reqBody := Event{
+			Name: "Updated Event",
+			RegistrationOptions: []EventRegistrationOption{
+				{RegistrationType: ByIndividual, Price: Money{Amount: 5000, Currency: "USD"}},
+			},
+			SignUpStats: &SignUpStats{},
+		}
+		resp, err := api.PatchEventsV1Id(ctxWithLogger(context.Background(), noopLogger), PatchEventsV1IdRequestObject{Id: eventID, Body: &reqBody})
+		assert.NoError(t, err)
+
+		switch r := resp.(type) {
+		case PatchEventsV1Id409JSONResponse:
+			assert.Equal(t, Conflict, r.Code)
+		default:
+			t.Fatalf("unexpected response type: %T", resp)
+		}
+	})
+
 	t.Run("update event error", func(t *testing.T) {
 		eventID := uuid.New()
 		existingEvent := events.Event{
