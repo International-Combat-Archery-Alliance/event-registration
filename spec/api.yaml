@@ -14,6 +14,7 @@ security:
 paths:
   /events/v1:
     get:
+      operationId: GetEventsV1
       summary: Get all events
       description: Retrieves a list of all events
       security: []
@@ -69,6 +70,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     post:
+      operationId: PostEventsV1
       summary: Create a new event
       description: Admin endpoint to create a new event
       security:
@@ -102,6 +104,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/{id}:
     get:
+      operationId: GetEventsV1Id
       summary: Get an event
       description: Get one event by id
       security: []
@@ -145,6 +148,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     patch:
+      operationId: PatchEventsV1Id
       summary: Update an event
       description: Update an event by id
       security:
@@ -205,6 +209,7 @@ paths:
 
   /events/v1/teams:
     get:
+      operationId: GetEventsV1Teams
       summary: List teams
       description: Public, name-sorted team directory with cursor pagination.
       security: []
@@ -260,6 +265,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     post:
+      operationId: PostEventsV1Teams
       summary: Create a new team
       description: Admin endpoint to create a new team (rosters stay empty until player-profiles lands)
       security:
@@ -299,6 +305,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/teams/by-id/{teamId}:
     get:
+      operationId: GetEventsV1TeamsByIdTeamId
       summary: Get a team
       description: >-
         Get one team by id. The "by-id" segment is an alternate-lookup segment
@@ -350,6 +357,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/{eventId}/teams/{teamId}/seed:
     post:
+      operationId: PostEventsV1EventIdTeamsTeamIdSeed
       summary: Seed a CONFIRMED participation (MVP admin bypass)
       description: MVP-only admin path creating a CONFIRMED participation with an empty roster snapshot plus its team-history row, bypassing the Stage C payment lifecycle. Revisit in Stage C.
       security:
@@ -410,6 +418,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/{eventId}/games:
     get:
+      operationId: GetEventsV1EventIdGames
       summary: Get an event schedule
       description: Public schedule, QUALIFYING before PLAYOFF with team names joined. Empty until an admin generates it.
       security: []
@@ -455,6 +464,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     post:
+      operationId: PostEventsV1EventIdGames
       summary: Create a game by hand
       description: Admin-only. Creates one SCHEDULED QUALIFYING game; gameNo is minted from the event's monotonic high-water mark and is never recycled. Blocked once the event is FINALIZED.
       security:
@@ -514,6 +524,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/{eventId}/games/generate:
     post:
+      operationId: PostEventsV1EventIdGamesGenerate
       summary: Generate a schedule from CONFIRMED teams
       description: "Admin-only generate-then-edit start. Round robin emits the whole schedule; Swiss appends one round (defaults to the next ungenerated round). Replace is per-format: unplayed rows (SCHEDULED, BYE, CANCELLED) are swept and regenerated, while recorded results are preserved. A generated game that would overwrite a recorded result is skipped when it is the same pairing, and refused when it is not. The response is the event's schedule after the write: regenerated games plus preserved result rows, in schedule order (phase, then round, then position)."
       security:
@@ -575,6 +586,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/{eventId}/games/{gameNo}:
     put:
+      operationId: PutEventsV1EventIdGamesGameNo
       summary: Edit a SCHEDULED game's schedule fields
       description: Admin schedule edit (round, seq, sides, startTime, notes). Only valid while the game is SCHEDULED; results go through the result endpoint. Blocked once the event is FINALIZED.
       security:
@@ -641,6 +653,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     delete:
+      operationId: DeleteEventsV1EventIdGamesGameNo
       summary: Delete a SCHEDULED game
       description: Admin-only. Deletes an unplayed row (SCHEDULED, BYE, or CANCELLED). A recorded result (COMPLETED, FORFEIT, DOUBLE_FORFEIT) is never deleted.
       security:
@@ -692,6 +705,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/{eventId}/games/{gameNo}/result:
     put:
+      operationId: PutEventsV1EventIdGamesGameNoResult
       summary: Enter a game result
       description: Admin-only. Always takes the full result shape (status, scores, forfeit side); omitted result fields clear. Blocked once the event is FINALIZED.
       security:
@@ -759,6 +773,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/{eventId}/standings:
     get:
+      operationId: GetEventsV1EventIdStandings
       summary: Get derived standings
       description: Public standings derived at read time from COMPLETED/FORFEIT qualifying games. DNS teams trail unranked.
       security: []
@@ -806,6 +821,7 @@ paths:
 
   /events/v1/{eventId}/register:
     post:
+      operationId: PostEventsV1EventIdRegister
       summary: Sign up for an event
       description: Deprecated in favor of the payment sign up flow, will be removed in the future.
       deprecated: true
@@ -877,6 +893,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/{eventId}/registrations:
     get:
+      operationId: GetEventsV1EventIdRegistrations
       summary: Get all registrations for an event
       description: Get all registrations for an event
       security:
@@ -942,6 +959,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     post:
+      operationId: PostEventsV1EventIdRegistrations
       summary: Sign up for an event
       description: Starts an event sign up flow
       security: []
@@ -1012,6 +1030,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/admin/registrations/{eventId}/{email}/confirm:
     post:
+      operationId: PostEventsV1AdminRegistrationsEventIdEmailConfirm
       summary: Manually confirm a registration as paid
       description: "Admin endpoint to mark an unpaid payment-flow registration as paid when the Stripe webhook failed or can no longer be replayed. Sends the confirmation email on first confirm; repeat calls are idempotent. Notifications are best-effort: a 200 response guarantees the registration is paid, not that the email was delivered."
       security:
@@ -1071,6 +1090,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/admin/registrations/{eventId}/{email}/notify:
     post:
+      operationId: PostEventsV1AdminRegistrationsEventIdEmailNotify
       summary: Resend registration notifications
       description: "Admin endpoint to resend the confirmation email and mailing-list signup for a paid registration, e.g. when the original send failed. Only paid registrations can be notified; 200 means the email was sent."
       security:
@@ -1131,6 +1151,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/admin/test-email:
     post:
+      operationId: PostEventsV1AdminTestEmail
       summary: Test email sending
       description: Sends a test registration confirmation email to the specified address. Admin only.
       security:
@@ -1167,6 +1188,7 @@ paths:
                 $ref: '#/components/schemas/Error'
   /events/v1/admin/test-mailerlite:
     post:
+      operationId: PostEventsV1AdminTestMailerlite
       summary: Test MailerLite integration
       description: Creates a test group in MailerLite and adds the given emails to it. For ByIndividual, each email is added as an individual subscriber. For ByTeam, the first email is the captain and the rest are team players. Names are auto-generated from email prefixes. Admin only.
       security:
