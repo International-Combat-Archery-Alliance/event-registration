@@ -9,6 +9,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+
+	"github.com/International-Combat-Archery-Alliance/event-registration/games"
 )
 
 var tracer = otel.Tracer("github.com/International-Combat-Archery-Alliance/event-registration/events")
@@ -31,6 +33,20 @@ type Event struct {
 	ImageName             *string
 	Media                 []EventMediaItem
 	MailingListGroupID    *string
+	Status                EventStatus
+	// ScheduleGeneration counts accepted schedule writes. A generate takes its
+	// epoch only after the request validated and the schedule built, but the
+	// grant itself counts: a later storage failure can leave it advanced. It
+	// is an internal audit counter carried on the event item, not an API
+	// field.
+	ScheduleGeneration int
+	// LastGameNo is the per-event high-water mark for game numbers. It never
+	// decreases, so a number is never recycled after a delete, and it makes
+	// minting exact under the schedule-write guard.
+	LastGameNo int
+	// Tiebreakers is the per-event ordered comparator for standings and Swiss
+	// pairing (D34). Empty means games.DefaultTiebreakOrder().
+	Tiebreakers games.TiebreakOrder
 }
 
 type EventMediaType string
@@ -113,6 +129,33 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		return Event{}, err
 	}
 
+	existingStatus := existingEvent.Status.NormalizeDefault()
+	if !existingStatus.Valid() {
+		err := NewInvalidEventStatusError("invalid existing event status", nil)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return Event{}, err
+	}
+	nextStatus := event.Status
+	if nextStatus == "" {
+		// Status is optional in the API (old clients / pre-status rows):
+		// preserve the existing status.
+		nextStatus = existingStatus
+	} else {
+		if !nextStatus.Valid() {
+			err := NewInvalidEventStatusError("invalid event status", nil)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return Event{}, err
+		}
+		if !AllowedTransition(existingStatus, nextStatus) {
+			err := NewInvalidStatusTransitionError("invalid event status transition", nil)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return Event{}, err
+		}
+	}
+
 	updatedEvent := Event{
 		ID:                    id,
 		Version:               existingEvent.Version + 1,
@@ -131,6 +174,14 @@ func UpdateEvent(ctx context.Context, repo Repository, id uuid.UUID, event Event
 		ImageName:             event.ImageName,
 		Media:                 event.Media,
 		MailingListGroupID:    existingEvent.MailingListGroupID,
+		Status:                nextStatus,
+		// Schedule counters are schedule state, not event-body fields: a PATCH
+		// must carry them forward or the next schedule write would restart
+		// minting from zero. Tiebreakers are body fields: the PATCH body is a
+		// full replacement, and an absent list means the default order.
+		ScheduleGeneration: existingEvent.ScheduleGeneration,
+		LastGameNo:         existingEvent.LastGameNo,
+		Tiebreakers:        event.Tiebreakers,
 	}
 
 	err = repo.UpdateEvent(ctx, updatedEvent)
